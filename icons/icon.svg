@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1B4332"/>
+  <circle cx="256" cy="256" r="80" fill="#52B788"/>
+  <!-- Rayos del sol -->
+  <g stroke="#52B788" stroke-width="28" stroke-linecap="round">
+    <line x1="256" y1="100" x2="256" y2="148"/>
+    <line x1="256" y1="364" x2="256" y2="412"/>
+    <line x1="100" y1="256" x2="148" y2="256"/>
+    <line x1="364" y1="256" x2="412" y2="256"/>
+    <line x1="151" y1="151" x2="185" y2="185"/>
+    <line x1="327" y1="327" x2="361" y2="361"/>
+    <line x1="361" y1="151" x2="327" y2="185"/>
+    <line x1="185" y1="327" x2="151" y2="361"/>
+  </g>
+</svg>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1B4332" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ecofit V6" />
+  <meta name="description" content="Bitácora de proyectos fotovoltaicos — Ecofit Solar Solutions" />
+
+  <title>Bitácora Ecofit Solar Solutions</title>
+
+  <link rel="manifest" href="./manifest.json" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1" defer></script>
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+
+  <!-- ── Offline banner ──────────────────────────────────────────────────────── -->
+  <div id="offline-banner" style="display:none">
+    <ph-icon name="wifi-slash" size="16"></ph-icon>
+    Sin conexión — modo offline
+  </div>
+
+  <!-- ── Top header ──────────────────────────────────────────────────────────── -->
+  <header id="top-header" style="display:none">
+    <div class="hdr-brand" onclick="navigate('#dashboard')" style="cursor:pointer">
+      <img src="./icons/logo.png" alt="Ecofit Solar" class="hdr-logo"
+           onerror="this.style.display='none'">
+      <div class="hdr-logo-words">
+        <span class="hdr-logo-main">Ecofit</span>
+        <span class="hdr-logo-sub">Solar Solutions</span>
+      </div>
+    </div>
+    <button class="hdr-theme-toggle" onclick="window._toggleTheme()" title="Cambiar tema">
+      <ph-icon name="sun" size="17" class="ico-sun"></ph-icon>
+      <ph-icon name="moon" size="17" class="ico-moon"></ph-icon>
+    </button>
+    <div class="hdr-user" onclick="window.location.hash='#settings'">
+      <div class="hdr-user-avatar">
+        <ph-icon name="user-circle" size="22"></ph-icon>
+      </div>
+      <div class="hdr-user-info">
+        <span id="hdr-user-name">—</span>
+        <span id="hdr-user-rol" class="hdr-user-rol">—</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main content ────────────────────────────────────────────────────────── -->
+  <main id="app">
+    <!-- Router renderiza aquí -->
+    <div class="splash-screen">
+      <ph-icon name="sun" size="64" class="splash-icon"></ph-icon>
+      <p class="splash-text">Cargando…</p>
+    </div>
+  </main>
+
+  <!-- ── Bottom navigation ───────────────────────────────────────────────────── -->
+  <nav id="bottom-nav" class="bottom-nav" style="display:none">
+    <a class="nav-link" data-view="dashboard" onclick="navigate('#dashboard')">
+      <ph-icon name="house" size="24"></ph-icon>
+      <span>Inicio</span>
+    </a>
+<a class="nav-link" data-view="calculadora" onclick="navigate('#calculadora')">
+      <ph-icon name="calculator" size="24"></ph-icon>
+      <span>Calcular</span>
+    </a>
+    <a class="nav-link" data-view="inventario" onclick="navigate('#inventario')">
+      <ph-icon name="package" size="24"></ph-icon>
+      <span>Inventario</span>
+    </a>
+    <a class="nav-link" data-view="settings" onclick="navigate('#settings')">
+      <ph-icon name="gear" size="24"></ph-icon>
+      <span>Ajustes</span>
+    </a>
+  </nav>
+
+  <!-- ── Toast container ─────────────────────────────────────────────────────── -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- ── External libraries ──────────────────────────────────────────────────── -->
+
+  <!-- jsPDF 2.5.1 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- ZXing barcode scanner -->
+  <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+
+  <!-- ── App entry point ─────────────────────────────────────────────────────── -->
+  <script type="module" src="./js/app.js"></script>
+
+  <!-- ── Show nav after load ─────────────────────────────────────────────────── -->
+  <script>
+    // Mostrar bottom-nav una vez que la sesión esté activa
+    // (se controla desde app.js al detectar sesión válida)
+    window.__showNav = function() {
+      const nav = document.getElementById('bottom-nav');
+      if (nav) nav.style.display = '';
+    };
+    window.__hideNav = function() {
+      const nav = document.getElementById('bottom-nav');
+      if (nav) nav.style.display = 'none';
+    };
+  </script>
+</body>
+</html>

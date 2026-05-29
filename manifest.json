@@ -1,0 +1,35 @@
+{
+  "name": "Bitácora Ecofit Solar Solutions",
+  "short_name": "Ecofit V6",
+  "description": "Gestión de proyectos fotovoltaicos — Ecofit Solar Solutions",
+  "start_url": "./index.html#dashboard",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f1a14",
+  "theme_color": "#1B4332",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nuevo Proyecto",
+      "short_name": "Nuevo",
+      "url": "./index.html#nuevo-proyecto",
+      "description": "Crear un nuevo proyecto fotovoltaico"
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "./index.html#dashboard",
+      "description": "Ver todos los proyectos"
+    }
+  ],
+  "categories": ["business", "utilities"],
+  "screenshots": []
+}
