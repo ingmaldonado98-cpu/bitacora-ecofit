@@ -153,21 +153,25 @@ body {
 .hdr-logo-main { font-family: 'DM Serif Display', serif; font-size: 1rem; color: #ffffff; letter-spacing: .01em; }
 .hdr-logo-sub  { font-size: .6rem; color: var(--solar); letter-spacing: .06em; text-transform: uppercase; opacity: .85; }
 
-.hdr-brand { display: flex; align-items: center; gap: 8px; }
+.hdr-brand { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+
+/* Grupo derecho del header */
+.hdr-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
 /* Usuario en header */
-.hdr-user  { display: flex; align-items: center; gap: 8px; cursor: pointer;
+.hdr-user  { display: flex; align-items: center; gap: 6px; cursor: pointer;
              padding: 4px 6px; border-radius: var(--radius-sm);
              transition: background .15s; }
 .hdr-user:hover { background: rgba(255,255,255,.06); }
-.hdr-user-info { text-align: right; }
-.hdr-user-name { font-size: .8rem; font-weight: 600; color: var(--text); display: block; }
-.hdr-user-rol  { font-size: .65rem; color: var(--text-muted); }
+.hdr-user-info { text-align: left; }
+#hdr-user-name { font-size: .78rem; font-weight: 600; color: var(--text); display: block; white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+.hdr-user-rol  { font-size: .62rem; color: var(--text-muted); }
 .hdr-logout-btn {
   background: none; border: none; cursor: pointer;
-  color: var(--text-muted); padding: 6px 8px;
+  color: var(--text-muted);
+  width: 34px; height: 34px;
   border-radius: var(--radius-sm); transition: color .15s, background .15s;
-  display: flex; align-items: center;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .hdr-logout-btn:hover { color: #f87171; background: rgba(248,113,113,.1); }
 

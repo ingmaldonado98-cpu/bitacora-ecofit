@@ -43,22 +43,22 @@
         <span class="hdr-logo-sub">Solar Solutions</span>
       </div>
     </div>
-    <button class="hdr-theme-toggle" onclick="window._toggleTheme()" title="Cambiar tema">
-      <ph-icon name="sun" size="17" class="ico-sun"></ph-icon>
-      <ph-icon name="moon" size="17" class="ico-moon"></ph-icon>
-    </button>
-    <div class="hdr-user" onclick="window.location.hash='#settings'">
-      <div class="hdr-user-avatar">
-        <ph-icon name="user-circle" size="22"></ph-icon>
+    <div class="hdr-right">
+      <button class="hdr-theme-toggle" onclick="window._toggleTheme()" title="Cambiar tema">
+        <ph-icon name="sun" size="17" class="ico-sun"></ph-icon>
+        <ph-icon name="moon" size="17" class="ico-moon"></ph-icon>
+      </button>
+      <div class="hdr-user" onclick="window.location.hash='#settings'" title="Ajustes">
+        <ph-icon name="user-circle" size="20"></ph-icon>
+        <div class="hdr-user-info">
+          <span id="hdr-user-name">—</span>
+          <span id="hdr-user-rol" class="hdr-user-rol">—</span>
+        </div>
       </div>
-      <div class="hdr-user-info">
-        <span id="hdr-user-name">—</span>
-        <span id="hdr-user-rol" class="hdr-user-rol">—</span>
-      </div>
+      <button class="hdr-logout-btn" onclick="window._logout()" title="Cerrar sesión">
+        <ph-icon name="arrow-square-out" size="18"></ph-icon>
+      </button>
     </div>
-    <button class="hdr-logout-btn" onclick="window._logout()" title="Cerrar sesión">
-      <ph-icon name="sign-out" size="18"></ph-icon>
-    </button>
   </header>
 
   <!-- ── Main content ────────────────────────────────────────────────────────── -->
