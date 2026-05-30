@@ -163,6 +163,13 @@ body {
 .hdr-user-info { text-align: right; }
 .hdr-user-name { font-size: .8rem; font-weight: 600; color: var(--text); display: block; }
 .hdr-user-rol  { font-size: .65rem; color: var(--text-muted); }
+.hdr-logout-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); padding: 6px 8px;
+  border-radius: var(--radius-sm); transition: color .15s, background .15s;
+  display: flex; align-items: center;
+}
+.hdr-logout-btn:hover { color: #f87171; background: rgba(248,113,113,.1); }
 
 /* ── Bottom nav ───────────────────────────────────────────────────────────── */
 #bottom-nav {

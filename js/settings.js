@@ -192,7 +192,7 @@ export async function renderSettings(session) {
 
 function renderUsersList(allUsers, session) {
   return allUsers.map(u => `
-    <div class="user-row">
+    <div class="user-row" id="urow-${u.id}">
       <div class="user-info">
         <span class="user-nombre">${esc(u.nombre)}</span>
         <span class="user-username">@${esc(u.username)}</span>
@@ -201,13 +201,63 @@ function renderUsersList(allUsers, session) {
       </div>
       ${u.id !== session.id ? `
       <div class="user-actions">
+        <button class="btn-icon-sm" onclick="editarUser('${u.id}')" title="Editar">✎</button>
         <button class="btn-icon-sm" onclick="toggleUser('${u.id}',${u.activo})"
                 title="${u.activo?'Desactivar':'Activar'}">${u.activo?'✓':'○'}</button>
         <button class="btn-del-sm" onclick="eliminarUser('${u.id}')">✕</button>
       </div>` : '<span class="user-yo">(tú)</span>'}
     </div>
+    ${u.id !== session.id ? `
+    <div class="form-inline-card" id="uedit-${u.id}" style="display:none">
+      <div class="form-row">
+        <div class="form-group"><label>Nombre</label>
+          <input type="text" id="ue-nombre-${u.id}" value="${esc(u.nombre)}" /></div>
+        <div class="form-group"><label>Usuario</label>
+          <input type="text" id="ue-username-${u.id}" value="${esc(u.username)}" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Nueva contraseña <span style="color:var(--text-muted);font-size:.75rem">(dejar vacío para no cambiar)</span></label>
+          <input type="password" id="ue-pass-${u.id}" placeholder="mín. 6 chars" /></div>
+        <div class="form-group"><label>Rol</label>
+          <select id="ue-rol-${u.id}">
+            ${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.rol===k?'selected':''}>${v.label}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-outline btn-sm" onclick="document.getElementById('uedit-${u.id}').style.display='none';document.getElementById('urow-${u.id}').style.display=''">Cancelar</button>
+        <button class="btn-primary btn-sm" onclick="guardarEditUser('${u.id}')">Guardar</button>
+      </div>
+    </div>` : ''}
   `).join('');
 }
+
+window.editarUser = function(id) {
+  document.getElementById('urow-' + id).style.display = 'none';
+  document.getElementById('uedit-' + id).style.display = 'block';
+  document.getElementById('ue-nombre-' + id).focus();
+};
+
+window.guardarEditUser = async function(id) {
+  const nombre   = document.getElementById('ue-nombre-' + id).value.trim();
+  const username = document.getElementById('ue-username-' + id).value.trim().toLowerCase();
+  const pass     = document.getElementById('ue-pass-' + id).value;
+  const rol      = document.getElementById('ue-rol-' + id).value;
+
+  if (!nombre || !username) { toast('Nombre y usuario son obligatorios', 'error'); return; }
+  if (pass && pass.length < 6) { toast('Contraseña mínimo 6 caracteres', 'error'); return; }
+
+  const changes = { nombre, username, rol };
+  if (pass) changes.password = await hashPassword(pass);
+
+  try {
+    await users.update(id, changes);
+    toast('✅ Usuario actualizado');
+    navigate('#settings');
+  } catch(err) {
+    toast('Error al guardar: ' + err.message, 'error');
+  }
+};
 
 window.showNewUser = function() {
   document.getElementById('form-nuevo-usuario').style.display = 'block';

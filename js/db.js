@@ -205,7 +205,7 @@ export async function exportBackup() {
     version: 6,
     exportedAt: new Date().toISOString(),
     projects: projs,
-    users: usrs.map(u => ({ ...u, password: undefined })), // no exportar contraseñas
+    users: usrs, // contraseñas ya hasheadas — seguro exportar
     kv:         kvAll.filter(r => r.key !== 'session'),    // no exportar sesión activa
     config:     configAll,
     inventario: invAll,
@@ -225,6 +225,18 @@ export async function importBackup(data) {
     t.oncomplete = resolve;
     t.onerror = () => reject(t.error);
   });
+
+  // Restaurar usuarios (sin tocar al usuario admin si no viene en el backup)
+  if (data.users?.length) {
+    await new Promise((resolve, reject) => {
+      const t = db.transaction(['users'], 'readwrite');
+      const s = t.objectStore('users');
+      s.clear();
+      data.users.forEach(u => { if (u.password) s.put(u); }); // solo usuarios con contraseña
+      t.oncomplete = resolve;
+      t.onerror = () => reject(t.error);
+    });
+  }
 
   // Restaurar kv (presets, contadores) — sin sobreescribir sesión activa
   if (data.kv?.length) {
