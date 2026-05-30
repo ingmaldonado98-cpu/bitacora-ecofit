@@ -1,6 +1,6 @@
 // sw.js — Service Worker Bitácora Ecofit V6
-const CACHE_NAME  = 'ecofit-v6-v20';
-const SW_VERSION  = '6.19.0';
+const CACHE_NAME  = 'ecofit-v6-v21';
+const SW_VERSION  = '7.0.0';
 
 const APP_SHELL = [
   './',
@@ -8,6 +8,7 @@ const APP_SHELL = [
   './manifest.json',
   './css/style.css',
   './js/app.js',
+  './js/firebase.js',
   './js/icons.js',
   './js/auth.js',
   './js/auditoria.js',
@@ -58,14 +59,16 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // External CDNs and Google APIs → Network first, fall back to cache
+  // Firebase, CDNs y APIs externas → siempre Network (no cachear)
   if (
     url.origin !== self.location.origin ||
-    url.pathname.startsWith('/googleapis') ||
-    url.pathname.includes('fonts.googleapis') ||
-    url.pathname.includes('fonts.gstatic') ||
-    url.pathname.includes('unpkg.com') ||
-    url.pathname.includes('cdnjs.cloudflare')
+    url.hostname.includes('firebaseapp.com')     ||
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('identitytoolkit.googleapis.com') ||
+    url.hostname.includes('gstatic.com')         ||
+    url.hostname.includes('googleapis.com')      ||
+    url.hostname.includes('unpkg.com')           ||
+    url.hostname.includes('cdnjs.cloudflare.com')
   ) {
     e.respondWith(networkFirst(e.request));
     return;

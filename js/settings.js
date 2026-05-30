@@ -1,10 +1,11 @@
 // settings.js — Configuración Admin
 
 import { users, config, kv, exportBackup, importBackup } from './db.js';
-import { esc, uuid, isoNow, toast, confirmDialog, hashPassword } from './utils.js';
+import { esc, uuid, isoNow, toast, confirmDialog } from './utils.js';
 import { isAdmin, ROLES } from './auth.js';
 import { PANEL_PRESETS } from '../modules/calculadora/index.js';
 import { icon } from './icons.js';
+import { createFbUser, toEmail, fbUsers } from './firebase.js';
 
 export async function renderSettings(session) {
   if (!isAdmin(session)) {
@@ -268,7 +269,7 @@ window.guardarEditUser = async function(id) {
   if (pass && pass.length < 6) { toast('Contraseña mínimo 6 caracteres', 'error'); return; }
 
   const changes = { nombre, username, rol };
-  if (pass) changes.password = await hashPassword(pass);
+  // Nota: cambio de contraseña en Firebase Auth requiere Admin SDK (no implementado en cliente)
 
   try {
     await users.update(id, changes);
@@ -293,13 +294,19 @@ window.crearUsuario = async function() {
   if (!nombre || !username || !pass) { toast('Completa todos los campos','error'); return; }
   if (pass.length < 6) { toast('Contraseña mínimo 6 caracteres','error'); return; }
 
+  const btn = document.querySelector('#form-nuevo-usuario .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
+
   try {
-    const hashedPass = await hashPassword(pass);
-    await users.add({ id:uuid(), nombre, username, password:hashedPass, rol, activo:true, createdAt:isoNow() });
+    // 1. Crear en Firebase Auth (sin cerrar sesión actual)
+    const uid = await createFbUser(username, pass);
+    // 2. Crear perfil en Firestore
+    await fbUsers.add({ id: uid, nombre, username, rol, activo: true, createdAt: isoNow() });
     toast(`✅ Usuario @${username} creado`);
     navigate('#settings');
   } catch(err) {
-    toast('Error: usuario ya existe','error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Crear'; }
+    toast('Error: ' + (err.message || 'usuario ya existe'), 'error');
   }
 };
 
