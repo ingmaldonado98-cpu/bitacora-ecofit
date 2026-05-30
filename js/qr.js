@@ -2,6 +2,7 @@
 
 import { projects, config } from './db.js';
 import { esc, fmtFecha, TIPOS_SISTEMA } from './utils.js';
+import { icon } from './icons.js';
 
 export async function renderQR(projectId, session) {
   const [project, contacto] = await Promise.all([
@@ -35,14 +36,14 @@ export async function renderQR(projectId, session) {
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
-      <ph-icon name="caret-left"></ph-icon>
+      ${icon('caret-left')}
     </button>
     <h1 class="hdr-title">QR del cliente</h1>
   </div>
 
   <div class="card qr-card">
     <div class="qr-header">
-      <ph-icon name="sun" size="32" class="qr-sun"></ph-icon>
+      ${icon('sun', 32, 'qr-sun')}
       <div>
         <h2 class="qr-empresa">Ecofit Solar Solutions</h2>
         <p class="qr-sub">La Paz, Baja California Sur</p>
@@ -65,7 +66,7 @@ export async function renderQR(projectId, session) {
 
     <div class="qr-actions">
       <button class="btn-primary" onclick="descargarQR('${projectId}')">
-        <ph-icon name="download-simple"></ph-icon> Descargar PNG
+        ${icon('download-simple')} Descargar PNG
       </button>
     </div>
   </div>

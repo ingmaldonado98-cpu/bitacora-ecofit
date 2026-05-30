@@ -4,12 +4,13 @@ import { users, config, kv, exportBackup, importBackup } from './db.js';
 import { esc, uuid, isoNow, toast, confirmDialog, hashPassword } from './utils.js';
 import { isAdmin, ROLES } from './auth.js';
 import { PANEL_PRESETS } from '../modules/calculadora/index.js';
+import { icon } from './icons.js';
 
 export async function renderSettings(session) {
   if (!isAdmin(session)) {
     return `
     <div class="view-header">
-      <button class="btn-back" onclick="navigate('#dashboard')"><ph-icon name="caret-left"></ph-icon></button>
+      <button class="btn-back" onclick="navigate('#dashboard')">${icon('caret-left')}</button>
       <h1 class="hdr-title">Ajustes</h1>
     </div>
     <p class="empty-msg">Solo el administrador puede gestionar ajustes.</p>`;
@@ -24,7 +25,7 @@ export async function renderSettings(session) {
 
   return `
   <div class="view-header">
-    <button class="btn-back" onclick="navigate('#dashboard')"><ph-icon name="caret-left"></ph-icon></button>
+    <button class="btn-back" onclick="navigate('#dashboard')">${icon('caret-left')}</button>
     <h1 class="hdr-title">Configuración</h1>
   </div>
 
@@ -178,7 +179,7 @@ export async function renderSettings(session) {
   <div class="card card-danger">
     <h3 class="card-title card-title-danger">Zona de peligro</h3>
     <button class="btn-outline btn-danger" onclick="limpiarDatos()">
-      <ph-icon name="trash"></ph-icon> Limpiar todos los datos locales
+      ${icon('trash')} Limpiar todos los datos locales
     </button>
   </div>
 

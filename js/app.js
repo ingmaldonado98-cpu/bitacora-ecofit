@@ -14,6 +14,7 @@ import { renderCalculadora } from './calculadora.js';
 import { renderChecklistModule } from './checklist.js';
 import { projects } from './db.js';
 import { toast, esc } from './utils.js';
+import { icon } from './icons.js';
 
 const app = document.getElementById('app');
 
@@ -129,7 +130,7 @@ async function route() {
   } catch (err) {
     console.error('Router error:', err);
     app.innerHTML = `<div class="error-screen">
-      <ph-icon name="warning-circle" size="48"></ph-icon>
+      ${icon('warning-circle', 48)}
       <h2>Error al cargar</h2>
       <p>${esc(err.message)}</p>
       <button class="btn-primary" onclick="navigate('#dashboard')">Volver al inicio</button>

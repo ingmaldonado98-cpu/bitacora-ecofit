@@ -2,6 +2,7 @@
 
 import { users, kv, seedIfEmpty } from './db.js';
 import { toast, hashPassword, isHashed } from './utils.js';
+import { icon } from './icons.js';
 
 // ── Roles y permisos ───────────────────────────────────────────────────────────
 export const ROLES = {
@@ -106,7 +107,7 @@ export function renderLogin() {
   <div class="login-screen">
     <div class="login-card">
       <div class="login-logo">
-        <ph-icon name="sun" size="48" class="logo-icon"></ph-icon>
+        ${icon('sun', 48, 'logo-icon')}
       </div>
       <h1 class="login-title">Ecofit Solar</h1>
       <p class="login-sub">Bitácora de Instalaciones</p>
@@ -115,7 +116,7 @@ export function renderLogin() {
         <div class="form-group">
           <label>Usuario</label>
           <div class="input-icon-wrap">
-            <ph-icon name="user" class="input-icon"></ph-icon>
+            ${icon('user', 20, 'input-icon')}
             <input type="text" id="login-user" name="username" autocomplete="username"
                    placeholder="Ingresa tu usuario" required />
           </div>
@@ -123,7 +124,7 @@ export function renderLogin() {
         <div class="form-group">
           <label>Contraseña</label>
           <div class="input-icon-wrap">
-            <ph-icon name="lock" class="input-icon"></ph-icon>
+            ${icon('lock', 20, 'input-icon')}
             <input type="password" id="login-pass" name="password" autocomplete="current-password"
                    placeholder="••••••••" required />
           </div>

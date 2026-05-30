@@ -1,6 +1,7 @@
 // calculadora.js — Calculadora BOM · Bitácora Ecofit V6
 
 import { toast } from './utils.js';
+import { icon } from './icons.js';
 import { projects, inventario as invStore, kv } from './db.js';
 import {
   PANEL_PRESETS, C,
@@ -93,14 +94,14 @@ function renderCalc() {
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('${backUrl}')">
-      <ph-icon name="caret-left"></ph-icon>
+      ${icon('caret-left')}
     </button>
     <div class="hdr-info" style="flex:1">
       <span class="hdr-id">Calculadora BOM</span>
       <span class="hdr-sub">${subtitle}</span>
     </div>
     <button class="btn-icon-hdr" onclick="window._calcReset()" title="Nueva consulta">
-      <ph-icon name="arrow-counter-clockwise" size="18"></ph-icon>
+      ${icon('arrow-counter-clockwise', 18)}
     </button>
   </div>
 
@@ -706,7 +707,7 @@ function renderCTA() {
   <div class="card">
     ${_projectId ? `
     <button class="btn-primary btn-full" onclick="calcGuardar()">
-      <ph-icon name="floppy-disk" size="18"></ph-icon>
+      ${icon('floppy-disk', 18)}
       Guardar BOM en proyecto
     </button>
     <p style="font-size:.75rem;color:var(--text-muted);text-align:center;margin-top:8px">
@@ -716,7 +717,7 @@ function renderCTA() {
       Abre esta calculadora desde un proyecto para guardar el BOM directamente.
     </p>
     <button class="btn-outline btn-full" onclick="navigate('#dashboard')">
-      <ph-icon name="house" size="18"></ph-icon>
+      ${icon('house', 18)}
       Ir al inicio
     </button>`}
   </div>

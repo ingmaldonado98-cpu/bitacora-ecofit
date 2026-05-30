@@ -1,6 +1,6 @@
 // sw.js — Service Worker Bitácora Ecofit V6
-const CACHE_NAME  = 'ecofit-v6-v18';
-const SW_VERSION  = '6.17.0';
+const CACHE_NAME  = 'ecofit-v6-v19';
+const SW_VERSION  = '6.18.0';
 
 const APP_SHELL = [
   './',
@@ -8,6 +8,7 @@ const APP_SHELL = [
   './manifest.json',
   './css/style.css',
   './js/app.js',
+  './js/icons.js',
   './js/auth.js',
   './js/auditoria.js',
   './js/calculadora.js',

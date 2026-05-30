@@ -3,6 +3,7 @@
 import { projects } from './db.js';
 import { esc, fotoMini, capturePhoto, toast, isoNow, confirmDialog } from './utils.js';
 import { canEdit, isAdmin, isLider } from './auth.js';
+import { icon } from './icons.js';
 
 const CHECKLIST_ITEMS = [
   { id: 1, label: 'Polaridad correcta' },
@@ -40,7 +41,7 @@ export async function renderAuditoria(projectId, session) {
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
-      <ph-icon name="caret-left"></ph-icon>
+      ${icon('caret-left')}
     </button>
     <h1 class="hdr-title">Auditoría Técnica</h1>
     <span class="hdr-sub">${esc(project.displayId)}</span>
@@ -127,7 +128,7 @@ export async function renderAuditoria(projectId, session) {
           ? `${fotoMini(aud.docFirmado,'Documento firmado')}
              ${edit?`<button type="button" class="btn-del-foto" onclick="delDocFirmado('${projectId}')">✕</button>`:'`'}`
           : (edit ? `<button type="button" class="btn-foto-add" onclick="capDocFirmado()">
-              <ph-icon name="camera" size="28"></ph-icon><span>Foto / Escaneo</span>
+              ${icon('camera', 28)}<span>Foto / Escaneo</span>
             </button>` : '<p class="empty-msg-sm">Sin documento.</p>')}
       </div>
       <div id="slot-doc-firmado"></div>
@@ -147,7 +148,7 @@ export async function renderAuditoria(projectId, session) {
 
   ${aud.resultado ? `
   <div class="resultado-banner" style="background:${RESULTADOS[aud.resultado]?.color}22;border-color:${RESULTADOS[aud.resultado]?.color}">
-    <ph-icon name="clipboard-text" size="24"></ph-icon>
+    ${icon('clipboard-text', 24)}
     <span style="color:${RESULTADOS[aud.resultado]?.color};font-weight:700">
       ${RESULTADOS[aud.resultado]?.label}
     </span>

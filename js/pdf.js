@@ -3,6 +3,7 @@
 import { projects, config } from './db.js';
 import { esc, fmtFecha, TIPOS_SISTEMA } from './utils.js';
 import { isAdmin } from './auth.js';
+import { icon } from './icons.js';
 
 const VERDE    = [27, 67, 50];   // #1B4332
 const VERDE_MED= [64,145,108];   // #40916C
@@ -20,7 +21,7 @@ export async function renderPDFExport(projectId, session) {
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
-      <ph-icon name="caret-left"></ph-icon>
+      ${icon('caret-left')}
     </button>
     <h1 class="hdr-title">Exportar PDF</h1>
     <span class="hdr-sub">${esc(project.displayId)}</span>
@@ -31,7 +32,7 @@ export async function renderPDFExport(projectId, session) {
     <!-- PDF Cliente -->
     <div class="card pdf-card">
       <div class="pdf-card-header">
-        <ph-icon name="user" size="28" class="pdf-icon-client"></ph-icon>
+        ${icon('user', 28, 'pdf-icon-client')}
         <div>
           <h3>PDF Cliente</h3>
           <p class="hint">Visual, limpio, sin datos técnicos internos</p>
@@ -45,14 +46,14 @@ export async function renderPDFExport(projectId, session) {
         <li>✅ Datos de contacto Ecofit</li>
       </ul>
       <button class="btn-primary btn-full" onclick="exportarPDFCliente('${projectId}')">
-        <ph-icon name="file-pdf"></ph-icon> Generar PDF Cliente
+        ${icon('file-pdf')} Generar PDF Cliente
       </button>
     </div>
 
     <!-- PDF Técnico -->
     <div class="card pdf-card">
       <div class="pdf-card-header">
-        <ph-icon name="wrench" size="28" class="pdf-icon-tech"></ph-icon>
+        ${icon('wrench', 28, 'pdf-icon-tech')}
         <div>
           <h3>PDF Técnico</h3>
           <p class="hint">Completo para garantías y archivo interno</p>
@@ -79,7 +80,7 @@ export async function renderPDFExport(projectId, session) {
           </label>`).join('')}
       </div>
       <button class="btn-primary btn-full" style="margin-top:14px" onclick="exportarPDFTecnico('${projectId}')">
-        <ph-icon name="file-pdf"></ph-icon> Generar PDF Técnico
+        ${icon('file-pdf')} Generar PDF Técnico
       </button>
     </div>
   </div>

@@ -1,6 +1,7 @@
 // scanner.js — ZXing barcode / QR scanner wrapper
 
 // ZXing se carga desde CDN como variable global window.ZXing
+import { icon } from './icons.js';
 
 let _activeReader = null;
 

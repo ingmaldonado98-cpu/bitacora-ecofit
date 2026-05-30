@@ -4,6 +4,7 @@ import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog,
          uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
+import { icon } from './icons.js';
 import { scanOnce, startContinuousScan, stopScanner } from './scanner.js';
 
 // ── Vista principal del módulo ─────────────────────────────────────────────────
@@ -16,7 +17,7 @@ export async function renderGarantia(projectId, session) {
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
-      <ph-icon name="caret-left"></ph-icon>
+      ${icon('caret-left')}
     </button>
     <h1 class="hdr-title">Garantía</h1>
     <span class="hdr-sub">${esc(project.displayId)}</span>
@@ -41,7 +42,7 @@ export async function renderGarantia(projectId, session) {
         ${g.fotoSistema
           ? `${fotoMini(g.fotoSistema,'Foto general')}<button class="btn-del-foto" onclick="delFotoGeneral('${projectId}')">✕</button>`
           : (edit ? `<button class="btn-foto-add" onclick="capturarFotoSistema('${projectId}')">
-              <ph-icon name="camera" size="32"></ph-icon><span>Tomar foto</span>
+              ${icon('camera', 32)}<span>Tomar foto</span>
             </button>` : '<p class="empty-msg-sm">Sin foto.</p>')}
       </div>
     </div>
@@ -133,7 +134,7 @@ function renderFotosAdicionales(fotos, projectId, edit) {
   <div class="card-title-row">
     <h3 class="card-title">1B+ · Fotos adicionales de cierre</h3>
     ${edit ? `<button class="btn-primary btn-sm" onclick="capFotoAdicional('${projectId}')">
-      <ph-icon name="camera"></ph-icon> Foto</button>` : ''}
+      ${icon('camera')} Foto</button>` : ''}
   </div>
   ${fotos.length === 0
     ? `<p class="empty-msg-sm">Sin fotos adicionales.</p>`
@@ -202,7 +203,7 @@ function renderFotosTecnicas(ft, projectId, edit) {
         ${ft[s.key]
           ? `${fotoMini(ft[s.key],s.label)}<button class="btn-del-foto" onclick="delFotoTecnica('${projectId}','${s.key}')">✕</button>`
           : (edit ? `<button class="btn-foto-sm" onclick="capFotoTecnica('${projectId}','${s.key}')">
-              <ph-icon name="camera"></ph-icon> Tomar
+              ${icon('camera')} Tomar
             </button>` : '—')}
       </div>
     </div>
@@ -239,7 +240,7 @@ function renderEquipos(equipos, projectId, edit, admin) {
         ${admin ? `<button class="btn-del-sm" onclick="delEquipo('${projectId}',${i})">✕</button>` : ''}
       </div>
       <div class="eq-serial">
-        <ph-icon name="barcode"></ph-icon>
+        ${icon('barcode')}
         <span>${esc(eq.serial || '—')}</span>
       </div>
       <div class="eq-fotos">
@@ -270,24 +271,24 @@ function formEquipo(projectId) {
       <div class="serial-row">
         <input type="text" id="eq-serial" placeholder="Escribe o escanea el serial" />
         <button type="button" class="btn-icon" onclick="scanSerial()" title="Escanear con cámara">
-          <ph-icon name="barcode"></ph-icon>
+          ${icon('barcode')}
         </button>
       </div>
     </div>
     <div class="fotos-captura-row">
       <div class="foto-cap-slot" id="slot-eq-placa">
         <button class="btn-foto-sm" onclick="capEqFoto('placa','slot-eq-placa')">
-          <ph-icon name="camera"></ph-icon> Placa S/N
+          ${icon('camera')} Placa S/N
         </button>
       </div>
       <div class="foto-cap-slot" id="slot-eq-frontal">
         <button class="btn-foto-sm" onclick="capEqFoto('frontal','slot-eq-frontal')">
-          <ph-icon name="camera"></ph-icon> Frontal
+          ${icon('camera')} Frontal
         </button>
       </div>
       <div class="foto-cap-slot" id="slot-eq-angulo">
         <button class="btn-foto-sm" onclick="capEqFoto('angulo','slot-eq-angulo')">
-          <ph-icon name="camera"></ph-icon> Ángulo
+          ${icon('camera')} Ángulo
         </button>
       </div>
     </div>
@@ -362,12 +363,12 @@ function renderCalcInfo(cfg, projectId) {
   if (!cfg) return `
   <div class="calc-info-banner calc-info-empty">
     <div class="cib-header">
-      <ph-icon name="calculator" size="14"></ph-icon>
+      ${icon('calculator', 14)}
       <span>Sin datos de calculadora</span>
     </div>
     <p class="cib-hint">Genera el BOM en la calculadora para ver la estructura aquí.</p>
     <button class="btn-outline btn-sm" onclick="navigate('#calculadora/${projectId}')">
-      <ph-icon name="calculator" size="14"></ph-icon> Abrir calculadora
+      ${icon('calculator', 14)} Abrir calculadora
     </button>
   </div>`;
   const estructuraLabel = cfg.estructura === 'k2' ? 'K2 Systems' : cfg.estructura === 'aluminex' ? 'Aluminex' : cfg.estructura || '—';
@@ -380,11 +381,11 @@ function renderCalcInfo(cfg, projectId) {
   return `
   <div class="calc-info-banner">
     <div class="cib-header">
-      <ph-icon name="calculator" size="14"></ph-icon>
+      ${icon('calculator', 14)}
       <span>Datos de calculadora</span>
       ${ts ? `<span class="cib-ts">${ts}</span>` : ''}
       <button class="btn-icon-xs" onclick="navigate('#calculadora/${projectId}')" title="Editar en calculadora">
-        <ph-icon name="pencil-simple" size="12"></ph-icon>
+        ${icon('pencil-simple', 12)}
       </button>
     </div>
     <div class="card-row">
@@ -444,7 +445,7 @@ export async function renderEstructuraForm(projectId, session) {
   const est = project?.garantia?.estructura || {};
   return `
   <div class="view-header">
-    <button class="btn-back" onclick="navigate('#proyecto/${projectId}/garantia')"><ph-icon name="caret-left"></ph-icon></button>
+    <button class="btn-back" onclick="navigate('#proyecto/${projectId}/garantia')">${icon('caret-left')}</button>
     <h1 class="hdr-title">Estructura de montaje</h1>
   </div>
   <form class="form-card" onsubmit="guardarEstructura(event,'${projectId}')">
@@ -459,7 +460,7 @@ export async function renderEstructuraForm(projectId, session) {
     <div class="form-group"><label>Número de lote</label>
       <div class="serial-row">
         <input type="text" name="numLote" id="est-lote" value="${esc(est.numLote||'')}" />
-        <button type="button" class="btn-icon" onclick="capEqFoto('etiqueta','slot-est-etiq')"><ph-icon name="camera"></ph-icon></button>
+        <button type="button" class="btn-icon" onclick="capEqFoto('etiqueta','slot-est-etiq')">${icon('camera')}</button>
       </div>
       <div id="slot-est-etiq">${fotoMini(est.fotoEtiqueta,'Etiqueta lote')}</div>
     </div>
@@ -479,12 +480,12 @@ export async function renderEstructuraForm(projectId, session) {
     <div class="fotos-captura-row">
       <div class="foto-cap-slot" id="slot-est-frontal">
         <button type="button" class="btn-foto-sm" onclick="capEqFoto('frontal','slot-est-frontal')">
-          <ph-icon name="camera"></ph-icon> Frontal</button>
+          ${icon('camera')} Frontal</button>
         ${fotoMini(est.fotoFrontal,'Frontal')}
       </div>
       <div class="foto-cap-slot" id="slot-est-angulo">
         <button type="button" class="btn-foto-sm" onclick="capEqFoto('angulo','slot-est-angulo')">
-          <ph-icon name="camera"></ph-icon> Ángulo</button>
+          ${icon('camera')} Ángulo</button>
         ${fotoMini(est.fotoAngulo,'Ángulo')}
       </div>
     </div>
@@ -568,10 +569,10 @@ function renderString(str, idx, projectId, edit) {
       <div class="string-actions">
         ${edit ? `
           <button class="btn-icon-sm" onclick="startScanString('${projectId}',${idx})" title="Escaneo continuo">
-            <ph-icon name="barcode"></ph-icon>
+            ${icon('barcode')}
           </button>
           <button class="btn-icon-sm" onclick="addPanelManual('${projectId}',${idx})" title="Agregar manual">
-            <ph-icon name="plus"></ph-icon>
+            ${icon('plus')}
           </button>
           <button class="btn-del-sm" onclick="delString('${projectId}',${idx})">✕</button>
         ` : ''}

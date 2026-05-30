@@ -3,6 +3,7 @@
 import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
+import { icon } from './icons.js';
 
 // ── Vista principal ────────────────────────────────────────────────────────────
 export async function renderDocumentacion(projectId, session) {
@@ -14,7 +15,7 @@ export async function renderDocumentacion(projectId, session) {
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
-      <ph-icon name="caret-left"></ph-icon>
+      ${icon('caret-left')}
     </button>
     <h1 class="hdr-title">Documentación</h1>
     <span class="hdr-sub">${esc(project.displayId)}</span>
@@ -155,7 +156,7 @@ function renderLevantamiento(project, tipo, edit) {
         <div class="ft-slot">
           ${lev.sombras?.foto
             ? `${fotoMini(lev.sombras.foto,'Sombra')}<button class="btn-del-foto" onclick="delSombraFoto('${pid}')">✕</button>`
-            : (edit ? `<button class="btn-foto-sm" onclick="capSombraFoto('${pid}')"><ph-icon name="camera"></ph-icon> Foto</button>` : '—')}
+            : (edit ? `<button class="btn-foto-sm" onclick="capSombraFoto('${pid}')">${icon('camera')} Foto</button>` : '—')}
         </div>
       </div>
       <div class="form-group" style="margin-top:8px">
@@ -391,7 +392,7 @@ function renderRecibos(recibos, edit, pid) {
         <div class="recibo-foto-slot">
           ${r.foto
             ? `${fotoMini(r.foto,'Recibo')}${edit?`<button type="button" class="btn-del-foto" onclick="_recibos[${i}].foto=null;refreshRecibos()">✕</button>`:''}`
-            : (edit ? `<button type="button" class="btn-foto-sm" onclick="capReciboFoto(${i})"><ph-icon name="receipt" size="14"></ph-icon> Foto</button>` : '<span style="color:var(--text-muted);font-size:.75rem">Sin foto</span>')}
+            : (edit ? `<button type="button" class="btn-foto-sm" onclick="capReciboFoto(${i})">${icon('receipt', 14)} Foto</button>` : '<span style="color:var(--text-muted);font-size:.75rem">Sin foto</span>')}
         </div>
         ${edit?`<button type="button" class="btn-del-sm" onclick="delRecibo(${i})" title="Eliminar">✕</button>`:''}
       </div>
@@ -629,8 +630,8 @@ function renderFase(project, fase, titulo, projectId, edit, required=false) {
     <h3 class="card-title">${titulo}</h3>
     ${required?'<span class="req-badge">OBLIGATORIA</span>':''}
     ${edit?`<button class="btn-primary btn-sm" onclick="agregarFoto('${projectId}','${fase}')">
-      <ph-icon name="camera"></ph-icon> Foto</button>`:''}
-  </div>
+      ${icon('camera')} Foto</button>`:''}
+</div>
   ${fotos.length===0
     ? `<p class="empty-msg-sm">${required?'⚠ Se requiere al menos una foto.':'Sin fotos aún.'}</p>`
     : `<div class="fotos-grid" id="fotos-${fase}">

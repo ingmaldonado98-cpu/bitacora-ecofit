@@ -4,6 +4,7 @@ import { projects } from './db.js';
 import { esc, toast, isoNow } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
 import { HERRAMIENTA, getConsumibles, ADMIN_REVIEW_ITEMS, EXEC_CHECKLIST } from '../modules/checklist/index.js';
+import { icon } from './icons.js';
 
 export async function renderChecklistModule(projectId, session) {
   const project = await projects.getById(projectId);
@@ -32,7 +33,7 @@ export async function renderChecklistModule(projectId, session) {
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
-      <ph-icon name="caret-left"></ph-icon>
+      ${icon('caret-left')}
     </button>
     <h1 class="hdr-title">Checklist</h1>
     <span class="hdr-sub">${esc(project.displayId)}</span>
@@ -40,7 +41,7 @@ export async function renderChecklistModule(projectId, session) {
 
   ${published ? `
   <div class="cl-status-banner cl-approved">
-    <ph-icon name="check-circle" size="18" class="icon-ok"></ph-icon>
+    ${icon('check-circle', 18, 'icon-ok')}
     <div class="cl-status-text">
       <strong>Aprobado y publicado</strong>
       <span>por ${esc(cl.publishedBy || '—')} · ${cl.publishedAt ? new Date(cl.publishedAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : ''}</span>
@@ -48,7 +49,7 @@ export async function renderChecklistModule(projectId, session) {
     ${admin ? `<button class="btn-outline btn-sm" onclick="clUnpublish('${projectId}')">Revocar</button>` : ''}
   </div>` : admin && allAdmin ? `
   <div class="cl-status-banner cl-ready">
-    <ph-icon name="check-circle" size="18" class="icon-ok"></ph-icon>
+    ${icon('check-circle', 18, 'icon-ok')}
     <div class="cl-status-text">
       <strong>Revisión completa</strong>
       <span>Listo para publicar al técnico</span>
@@ -110,10 +111,10 @@ export async function renderChecklistModule(projectId, session) {
         </label>`).join('')}
       </div>` : `
       <div class="cl-no-cfg">
-        <ph-icon name="calculator" size="36"></ph-icon>
+        ${icon('calculator', 36)}
         <p>Genera el BOM en la calculadora para ver la lista de consumibles automáticamente.</p>
         <button class="btn-outline btn-sm" onclick="navigate('#calculadora/${projectId}')">
-          <ph-icon name="calculator" size="14"></ph-icon> Abrir calculadora
+          ${icon('calculator', 14)} Abrir calculadora
         </button>
       </div>`}
     </div>
@@ -139,7 +140,7 @@ export async function renderChecklistModule(projectId, session) {
       ${allAdmin && !published ? `
       <div style="margin-top:14px">
         <button class="btn-primary" onclick="clPublish('${projectId}')">
-          <ph-icon name="check-circle" size="16"></ph-icon> Aprobar y publicar al técnico
+          ${icon('check-circle', 16)} Aprobar y publicar al técnico
         </button>
       </div>` : ''}`}
     </div>
@@ -150,7 +151,7 @@ export async function renderChecklistModule(projectId, session) {
     <div class="card">
       ${!published && !admin ? `
       <div class="cl-locked-banner">
-        <ph-icon name="lock" size="20"></ph-icon>
+        ${icon('lock', 20)}
         <p>El administrador debe aprobar el checklist antes de que el técnico pueda registrar la ejecución.</p>
       </div>` : ''}
       ${renderProgress(doneExec, execItems.length)}
@@ -170,7 +171,7 @@ export async function renderChecklistModule(projectId, session) {
 
   <div class="cl-footer-actions">
     <button class="btn-outline btn-sm" onclick="clExportPDF('${projectId}')">
-      <ph-icon name="file-pdf" size="14"></ph-icon> Exportar PDF
+      ${icon('file-pdf', 14)} Exportar PDF
     </button>
   </div>
   `;

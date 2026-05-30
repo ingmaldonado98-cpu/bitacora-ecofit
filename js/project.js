@@ -4,6 +4,7 @@ import { projects, users, kv } from './db.js';
 import { esc, fmtFecha, fmtFechaHora, fmtProjectId, uuid, isoNow, toast,
          ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS } from './auth.js';
+import { icon } from './icons.js';
 
 // ── Vista detalle del proyecto ─────────────────────────────────────────────────
 export async function renderProjectDetail(id, session) {
@@ -30,7 +31,7 @@ export async function renderProjectDetail(id, session) {
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#dashboard')">
-      <ph-icon name="caret-left"></ph-icon>
+      ${icon('caret-left')}
     </button>
     <div class="header-info">
       <span class="hdr-id">${esc(project.displayId)}</span>
@@ -38,7 +39,7 @@ export async function renderProjectDetail(id, session) {
     </div>
     <div class="header-actions">
       ${edit ? `<button class="btn-icon-hdr" onclick="navigate('#editar-proyecto/${id}')">
-        <ph-icon name="pencil"></ph-icon>
+        ${icon('pencil')}
       </button>` : ''}
     </div>
   </div>
@@ -113,37 +114,37 @@ export async function renderProjectDetail(id, session) {
   <!-- Módulos navegación -->
   <div class="modules-grid">
     <button class="module-btn mod-garantia" onclick="navigate('#proyecto/${id}/garantia')">
-      <ph-icon name="seal-check" size="30"></ph-icon>
+      ${icon('seal-check', 30)}
       <span>Garantía</span>
       <span class="mod-sub">Equipos · Paneles · Fotos</span>
     </button>
     <button class="module-btn mod-docs" onclick="navigate('#proyecto/${id}/documentacion')">
-      <ph-icon name="images" size="30"></ph-icon>
+      ${icon('images', 30)}
       <span>Documentación</span>
       <span class="mod-sub">Levantamiento · Fotos</span>
     </button>
     ${(admin || isLider(session)) ? `<button class="module-btn mod-auditoria" onclick="navigate('#proyecto/${id}/auditoria')">
-      <ph-icon name="magnifying-glass-plus" size="30"></ph-icon>
+      ${icon('magnifying-glass-plus', 30)}
       <span>Auditoría</span>
       <span class="mod-sub">Checklist · Dictamen</span>
     </button>` : ''}
     <button class="module-btn mod-qr" onclick="navigate('#proyecto/${id}/qr')">
-      <ph-icon name="qr-code" size="30"></ph-icon>
+      ${icon('qr-code', 30)}
       <span>QR Cliente</span>
       <span class="mod-sub">PNG descargable</span>
     </button>
     <button class="module-btn mod-calc" onclick="navigate('#calculadora/${id}')">
-      <ph-icon name="calculator" size="30"></ph-icon>
+      ${icon('calculator', 30)}
       <span>Calculadora</span>
       <span class="mod-sub">BOM · Estructura · Montaje</span>
     </button>
     <button class="module-btn mod-cl" onclick="navigate('#checklist/${id}')">
-      <ph-icon name="check-square" size="30"></ph-icon>
+      ${icon('check-square', 30)}
       <span>Checklist</span>
       <span class="mod-sub">Herramienta · Revisión · Campo</span>
     </button>
     ${admin ? `<button class="module-btn mod-pdf" onclick="navigate('#proyecto/${id}/pdf')">
-      <ph-icon name="file-arrow-down" size="30"></ph-icon>
+      ${icon('file-arrow-down', 30)}
       <span>Exportar PDF</span>
       <span class="mod-sub">Cliente · Técnico</span>
     </button>` : ''}
@@ -266,7 +267,7 @@ function renderChecklistProgreso(project) {
           <span class="chk-ico">${i.ok ? '✓' : '○'}</span>
           <span class="chk-lbl">${i.label}</span>
           ${i.req && !i.ok ? '<span class="chk-req-badge">Requerido</span>' : ''}
-          <ph-icon name="caret-right" size="14" class="chk-arrow"></ph-icon>
+          ${icon('caret-right', 14, 'chk-arrow')}
         </div>`).join('')}
       <details class="chk-opcionales">
         <summary>Opcionales (${opts.filter(i=>i.ok).length}/${opts.length})</summary>
@@ -274,7 +275,7 @@ function renderChecklistProgreso(project) {
           <div class="chk-item chk-opt ${i.ok?'chk-ok':''}" onclick="navigate('${i.link}')">
             <span class="chk-ico">${i.ok ? '✓' : '○'}</span>
             <span class="chk-lbl">${i.label}</span>
-            <ph-icon name="caret-right" size="14" class="chk-arrow"></ph-icon>
+            ${icon('caret-right', 14, 'chk-arrow')}
           </div>`).join('')}
       </details>
     </div>
@@ -293,8 +294,8 @@ function checklistFaltantes(project) {
 
   if (!faltantes.length) return '';
   return `<div class="faltantes-list">
-    <p class="falt-title"><ph-icon name="warning"></ph-icon> Pendiente para enviar a revisión:</p>
-    ${faltantes.map(f => `<div class="falt-item"><ph-icon name="x-circle" class="falt-x"></ph-icon> ${esc(f)}</div>`).join('')}
+    <p class="falt-title">${icon('warning')} Pendiente para enviar a revisión:</p>
+    ${faltantes.map(f => `<div class="falt-item">${icon('x-circle', 20, 'falt-x')} ${esc(f)}</div>`).join('')}
   </div>`;
 }
 
@@ -370,7 +371,7 @@ export async function renderProjectForm(id, session) {
 
   return `
   <div class="view-header">
-    <button class="btn-back" onclick="history.back()"><ph-icon name="caret-left"></ph-icon></button>
+    <button class="btn-back" onclick="history.back()">${icon('caret-left')}</button>
     <h1 class="hdr-title">${isEditing ? 'Editar proyecto' : 'Nuevo proyecto'}</h1>
   </div>
 
