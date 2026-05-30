@@ -167,9 +167,15 @@ export async function renderSettings(session) {
   <!-- Datos locales -->
   <div class="card">
     <h3 class="card-title">Datos locales</h3>
+    <p class="hint-text">
+      Los datos se guardan en este dispositivo. Para que otros técnicos puedan entrar,
+      <strong>exporta el backup y envíaselo</strong> — ellos lo importan en su dispositivo y ya tienen acceso con su usuario y contraseña.
+    </p>
     <div class="form-actions-row">
-      <button class="btn-outline" onclick="exportarDatos()">⬇ Exportar JSON</button>
-      <button class="btn-outline" onclick="document.getElementById('import-json').click()">⬆ Importar JSON</button>
+      <button class="btn-primary" onclick="exportarDatos()" style="display:flex;align-items:center;gap:6px">
+        ${icon('file-arrow-down', 16)} Exportar backup
+      </button>
+      <button class="btn-outline" onclick="document.getElementById('import-json').click()">⬆ Importar backup</button>
       <input type="file" id="import-json" accept=".json" style="display:none" onchange="importarDatos(event)" />
     </div>
   </div>
@@ -181,6 +187,19 @@ export async function renderSettings(session) {
     <button class="btn-outline btn-danger" onclick="limpiarDatos()">
       ${icon('trash')} Limpiar todos los datos locales
     </button>
+  </div>
+
+  <!-- Sesión -->
+  <div class="card" style="border-color:rgba(248,113,113,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <p style="font-weight:600;color:var(--text);margin:0">${esc(session.nombre)}</p>
+        <p style="font-size:.78rem;color:var(--text-muted);margin:2px 0 0">@${esc(session.username)} · ${ROLES[session.rol]?.label||session.rol}</p>
+      </div>
+      <button class="btn-outline btn-danger" onclick="window._logout()" style="display:flex;align-items:center;gap:6px">
+        ${icon('arrow-square-out', 16)} Cerrar sesión
+      </button>
+    </div>
   </div>
 
   <div class="settings-footer">
