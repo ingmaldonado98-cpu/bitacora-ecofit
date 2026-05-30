@@ -269,7 +269,9 @@ function renderDist() {
 
 // ── Panel ──────────────────────────────────────────────────────────────────
 function renderPanel() {
-  const chips = _allPresets.map(p=>`
+  // Excluir el preset "custom/manual" de los chips principales
+  const visiblePresets = _allPresets.filter(p => p.id !== 'custom');
+  const chips = visiblePresets.map(p=>`
     <button class="calc-preset-chip ${cs.presetId===p.id?'calc-preset-on':''}"
       onclick="calcSelectPreset('${p.id}')">
       <span style="font-weight:700;font-size:.85rem">${p.label}</span>
@@ -284,6 +286,15 @@ function renderPanel() {
       Selecciona el modelo para calcular cortes y posición de rieles correctamente.
     </p>
     <div class="calc-preset-grid">${chips}</div>
+    ${visiblePresets.length === 0 ? `
+    <p style="font-size:.78rem;color:var(--text-muted);margin:8px 0">
+      Sin modelos guardados. <button class="btn-link" onclick="navigate('#settings')">Agregar en Ajustes →</button>
+    </p>` : ''}
+    <p style="margin:8px 0 0;font-size:.75rem;color:var(--text-muted)">
+      <button class="btn-link" onclick="calcSelectPreset('custom')" style="${isCustom?'color:var(--g300)':''}">
+        ${isCustom ? '✎ Medida manual activa' : '+ Ingresar medida manual'}
+      </button>
+    </p>
     ${isCustom ? `
     <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
       <div class="form-group" style="flex:1;min-width:120px">
@@ -440,17 +451,27 @@ function renderDiagrama() {
   s += '</svg>';
 
   return `
-  <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:10px 14px;background:var(--surface2);display:flex;justify-content:space-between;align-items:center">
+  <div class="card" style="padding:0;overflow:hidden" id="diagram-card">
+    <div style="padding:10px 14px;background:var(--surface2);display:flex;justify-content:space-between;align-items:center;gap:8px">
       <h3 class="card-title" style="margin:0">Diagrama — vista superior</h3>
-      <span style="font-size:.72rem;color:var(--text-muted)">
-        <span style="color:var(--g300)">${totalPanels()} pan.</span> ·
-        <span style="color:var(--blue)">${railLen.toFixed(3)} m riel</span> ·
-        <span style="color:${FOOT_F}">${distBetweenFeet.toFixed(3)} m entre patas</span>
-      </span>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:.72rem;color:var(--text-muted)">
+          <span style="color:var(--g300)">${totalPanels()} pan.</span> ·
+          <span style="color:var(--blue)">${railLen.toFixed(3)} m riel</span> ·
+          <span style="color:${FOOT_F}">${distBetweenFeet.toFixed(3)} m entre patas</span>
+        </span>
+        <div class="diag-zoom-btns">
+          <button class="diag-btn" onclick="diagZoom(-0.2)" title="Alejar">−</button>
+          <button class="diag-btn" onclick="diagZoomReset()" title="Tamaño original">1:1</button>
+          <button class="diag-btn" onclick="diagZoom(0.2)" title="Acercar">+</button>
+          <button class="diag-btn" onclick="diagFullscreen()" title="Pantalla completa">⛶</button>
+        </div>
+      </div>
     </div>
-    <div style="padding:12px;overflow-x:auto;background:#0e1e11">
-      ${s}
+    <div id="diag-wrap" style="padding:12px;overflow:auto;background:#0e1e11;cursor:grab">
+      <div id="diag-inner" style="transform-origin:top left;transition:transform .15s;display:inline-block">
+        ${s}
+      </div>
     </div>
   </div>`;
 }
@@ -717,8 +738,33 @@ function selCard(fn, ico, label, sub, active, imgSrc) {
   </button>`;
 }
 
+// ── Diagrama zoom / fullscreen ─────────────────────────────────────────────
+let _diagScale = 1;
+window.diagZoom = function(delta) {
+  _diagScale = Math.min(3, Math.max(0.3, _diagScale + delta));
+  const el = document.getElementById('diag-inner');
+  if (el) el.style.transform = `scale(${_diagScale})`;
+};
+window.diagZoomReset = function() {
+  _diagScale = 1;
+  const el = document.getElementById('diag-inner');
+  if (el) el.style.transform = 'scale(1)';
+};
+window.diagFullscreen = function() {
+  const el = document.getElementById('diagram-card');
+  if (!el) return;
+  if (!document.fullscreenElement) {
+    el.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen();
+  }
+};
+// Resetear zoom al re-renderizar
+function _resetDiagZoom() { _diagScale = 1; }
+
 // ── Re-render interno ──────────────────────────────────────────────────────
 function calcRender() {
+  _resetDiagZoom();
   const app = document.getElementById('app');
   if (!app) return;
   app.innerHTML = renderCalc();

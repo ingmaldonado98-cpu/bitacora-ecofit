@@ -1233,3 +1233,15 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 }
 .panel-row-actions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
 .panel-edit-form { margin-top: 2px; }
+
+/* ── Diagrama zoom ─────────────────────────────────────────────────────────── */
+.diag-zoom-btns { display: flex; gap: 3px; align-items: center; }
+.diag-btn {
+  background: var(--surface3); border: 1px solid var(--border2);
+  color: var(--text); border-radius: 5px; padding: 3px 8px;
+  font-size: .8rem; cursor: pointer; transition: background .15s;
+  font-family: monospace; font-weight: 600;
+}
+.diag-btn:hover { background: var(--g700); color: var(--g100); }
+#diagram-card:fullscreen { background: #0e1e11; padding: 20px; }
+#diagram-card:fullscreen #diag-wrap { max-height: calc(100vh - 80px); }
