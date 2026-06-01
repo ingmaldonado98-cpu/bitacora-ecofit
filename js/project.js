@@ -2,7 +2,7 @@
 
 import { projects, users, kv } from './db.js';
 import { esc, fmtFecha, fmtFechaHora, fmtProjectId, uuid, isoNow, toast,
-         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog } from './utils.js';
+         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, CAMPOS_SISTEMA_PEQUENO, confirmDialog } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS } from './auth.js';
 import { icon } from './icons.js';
 
@@ -41,6 +41,9 @@ export async function renderProjectDetail(id, session) {
       ${edit ? `<button class="btn-icon-hdr" onclick="navigate('#editar-proyecto/${id}')">
         ${icon('pencil')}
       </button>` : ''}
+      ${admin ? `<button class="btn-icon-hdr btn-icon-danger" onclick="window._eliminarProyecto('${id}')" title="Eliminar proyecto">
+        ${icon('trash')}
+      </button>` : ''}
     </div>
   </div>
 
@@ -59,13 +62,23 @@ export async function renderProjectDetail(id, session) {
     <div class="card-row">
       <div class="meta-item">
         <span class="meta-lbl">Tipo de sistema</span>
-        <span class="meta-val">${tipo ? tipo.label : '—'}</span>
+        <span class="meta-val">${tipo ? tipo.label : '—'}${tipo?.hint ? `<br><small style="color:var(--text-muted)">${esc(tipo.hint)}</small>` : ''}</span>
       </div>
       <div class="meta-item">
         <span class="meta-lbl">Fecha inicio</span>
         <span class="meta-val">${fmtFecha(project.fechaInicio)}</span>
       </div>
     </div>
+    ${project.tipoSistema === 'sistema_pequeno' ? `
+    <div class="card-row">
+      ${project.bateria      ? `<div class="meta-item"><span class="meta-lbl">Batería</span><span class="meta-val">${esc(project.bateria)}</span></div>` : ''}
+      ${project.mppt         ? `<div class="meta-item"><span class="meta-lbl">MPPT</span><span class="meta-val">${esc(project.mppt)}</span></div>` : ''}
+    </div>
+    <div class="card-row">
+      ${project.inversor     ? `<div class="meta-item"><span class="meta-lbl">Inversor</span><span class="meta-val">${esc(project.inversor)}</span></div>` : ''}
+      ${project.breakerPanel ? `<div class="meta-item"><span class="meta-lbl">Breaker paneles</span><span class="meta-val">${esc(project.breakerPanel)}</span></div>` : ''}
+      ${project.breakerPolo  ? `<div class="meta-item"><span class="meta-lbl">Breaker 1 polo</span><span class="meta-val">${esc(project.breakerPolo)}</span></div>` : ''}
+    </div>` : ''}
     ${project.direccion ? `<div class="meta-item"><span class="meta-lbl">Dirección</span>
       <span class="meta-val">${esc(project.direccion)}</span></div>` : ''}
     <div class="card-row">
@@ -347,6 +360,14 @@ window._delObs = async function(id, idx) {
   document.getElementById('obs-list').innerHTML = renderObservaciones(obs, session, id);
 };
 
+window._eliminarProyecto = async function(id) {
+  const project = await projects.getById(id);
+  if (!confirmDialog(`¿Eliminar el proyecto "${project?.displayId} — ${project?.clientName}"?\n\nEsta acción es irreversible.`)) return;
+  await projects.delete(id);
+  toast('Proyecto eliminado');
+  navigate('#dashboard');
+};
+
 window._cambiarEstado = async function(id, nuevoEstado) {
   const msg = `¿Cambiar estado a "${ESTADOS[nuevoEstado]?.label}"?`;
   if (!confirmDialog(msg)) return;
@@ -425,6 +446,19 @@ export async function renderProjectForm(id, session) {
              value='${JSON.stringify(project?.tecnicosApoyo||[])}'>
     </div>
 
+    <!-- Campos extra: Sistema Pequeño -->
+    <div id="campos-pequeno" ${project?.tipoSistema !== 'sistema_pequeno' ? 'style="display:none"' : ''}>
+      <p class="hint-text" style="margin-bottom:10px">
+        🧊 Completa los componentes del sistema pequeño.
+      </p>
+      ${CAMPOS_SISTEMA_PEQUENO.map(f => `
+      <div class="form-group">
+        <label>${f.label}</label>
+        <input type="text" name="${f.name}" placeholder="${esc(f.placeholder)}"
+               value="${esc(project?.[f.name]||'')}" />
+      </div>`).join('')}
+    </div>
+
     <div class="form-group">
       <label>Dirección / Ubicación</label>
       <input type="text" name="direccion" placeholder="Colonia, calle, municipio"
@@ -448,6 +482,11 @@ window.selChip = function(groupId, value, inputId, btn) {
   document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('chip-active'));
   (btn || document.activeElement).classList.add('chip-active');
   document.getElementById(inputId).value = value;
+  // Mostrar / ocultar campos de sistema pequeño
+  if (inputId === 'tipo-val') {
+    const campos = document.getElementById('campos-pequeno');
+    if (campos) campos.style.display = value === 'sistema_pequeno' ? '' : 'none';
+  }
 };
 
 window.toggleApoyo = function(id, btn) {
@@ -463,14 +502,23 @@ window._submitProject = async function(e, editId) {
   const fd = new FormData(e.target);
   const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
 
+  const tipoSistema = fd.get('tipoSistema') || null;
+  const esPequeno   = tipoSistema === 'sistema_pequeno';
+
   const data = {
     clientName:      fd.get('clientName').trim(),
-    tipoSistema:     fd.get('tipoSistema') || null,
+    tipoSistema,
     prioridad:       fd.get('prioridad'),
     tecnicoLiderId:  fd.get('tecnicoLiderId') || null,
     tecnicosApoyo:   JSON.parse(fd.get('tecnicosApoyo') || '[]'),
     direccion:       fd.get('direccion').trim(),
     fechaInicio:     fd.get('fechaInicio') ? new Date(fd.get('fechaInicio')).toISOString() : null,
+    // Campos sistema pequeño (null si no aplica)
+    bateria:      esPequeno ? (fd.get('bateria')?.trim() || null)       : null,
+    mppt:         esPequeno ? (fd.get('mppt')?.trim() || null)          : null,
+    inversor:     esPequeno ? (fd.get('inversor')?.trim() || null)      : null,
+    breakerPanel: esPequeno ? (fd.get('breakerPanel')?.trim() || null)  : null,
+    breakerPolo:  esPequeno ? (fd.get('breakerPolo')?.trim() || null)   : null,
   };
 
   if (editId) {

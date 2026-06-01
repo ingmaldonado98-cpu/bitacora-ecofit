@@ -3,7 +3,7 @@
 import { projects } from './db.js';
 import { esc, toast, isoNow } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
-import { HERRAMIENTA, getConsumibles, ADMIN_REVIEW_ITEMS, EXEC_CHECKLIST } from '../modules/checklist/index.js';
+import { HERRAMIENTA, getConsumibles, ADMIN_REVIEW_ITEMS } from '../modules/checklist/index.js';
 import { icon } from './icons.js';
 
 export async function renderChecklistModule(projectId, session) {
@@ -21,12 +21,9 @@ export async function renderChecklistModule(projectId, session) {
 
   const herramienta = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
   const consumibles = cfg ? getConsumibles(estructura, base, techo) : [];
-  const execItems   = EXEC_CHECKLIST[techo] || EXEC_CHECKLIST.cemento;
-
   const doneHerr  = herramienta.filter(h => cl.herr?.[h.id]).length;
   const doneCons  = consumibles.filter((_, i) => cl.cons?.[String(i)]).length;
   const doneAdmin = ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length;
-  const doneExec  = execItems.filter(e => cl.exec?.[e.id]).length;
   const allAdmin  = doneAdmin === ADMIN_REVIEW_ITEMS.length;
   const published = !!cl.publishedAt;
 
@@ -66,9 +63,6 @@ export async function renderChecklistModule(projectId, session) {
     </button>
     <button class="tab-btn" data-tab="cl-rev" onclick="switchTab('cl-tabs','cl-rev',this)">
       Revisión${allAdmin ? '<span class="tab-badge tab-ok">✓</span>' : admin ? '<span class="tab-badge tab-req">!</span>' : ''}
-    </button>
-    <button class="tab-btn" data-tab="cl-exec" onclick="switchTab('cl-tabs','cl-exec',this)">
-      Ejecución${doneExec === execItems.length && execItems.length ? '<span class="tab-badge tab-ok">✓</span>' : ''}
     </button>
   </div>
 
@@ -146,29 +140,6 @@ export async function renderChecklistModule(projectId, session) {
     </div>
   </div>
 
-  <!-- Ejecución -->
-  <div id="cl-exec" class="tab-panel">
-    <div class="card">
-      ${!published && !admin ? `
-      <div class="cl-locked-banner">
-        ${icon('lock', 20)}
-        <p>El administrador debe aprobar el checklist antes de que el técnico pueda registrar la ejecución.</p>
-      </div>` : ''}
-      ${renderProgress(doneExec, execItems.length)}
-      <div class="cl-item-list ${!published && !admin ? 'cl-list-locked' : ''}">
-        ${execItems.map((e, i) => `
-        <label class="cl-item ${cl.exec?.[e.id] ? 'cl-item-done' : ''}">
-          <span class="cl-step-num">${i + 1}</span>
-          <input type="checkbox" ${cl.exec?.[e.id] ? 'checked' : ''} ${!published && !admin ? 'disabled' : ''}
-            onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${projectId}','${e.id}',this.checked)">
-          <div class="cl-item-text">
-            <span class="cl-item-name">${esc(e.n)}</span>
-          </div>
-        </label>`).join('')}
-      </div>
-    </div>
-  </div>
-
   <div class="cl-footer-actions">
     <button class="btn-outline btn-sm" onclick="clExportPDF('${projectId}')">
       ${icon('file-pdf', 14)} Exportar PDF
@@ -235,7 +206,6 @@ window.clExportPDF = async function(projectId) {
 
   const herramienta = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
   const consumibles = cfg ? getConsumibles(estructura, base, techo) : [];
-  const execItems   = EXEC_CHECKLIST[techo] || EXEC_CHECKLIST.cemento;
   const published   = cl.publishedAt
     ? `Aprobado por ${cl.publishedBy} · ${new Date(cl.publishedAt).toLocaleDateString('es-MX')}`
     : 'Pendiente de aprobación';
@@ -269,9 +239,6 @@ window.clExportPDF = async function(projectId) {
 
   <h2>Revisión pre-instalación (Admin)</h2>
   <table>${ADMIN_REVIEW_ITEMS.map(it => checkRow(!!cl.admin?.[it.id], it.label, it.detail)).join('')}</table>
-
-  <h2>Ejecución en campo</h2>
-  <table>${execItems.map((e, i) => checkRow(!!cl.exec?.[e.id], `${i+1}. ${e.n}`, null)).join('')}</table>
   </body></html>`;
 
   const win = window.open('', '_blank');
@@ -280,3 +247,52 @@ window.clExportPDF = async function(projectId) {
   win.focus();
   setTimeout(() => win.print(), 400);
 };
+
+// ── Lista de checklists (vista nav) ───────────────────────────────────────────
+export async function renderChecklistsList(session) {
+  const all = await projects.getAll();
+  const activos = all
+    .filter(p => !['cerrado', 'cancelado'].includes(p.estado))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const cards = activos.map(p => {
+    const cl = p.checklistData || {};
+    const cfg = p.projectConfig || null;
+    const techo = cfg?.techo || cl.techo || 'cemento';
+    const herr = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
+    const cons = cfg ? getConsumibles(cfg.estructura, cfg.base, techo) : [];
+
+    const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length;
+    const doneItems  =
+      herr.filter(h => cl.herr?.[h.id]).length +
+      cons.filter((_, i) => cl.cons?.[String(i)]).length +
+      ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length;
+
+    const pct      = totalItems > 0 ? Math.round(doneItems / totalItems * 100) : 0;
+    const published = !!cl.publishedAt;
+
+    return `
+      <div class="cl-list-card" onclick="navigate('#checklist/${p.id}')">
+        <div class="cl-list-header">
+          <span class="cl-list-id">${esc(p.displayId)}</span>
+          ${published
+            ? `<span class="cl-badge cl-badge-ok">${icon('check-circle', 13)} Aprobado</span>`
+            : `<span class="cl-badge">${pct}%</span>`}
+        </div>
+        <div class="cl-list-cliente">${esc(p.clientName || '—')}</div>
+        <div class="cl-progress-row">
+          <div class="cl-prog-bar"><div class="cl-prog-fill" style="width:${pct}%"></div></div>
+          <span class="cl-prog-txt">${doneItems}/${totalItems}</span>
+        </div>
+      </div>`;
+  });
+
+  return `
+  <div class="view-header">
+    <h1 class="hdr-title">Checklists</h1>
+  </div>
+  ${activos.length === 0
+    ? '<p class="empty-msg">No hay proyectos activos.</p>'
+    : `<div class="cl-list-grid">${cards.join('')}</div>`}
+  `;
+}

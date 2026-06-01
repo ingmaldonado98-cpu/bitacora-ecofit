@@ -6,6 +6,13 @@ import { isAdmin, ROLES } from './auth.js';
 import { PANEL_PRESETS } from '../modules/calculadora/index.js';
 import { icon } from './icons.js';
 import { createFbUser, toEmail, fbUsers } from './firebase.js';
+import { getStatus as getOneDriveStatusObj, pickFolder, requestPermission, testAccess } from './onedrive.js';
+
+async function getOneDriveStatus() {
+  const st = await getOneDriveStatusObj();
+  const cls = st.ok ? 'onedrive-ok' : 'onedrive-off';
+  return `<span class="${cls}">${st.msg}</span>`;
+}
 
 export async function renderSettings(session) {
   if (!isAdmin(session)) {
@@ -17,10 +24,9 @@ export async function renderSettings(session) {
     <p class="empty-msg">Solo el administrador puede gestionar ajustes.</p>`;
   }
 
-  const [allUsers, contacto, driveConfig, customPanels] = await Promise.all([
+  const [allUsers, contacto, customPanels] = await Promise.all([
     users.getAll(),
     config.get('contactoEcofit'),
-    config.get('driveConfig'),
     kv.get('panel_presets_custom'),
   ]);
 
@@ -76,19 +82,27 @@ export async function renderSettings(session) {
     <button class="btn-primary btn-sm" onclick="guardarContacto()">Guardar contacto</button>
   </div>
 
-  <!-- Google Drive -->
+  <!-- OneDrive -->
   <div class="card">
-    <h3 class="card-title">Google Drive — Respaldo documental</h3>
-    <p class="hint-text">Solo para subir fotos y PDFs. No almacena datos de la app.</p>
-    <div class="form-group"><label>API Key de Google Drive</label>
-      <input type="text" id="drive-api-key" placeholder="AIza…"
-             value="${esc(driveConfig?.apiKey||'')}" />
+    <h3 class="card-title">OneDrive Empresarial — Respaldo documental</h3>
+    <p class="hint-text">
+      Guarda PDFs y documentos directamente en la carpeta de OneDrive de la empresa.
+      OneDrive sincroniza automáticamente.
+    </p>
+    <div id="onedrive-status" class="onedrive-status">
+      ${await getOneDriveStatus()}
     </div>
-    <div class="form-group"><label>ID carpeta raíz en Drive</label>
-      <input type="text" id="drive-folder-id" placeholder="ID de la carpeta Ecofit en Drive"
-             value="${esc(driveConfig?.folderId||'')}" />
+    <div class="form-actions-row" style="margin-top:10px">
+      <button class="btn-primary btn-sm" onclick="seleccionarCarpetaOneDrive()">
+        ${icon('folder-open', 14)} Seleccionar carpeta OneDrive
+      </button>
+      <button class="btn-outline btn-sm" onclick="probarOneDrive()">
+        Probar acceso
+      </button>
     </div>
-    <button class="btn-outline btn-sm" onclick="guardarDrive()">Guardar configuración Drive</button>
+    <p class="hint-text" style="margin-top:8px">
+      Selecciona la carpeta <strong>OneDrive - Ecofit Solar Solutions</strong> o la subcarpeta donde quieras guardar los respaldos.
+    </p>
   </div>
 
   <!-- Instalación PWA -->
@@ -226,8 +240,13 @@ function renderUsersList(allUsers, session) {
         <button class="btn-icon-sm" onclick="toggleUser('${u.id}',${u.activo})"
                 title="${u.activo?'Desactivar':'Activar'}">${u.activo?'✓':'○'}</button>
         <button class="btn-del-sm" onclick="eliminarUser('${u.id}')">✕</button>
-      </div>` : '<span class="user-yo">(tú)</span>'}
+      </div>` : `
+      <div class="user-actions">
+        <span class="user-yo">(tú)</span>
+        <button class="btn-icon-sm" onclick="editarMiPerfil()" title="Editar mi perfil">✎</button>
+      </div>`}
     </div>
+
     ${u.id !== session.id ? `
     <div class="form-inline-card" id="uedit-${u.id}" style="display:none">
       <div class="form-row">
@@ -249,9 +268,83 @@ function renderUsersList(allUsers, session) {
         <button class="btn-outline btn-sm" onclick="document.getElementById('uedit-${u.id}').style.display='none';document.getElementById('urow-${u.id}').style.display=''">Cancelar</button>
         <button class="btn-primary btn-sm" onclick="guardarEditUser('${u.id}')">Guardar</button>
       </div>
-    </div>` : ''}
+    </div>` : `
+    <div class="form-inline-card" id="uedit-self" style="display:none">
+      <p class="hint-text" style="margin-bottom:10px">Solo puedes editar tu nombre, usuario y contraseña. El rol lo asigna el administrador.</p>
+      <div class="form-row">
+        <div class="form-group"><label>Nombre</label>
+          <input type="text" id="ue-self-nombre" value="${esc(u.nombre)}" /></div>
+        <div class="form-group"><label>Usuario</label>
+          <input type="text" id="ue-self-username" value="${esc(u.username)}" /></div>
+      </div>
+      <div class="form-group"><label>Nueva contraseña <span style="color:var(--text-muted);font-size:.75rem">(dejar vacío para no cambiar)</span></label>
+        <input type="password" id="ue-self-pass" placeholder="mín. 6 chars" /></div>
+      <div class="form-actions">
+        <button class="btn-outline btn-sm" onclick="cancelarMiPerfil()">Cancelar</button>
+        <button class="btn-primary btn-sm" onclick="guardarMiPerfil('${u.id}')">Guardar cambios</button>
+      </div>
+    </div>`}
   `).join('');
 }
+
+// ── Editar perfil propio ───────────────────────────────────────────────────────
+window.editarMiPerfil = function() {
+  const selfRow  = document.getElementById('urow-self') ||
+                   document.querySelector('.user-row:has(#uedit-self)');
+  const form = document.getElementById('uedit-self');
+  if (!form) return;
+  // Ocultar la fila y mostrar el form
+  const row = form.previousElementSibling;
+  if (row) row.style.display = 'none';
+  form.style.display = 'block';
+  document.getElementById('ue-self-nombre')?.focus();
+};
+
+window.cancelarMiPerfil = function() {
+  const form = document.getElementById('uedit-self');
+  if (!form) return;
+  form.style.display = 'none';
+  const row = form.previousElementSibling;
+  if (row) row.style.display = '';
+};
+
+window.guardarMiPerfil = async function(id) {
+  const nombre   = document.getElementById('ue-self-nombre')?.value.trim();
+  const username = document.getElementById('ue-self-username')?.value.trim().toLowerCase();
+  const pass     = document.getElementById('ue-self-pass')?.value;
+
+  if (!nombre || !username) { toast('Nombre y usuario son obligatorios', 'error'); return; }
+  if (pass && pass.length < 6) { toast('Contraseña mínimo 6 caracteres', 'error'); return; }
+
+  const btn = document.querySelector('#uedit-self .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+
+  try {
+    await users.update(id, { nombre, username });
+
+    // Cambiar contraseña en Firebase Auth (solo disponible para el usuario actual)
+    if (pass) {
+      const { getAuth, updatePassword } = await import(
+        'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js'
+      );
+      const currentUser = getAuth().currentUser;
+      if (currentUser) {
+        await updatePassword(currentUser, pass);
+      }
+    }
+
+    toast('✅ Perfil actualizado');
+    navigate('#settings');
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+    // Firebase requiere re-autenticación reciente para cambiar contraseña
+    if (err.code === 'auth/requires-recent-login') {
+      toast('Por seguridad, cierra sesión y vuelve a entrar antes de cambiar tu contraseña.', 'error');
+    } else {
+      toast('Error al guardar: ' + err.message, 'error');
+    }
+  }
+};
 
 window.editarUser = function(id) {
   document.getElementById('urow-' + id).style.display = 'none';
@@ -328,11 +421,37 @@ window.guardarContacto = async function() {
   toast('✅ Contacto guardado');
 };
 
-window.guardarDrive = async function() {
-  const apiKey   = document.getElementById('drive-api-key').value.trim();
-  const folderId = document.getElementById('drive-folder-id').value.trim();
-  await config.set('driveConfig', { apiKey, folderId });
-  toast('✅ Configuración Drive guardada');
+// ── OneDrive ───────────────────────────────────────────────────────────────────
+window.seleccionarCarpetaOneDrive = async function() {
+  try {
+    const handle = await pickFolder();
+    toast(`✅ Carpeta seleccionada: ${handle.name}`);
+    document.getElementById('onedrive-status').innerHTML =
+      `<span class="onedrive-ok">✅ Carpeta: ${handle.name}</span>`;
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      toast('Error al seleccionar carpeta: ' + err.message, 'error');
+    }
+  }
+};
+
+window.probarOneDrive = async function() {
+  try {
+    const path = await testAccess();
+    toast(`✅ Acceso confirmado — archivo guardado en: ${path}`);
+  } catch (err) {
+    if (err.message.includes('permiso') || err.message.includes('Permiso')) {
+      try {
+        await requestPermission();
+        const path = await testAccess();
+        toast(`✅ Acceso confirmado — archivo guardado en: ${path}`);
+      } catch (e) {
+        toast('Error: ' + e.message, 'error');
+      }
+    } else {
+      toast('Error: ' + err.message, 'error');
+    }
+  }
 };
 
 window.exportarDatos = async function() {

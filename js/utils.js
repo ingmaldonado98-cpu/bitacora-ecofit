@@ -164,13 +164,24 @@ export const PRIORIDADES = {
 };
 
 export const TIPOS_SISTEMA = {
-  interconectado: { label: 'Interconectado CFE',  icon: 'lightning' },
-  hibrido:        { label: 'Híbrido',              icon: 'battery-charging' },
-  aislado:        { label: 'Aislado / Off-grid',   icon: 'sun-horizon' },
-  bombeo:         { label: 'Bombeo Solar',          icon: 'waves' },
-  respaldo:       { label: 'Respaldo',              icon: 'shield-check' },
-  otro:           { label: 'Otro',                  icon: 'squares-four' },
+  interconectado:  { label: 'Interconectado CFE',        icon: 'lightning' },
+  hibrido:         { label: 'Híbrido',                   icon: 'battery-charging' },
+  aislado:         { label: 'Aislado / Off-grid',        icon: 'sun-horizon' },
+  bombeo:          { label: 'Bombeo Solar',               icon: 'waves' },
+  respaldo:        { label: 'Respaldo',                   icon: 'shield-check' },
+  sistema_pequeno: { label: 'Sistema Pequeño',            icon: 'snowflake',
+                     hint: 'Congeladores / refrigeradores solares, apoyos de gobierno' },
+  otro:            { label: 'Otro',                       icon: 'squares-four' },
 };
+
+// Campos extra que aplican solo a Sistema Pequeño
+export const CAMPOS_SISTEMA_PEQUENO = [
+  { name: 'bateria',       label: 'Batería',             placeholder: 'Ej: LiFePO4 100Ah 48V' },
+  { name: 'mppt',          label: 'Controlador MPPT',    placeholder: 'Ej: Victron SmartSolar 100/30' },
+  { name: 'inversor',      label: 'Inversor',            placeholder: 'Ej: Victron Phoenix 800VA (vacío si no aplica)' },
+  { name: 'breakerPanel',  label: 'Breaker de paneles',  placeholder: 'Ej: DC 20A' },
+  { name: 'breakerPolo',   label: 'Breaker 1 polo',      placeholder: 'Ej: AC 16A 1 polo' },
+];
 
 export const MARCAS_EQUIPOS = [
   'Victron Energy', 'LuxPower', 'SolarK', 'Pylontech', 'Epcom', 'EPEVER', 'Otra marca'

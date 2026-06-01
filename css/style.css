@@ -546,6 +546,8 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
   color: var(--text-muted); cursor: pointer; transition: all .15s;
 }
 .btn-icon-hdr:hover { color: var(--text); border-color: var(--g500); }
+.btn-icon-danger { color: var(--red, #f87171); }
+.btn-icon-danger:hover { background: rgba(248,113,113,.15); border-color: var(--red, #f87171); color: var(--red, #f87171); }
 .btn-icon { background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; transition: all .15s; }
 .btn-icon:hover { color: var(--text); border-color: var(--g500); }
 .btn-icon-sm { background: none; border: 1px solid var(--border2); border-radius: 6px; padding: 4px 8px; color: var(--text-muted); font-size: .8rem; cursor: pointer; transition: color .15s; }
@@ -1088,6 +1090,36 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 .cl-locked-banner p { margin: 0; }
 .cl-list-locked { opacity: .5; pointer-events: none; }
 .cl-footer-actions { padding: 12px 16px 80px; display: flex; justify-content: flex-end; }
+
+/* ── Checklist lista (nav view) ───────────────────────────────────────────── */
+.cl-list-grid { display: flex; flex-direction: column; gap: 10px; padding: 0 0 80px; }
+
+.cl-list-card {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 14px 16px; cursor: pointer;
+  transition: border-color .15s, transform .1s;
+}
+.cl-list-card:active { transform: scale(.99); border-color: var(--g500); }
+
+.cl-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+.cl-list-id { font-weight: 700; font-size: .95rem; color: var(--text); }
+.cl-list-cliente { font-size: .8rem; color: var(--text-muted); margin-bottom: 10px; }
+
+.cl-badge {
+  font-size: .72rem; font-weight: 700; padding: 2px 8px;
+  border-radius: 20px; background: var(--surface3); color: var(--text-muted);
+}
+.cl-badge-ok { background: rgba(74,222,128,.15); color: var(--g300); display: flex; align-items: center; gap: 4px; }
+
+.cl-progress-row { display: flex; align-items: center; gap: 10px; }
+.cl-prog-bar { flex: 1; height: 5px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+.cl-prog-fill { height: 100%; background: var(--g500); border-radius: 3px; transition: width .3s; }
+.cl-prog-txt { font-size: .72rem; color: var(--text-muted); white-space: nowrap; min-width: 32px; text-align: right; }
+
+/* ── OneDrive status ──────────────────────────────────────────────────────── */
+.onedrive-status { font-size: .85rem; padding: 8px 0; }
+.onedrive-ok  { color: var(--g300); font-weight: 600; }
+.onedrive-off { color: var(--text-muted); }
 
 /* ── Animación de entrada ─────────────────────────────────────────────────── */
 @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }

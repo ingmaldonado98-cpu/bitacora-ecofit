@@ -1,6 +1,6 @@
 // sw.js — Service Worker Bitácora Ecofit V6
-const CACHE_NAME  = 'ecofit-v6-v22';
-const SW_VERSION  = '7.1.0';
+const CACHE_NAME  = 'ecofit-v6-v25';
+const SW_VERSION  = '7.4.0';
 
 const APP_SHELL = [
   './',
@@ -23,6 +23,7 @@ const APP_SHELL = [
   './js/qr.js',
   './js/scanner.js',
   './js/settings.js',
+  './js/onedrive.js',
   './js/utils.js',
   './modules/calculadora/index.js',
   './modules/checklist/index.js',

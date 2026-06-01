@@ -11,7 +11,7 @@ import { renderPDFExport } from './pdf.js';
 import { renderSettings } from './settings.js';
 import { renderInventario } from './inventario.js';
 import { renderCalculadora } from './calculadora.js';
-import { renderChecklistModule } from './checklist.js';
+import { renderChecklistModule, renderChecklistsList } from './checklist.js';
 import { projects } from './db.js';
 import { toast, esc } from './utils.js';
 import { icon } from './icons.js';
@@ -110,6 +110,10 @@ async function route() {
 
       case 'calculadora':
         await render(renderCalculadora(session, id || null));
+        break;
+
+      case 'checklists':
+        await render(renderChecklistsList(session));
         break;
 
       case 'checklist':
