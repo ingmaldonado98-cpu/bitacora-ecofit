@@ -176,7 +176,19 @@ window.addEventListener('hashchange', route);
 
 // ── Logout ────────────────────────────────────────────────────────────────────
 window._logout = async function() {
-  if (!confirm('¿Cerrar sesión?')) return;
+  const ok = await new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-confirm-overlay';
+    overlay.innerHTML = `<div class="modal-confirm"><p class="modal-confirm-msg">¿Cerrar sesión?</p>
+      <div class="modal-confirm-actions">
+        <button class="btn-outline modal-btn-cancel">Cancelar</button>
+        <button class="btn-primary modal-btn-ok">Cerrar sesión</button>
+      </div></div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.modal-btn-ok').onclick    = () => { overlay.remove(); resolve(true);  };
+    overlay.querySelector('.modal-btn-cancel').onclick = () => { overlay.remove(); resolve(false); };
+  });
+  if (!ok) return;
   await logout();
   window.location.hash = '#login';
 };
@@ -191,6 +203,22 @@ window.addEventListener('online',  updateOnline);
 window.addEventListener('offline', updateOnline);
 updateOnline();
 
+// ── SW update banner ──────────────────────────────────────────────────────────
+function showUpdateBanner(newSW) {
+  const existing = document.getElementById('sw-update-banner');
+  if (existing) return;
+  const banner = document.createElement('div');
+  banner.id = 'sw-update-banner';
+  banner.innerHTML = `
+    <span>🔄 Nueva versión disponible</span>
+    <button onclick="
+      document.getElementById('sw-update-banner')?.remove();
+      navigator.serviceWorker.controller?.postMessage({type:'SKIP_WAITING'});
+      setTimeout(()=>location.reload(),300);
+    ">Actualizar ahora</button>`;
+  document.body.appendChild(banner);
+}
+
 // ── Service Worker ────────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').then(reg => {
@@ -198,7 +226,7 @@ if ('serviceWorker' in navigator) {
       const newSW = reg.installing;
       newSW.addEventListener('statechange', () => {
         if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-          toast('Nueva versión disponible. Recarga para actualizar.');
+          showUpdateBanner(newSW);
         }
       });
     });

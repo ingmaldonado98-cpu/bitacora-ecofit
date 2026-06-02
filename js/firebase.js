@@ -3,11 +3,15 @@
 
 import { initializeApp }                         from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword,
-         signOut, onAuthStateChanged }            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, collection, doc,
+         signOut, onAuthStateChanged,
+         sendPasswordResetEmail }                 from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFirestore, initializeFirestore,
+         persistentLocalCache, persistentMultipleTabManager,
+         collection, doc,
          getDoc, getDocs, setDoc, updateDoc,
-         deleteDoc, query, orderBy,
-         enableIndexedDbPersistence }             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+         deleteDoc, query, orderBy }              from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getStorage, ref as storageRef,
+         uploadString, getDownloadURL }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 // ── Configuración ──────────────────────────────────────────────────────────
 const FB_CONFIG = {
@@ -21,32 +25,42 @@ const FB_CONFIG = {
 
 const _app = initializeApp(FB_CONFIG);
 export const fbAuth = getAuth(_app);
-export const fbDB   = getFirestore(_app);
-
-// Persistencia offline — Firestore guarda todo en IndexedDB automáticamente
-enableIndexedDbPersistence(fbDB).catch(err => {
-  if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
-    console.warn('[FB] Persistence:', err.code);
-  }
+export const fbDB   = initializeFirestore(_app, {
+  cache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
+const _storage = getStorage(_app);
+
+// ── Subir foto a Firebase Storage ─────────────────────────────────────────
+export async function uploadPhoto(base64DataUrl, path) {
+  const sRef = storageRef(_storage, path);
+  await uploadString(sRef, base64DataUrl, 'data_url');
+  return getDownloadURL(sRef);
+}
 
 // ── Username → email interno ───────────────────────────────────────────────
 // Los usuarios entran con "username", internamente usamos username@ecofit.app
 export const toEmail = u => `${u.toLowerCase().trim()}@ecofit.app`;
 
 // ── Crear usuario en Firebase Auth SIN cerrar sesión actual (REST API) ─────
-export async function createFbUser(username, password) {
+// realEmail opcional: si se proporciona, se usa como email real de Firebase Auth
+export async function createFbUser(username, password, realEmail) {
+  const authEmail = realEmail?.trim() || toEmail(username);
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_CONFIG.apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: toEmail(username), password, returnSecureToken: false }),
+      body: JSON.stringify({ email: authEmail, password, returnSecureToken: false }),
     }
   );
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return data.localId; // UID de Firebase
+  return { uid: data.localId, authEmail };
+}
+
+// ── Reset de contraseña por email ─────────────────────────────────────────
+export async function resetPassword(authEmail) {
+  await sendPasswordResetEmail(fbAuth, authEmail);
 }
 
 // ── Seed: crear admin si no existe ningún usuario ──────────────────────────
@@ -55,10 +69,10 @@ export async function seedAdminIfEmpty() {
     const snap = await getDocs(collection(fbDB, 'users'));
     if (!snap.empty) return; // Ya hay usuarios
 
-    const uid = await createFbUser('admin', 'ecofit2024');
+    const { uid, authEmail } = await createFbUser('admin', 'ecofit2024');
     await setDoc(doc(fbDB, 'users', uid), {
       id: uid, username: 'admin', nombre: 'Administrador',
-      rol: 'admin', activo: true, createdAt: new Date().toISOString(),
+      rol: 'admin', activo: true, authEmail, createdAt: new Date().toISOString(),
     });
   } catch (err) {
     console.warn('[FB] seedAdmin:', err.message);

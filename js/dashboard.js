@@ -1,12 +1,13 @@
 // dashboard.js — Lista de proyectos y estadísticas
 
-import { projects } from './db.js';
+import { projects, users } from './db.js';
 import { esc, fmtFecha, fmtRelativa, fmtProjectId, ESTADOS, PRIORIDADES, TIPOS_SISTEMA, syncBadge } from './utils.js';
 import { isAdmin, isLider } from './auth.js';
 
 // ── Render dashboard completo ──────────────────────────────────────────────────
 export async function renderDashboard(session) {
-  const all = await projects.getAll();
+  _tecnicoFilter = null;
+  const [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
   const stats = calcStats(all);
 
   return `
@@ -53,6 +54,8 @@ export async function renderDashboard(session) {
     </div>
   </div>
 
+  ${isAdmin(session) ? renderWorkload(all, allUsers) : ''}
+
   <div class="search-filter-bar">
     <div class="search-wrap">
       <ph-icon name="magnifying-glass" class="search-icon"></ph-icon>
@@ -80,12 +83,51 @@ export async function renderDashboard(session) {
   `;
 }
 
+// ── Carga de trabajo por técnico (solo admin) ─────────────────────────────────
+function renderWorkload(all, allUsers) {
+  const activos = ['borrador','en_progreso','pendiente_revision','observado'];
+  const tecnicos = allUsers.filter(u => u.activo && u.rol !== 'admin');
+  if (!tecnicos.length) return '';
+
+  const chips = tecnicos.map(u => {
+    const propios   = all.filter(p => activos.includes(p.estado) && p.tecnicoLiderId === u.id).length;
+    const apoyo     = all.filter(p => activos.includes(p.estado) && (p.tecnicosApoyo||[]).includes(u.id)).length;
+    const total     = propios + apoyo;
+    const color     = total === 0 ? 'var(--text-muted)' : total <= 2 ? 'var(--g300)' : total <= 4 ? 'var(--solar)' : 'var(--red)';
+    const rol       = u.rol === 'lider' ? 'Líder' : 'Apoyo';
+    return `
+    <button class="workload-chip" onclick="window._dashFilterTecnico('${u.id}')" title="Ver proyectos de ${esc(u.nombre)}">
+      <span class="wl-nombre">${esc(u.nombre.split(' ')[0])}</span>
+      <span class="wl-rol">${rol}</span>
+      <span class="wl-count" style="color:${color}">${total}</span>
+      ${propios && apoyo ? `<span class="wl-sub">${propios}L·${apoyo}A</span>` : ''}
+    </button>`;
+  }).join('');
+
+  return `
+  <div class="workload-bar">
+    <span class="wl-label">Carga</span>
+    ${chips}
+    ${document.getElementById('wl-active') ? '' : ''}
+  </div>`;
+}
+
 // ── Filtros interactivos ───────────────────────────────────────────────────────
 let _allProjects = [];
 
 export function initDashboardFilters(all) {
   _allProjects = all;
 }
+
+let _tecnicoFilter = null;
+window._dashFilterTecnico = function(uid) {
+  _tecnicoFilter = _tecnicoFilter === uid ? null : uid;
+  document.querySelectorAll('.workload-chip').forEach(c => {
+    const isMe = c.getAttribute('onclick').includes(uid);
+    c.classList.toggle('wl-active', isMe && _tecnicoFilter === uid);
+  });
+  applyFilters();
+};
 
 window._dashSearch = async function(q) {
   const all = q.trim() ? await projects.search(q) : await projects.getAll();
@@ -101,6 +143,10 @@ function applyFilters() {
   let list = _allProjects;
   if (estado) list = list.filter(p => p.estado === estado);
   if (tipo)   list = list.filter(p => p.tipoSistema === tipo);
+  if (_tecnicoFilter) list = list.filter(p =>
+    p.tecnicoLiderId === _tecnicoFilter ||
+    (p.tecnicosApoyo || []).includes(_tecnicoFilter)
+  );
   const el = document.getElementById('projects-list');
   if (el) el.innerHTML = renderProjectList(list);
 }

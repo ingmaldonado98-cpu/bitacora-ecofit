@@ -1,9 +1,9 @@
 // project.js — Creación, detalle y gestión del proyecto
 
 import { projects, users, kv } from './db.js';
-import { esc, fmtFecha, fmtFechaHora, fmtProjectId, uuid, isoNow, toast,
-         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, CAMPOS_SISTEMA_PEQUENO, confirmDialog } from './utils.js';
-import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS } from './auth.js';
+import { esc, fmtFecha, fmtFechaHora, fmtRelativa, fmtProjectId, uuid, isoNow, toast,
+         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, CAMPOS_SISTEMA_PEQUENO, confirmDialog, cambioEstadoDialog } from './utils.js';
+import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } from './auth.js';
 import { icon } from './icons.js';
 
 // ── Vista detalle del proyecto ─────────────────────────────────────────────────
@@ -199,6 +199,8 @@ export async function renderProjectDetail(id, session) {
       </div>
     </div>
   </div>
+
+  ${renderStatusLog(project.statusLog)}
   `;
 }
 
@@ -295,6 +297,35 @@ function renderChecklistProgreso(project) {
   </div>`;
 }
 
+// ── Historial de cambios de estado ────────────────────────────────────────────
+function renderStatusLog(log) {
+  if (!log?.length) return '';
+  const entries = [...log].reverse();
+  return `
+  <div class="card">
+    <h3 class="card-title">Historial de cambios</h3>
+    <div class="status-log">
+      ${entries.map(e => {
+        const fromEst = ESTADOS[e.from];
+        const toEst   = ESTADOS[e.to];
+        return `
+        <div class="slog-entry">
+          <div class="slog-estados">
+            <span class="slog-badge" style="background:${fromEst?.color}20;color:${fromEst?.color}">${fromEst?.label || e.from}</span>
+            <span class="slog-arrow">→</span>
+            <span class="slog-badge" style="background:${toEst?.color}20;color:${toEst?.color}">${toEst?.label || e.to}</span>
+          </div>
+          <div class="slog-meta">
+            <span class="slog-by">${esc(e.by)}</span>
+            <span class="slog-at">${fmtRelativa(e.at)}</span>
+          </div>
+          ${e.nota ? `<p class="slog-nota">${esc(e.nota)}</p>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
 // ── Check requisitos para revisión ────────────────────────────────────────────
 function checklistFaltantes(project) {
   const faltantes = [];
@@ -352,7 +383,7 @@ window._submitObs = async function(id) {
 };
 
 window._delObs = async function(id, idx) {
-  if (!confirmDialog('¿Eliminar esta observación?')) return;
+  if (!await confirmDialog('¿Eliminar esta observación?')) return;
   const project = await projects.getById(id);
   const obs = (project.observaciones || []).filter((_,i) => i !== idx);
   await projects.update(id, { observaciones: obs });
@@ -362,22 +393,38 @@ window._delObs = async function(id, idx) {
 
 window._eliminarProyecto = async function(id) {
   const project = await projects.getById(id);
-  if (!confirmDialog(`¿Eliminar el proyecto "${project?.displayId} — ${project?.clientName}"?\n\nEsta acción es irreversible.`)) return;
+  if (!await confirmDialog(`¿Eliminar el proyecto "${project?.displayId} — ${project?.clientName}"?\n\nEsta acción es irreversible.`)) return;
   await projects.delete(id);
   toast('Proyecto eliminado');
   navigate('#dashboard');
 };
 
 window._cambiarEstado = async function(id, nuevoEstado) {
-  const msg = `¿Cambiar estado a "${ESTADOS[nuevoEstado]?.label}"?`;
-  if (!confirmDialog(msg)) return;
-  const changes = { estado: nuevoEstado };
-  if (nuevoEstado === 'en_progreso' && !(await projects.getById(id))?.fechaInicio) {
-    changes.fechaInicio = isoNow();
-  }
+  const notaRequerida = ['observado', 'cancelado'].includes(nuevoEstado);
+  const result = await cambioEstadoDialog(ESTADOS[nuevoEstado]?.label || nuevoEstado, notaRequerida);
+  if (!result) return;
+
+  const [session, project] = await Promise.all([getSession(), projects.getById(id)]);
+
+  const logEntry = {
+    id: uuid(),
+    from: project.estado,
+    to: nuevoEstado,
+    by: session?.nombre || 'Sistema',
+    byId: session?.uid || session?.id || '',
+    at: isoNow(),
+    nota: result.nota || null,
+  };
+
+  const changes = {
+    estado: nuevoEstado,
+    statusLog: [...(project.statusLog || []), logEntry],
+  };
+  if (nuevoEstado === 'en_progreso' && !project.fechaInicio) changes.fechaInicio = isoNow();
   if (nuevoEstado === 'cerrado') changes.fechaCierre = isoNow();
+
   await projects.update(id, changes);
-  toast(`Estado actualizado: ${ESTADOS[nuevoEstado]?.label}`);
+  toast(`Estado → ${ESTADOS[nuevoEstado]?.label}`);
   navigate(`#proyecto/${id}`);
 };
 

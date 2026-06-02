@@ -4,6 +4,9 @@ import { projects } from './db.js';
 import { esc, toast, isoNow } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
 import { HERRAMIENTA, getConsumibles, ADMIN_REVIEW_ITEMS } from '../modules/checklist/index.js';
+import { buildDiagramSVG, buildGuiaData, buildTorqueTable } from '../modules/calculadora/index.js';
+
+let _clDiagScale = 1;
 import { icon } from './icons.js';
 
 export async function renderChecklistModule(projectId, session) {
@@ -64,6 +67,9 @@ export async function renderChecklistModule(projectId, session) {
     <button class="tab-btn" data-tab="cl-rev" onclick="switchTab('cl-tabs','cl-rev',this)">
       Revisión${allAdmin ? '<span class="tab-badge tab-ok">✓</span>' : admin ? '<span class="tab-badge tab-req">!</span>' : ''}
     </button>
+    <button class="tab-btn" data-tab="cl-guia" onclick="switchTab('cl-tabs','cl-guia',this)">
+      Guía${cfg ? '' : ''}
+    </button>
   </div>
 
   <!-- Herramienta -->
@@ -91,19 +97,33 @@ export async function renderChecklistModule(projectId, session) {
   <!-- Consumibles -->
   <div id="cl-cons" class="tab-panel">
     <div class="card">
-      ${cfg ? `
-      ${renderProgress(doneCons, consumibles.length)}
-      <div class="cl-item-list">
-        ${consumibles.map((c, i) => `
-        <label class="cl-item ${cl.cons?.[String(i)] ? 'cl-item-done' : ''}">
-          <input type="checkbox" ${cl.cons?.[String(i)] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
-            onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleCons('${projectId}',${i},this.checked)">
-          <div class="cl-item-text">
-            <span class="cl-item-name">${esc(c.n)}</span>
-            ${c.note ? `<span class="cl-item-note">${esc(c.note)}</span>` : ''}
-          </div>
-        </label>`).join('')}
-      </div>` : `
+      ${cfg ? (() => {
+        const qtyMap = {};
+        (cfg.computed?.consumibles || []).forEach(c => { qtyMap[c.nombre] = c; });
+        return `
+        ${renderProgress(doneCons, consumibles.length)}
+        <div class="cl-item-list">
+          ${consumibles.map((c, i) => {
+            const match = qtyMap[c.n];
+            const qtyBadge = match
+              ? `<span style="font-size:.72rem;font-family:monospace;font-weight:700;color:var(--solar);
+                  background:rgba(250,179,0,.12);border-radius:4px;padding:1px 6px;white-space:nowrap">${match.qty} ${match.unit}</span>`
+              : '';
+            return `
+            <label class="cl-item ${cl.cons?.[String(i)] ? 'cl-item-done' : ''}">
+              <input type="checkbox" ${cl.cons?.[String(i)] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
+                onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleCons('${projectId}',${i},this.checked)">
+              <div class="cl-item-text" style="flex:1">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span class="cl-item-name">${esc(c.n)}</span>
+                  ${qtyBadge}
+                </div>
+                ${c.note ? `<span class="cl-item-note">${esc(c.note)}</span>` : ''}
+              </div>
+            </label>`;
+          }).join('')}
+        </div>`;
+      })() : `
       <div class="cl-no-cfg">
         ${icon('calculator', 36)}
         <p>Genera el BOM en la calculadora para ver la lista de consumibles automáticamente.</p>
@@ -112,6 +132,11 @@ export async function renderChecklistModule(projectId, session) {
         </button>
       </div>`}
     </div>
+  </div>
+
+  <!-- Guía técnica -->
+  <div id="cl-guia" class="tab-panel">
+    ${renderGuiaTab(cfg, projectId)}
   </div>
 
   <!-- Revisión Admin -->
@@ -146,6 +171,139 @@ export async function renderChecklistModule(projectId, session) {
     </button>
   </div>
   `;
+}
+
+// ── Guía técnica ──────────────────────────────────────────────────────────────
+function renderGuiaTab(cfg, projectId) {
+  if (!cfg) return `
+  <div class="card">
+    <div class="cl-no-cfg">
+      ${icon('calculator', 36)}
+      <p>Genera el BOM en la calculadora para ver el diagrama, medidas y cantidades de instalación.</p>
+      <button class="btn-outline btn-sm" onclick="navigate('#calculadora/${projectId}')">
+        ${icon('calculator', 14)} Abrir calculadora
+      </button>
+    </div>
+  </div>`;
+
+  const rd     = cfg.layout?.rowsData || [1];
+  const pW     = cfg.panel?.width     || 1.134;
+  const pH     = cfg.panel?.height    || 1.990;
+  const est    = cfg.estructura       || 'k2';
+  const techo  = cfg.techo            || 'cemento';
+  const isAlx  = est === 'aluminex';
+  const railName = isAlx ? 'NXT-RX (4.20 m)' : 'CrossRail 48-X (4.70 m)';
+  const gH     = est === 'aluminex' ? 0.022 : 0.010;
+
+  const svgStr     = buildDiagramSVG(rd, pW, pH, est);
+  const guia       = buildGuiaData(rd, pW, pH, est);
+  const torques    = buildTorqueTable(est, techo);
+  const computedC  = cfg.computed?.consumibles || [];
+
+  // Diagrama
+  const diagCard = `
+  <div class="card" style="padding:0;overflow:hidden" id="cl-diagram-card">
+    <div style="padding:10px 14px;background:var(--surface2);display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <h3 class="card-title" style="margin:0">Diagrama — vista superior</h3>
+      <div class="diag-zoom-btns">
+        <button class="diag-btn" onclick="clDiagZoom(-0.2)">−</button>
+        <button class="diag-btn" onclick="clDiagZoomReset()">1:1</button>
+        <button class="diag-btn" onclick="clDiagZoom(0.2)">+</button>
+        <button class="diag-btn" onclick="clDiagFullscreen()">⛶</button>
+      </div>
+    </div>
+    <div style="padding:12px;overflow:auto;background:#0e1e11;cursor:grab">
+      <div id="cl-diag-inner" style="transform-origin:top left;transition:transform .15s;display:inline-block">
+        ${svgStr}
+      </div>
+    </div>
+  </div>`;
+
+  // Medidas de instalación
+  const guiaBlocks = guia.map(g => {
+    const { n, rows, cut, clampPos, railGap, feet, span } = g;
+    const rowLbl = rows.length === 1 ? `Fila ${rows[0]}` : `Filas ${rows.join(', ')}`;
+    const feetMarks = feet.map((fp, fi) => {
+      const isEdge = fi === 0 || fi === feet.length - 1;
+      const lbl = fi === 0 ? 'S1 izq.' : fi === feet.length - 1 ? `S${fi+1} der.` : `S${fi+1}`;
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;
+        padding:6px 10px;border-radius:6px;
+        background:${isEdge?'rgba(46,189,66,.12)':'var(--surface2)'};
+        border:1px solid ${isEdge?'var(--g500)':'var(--border)'}">
+        <span style="font-family:monospace;font-size:.9rem;font-weight:700;color:${isEdge?'var(--g300)':'var(--text)'}">${(fp*100).toFixed(1)} cm</span>
+        <span style="font-size:.68rem;color:var(--text-muted)">${lbl}</span>
+      </div>`;
+    }).join('');
+    return `
+    <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:var(--surface2)">
+        <span style="font-weight:700;font-size:.86rem;color:var(--text)">${rowLbl} — ${n} panel${n>1?'es':''}</span>
+        <span style="font-family:monospace;font-size:.9rem;color:var(--solar);font-weight:700">✂ ${(cut*100).toFixed(1)} cm</span>
+      </div>
+      <div style="padding:10px 14px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:.82rem">
+          <span style="color:var(--text-muted)">Cortar ${railName}: </span>
+          <b style="color:var(--text)">${(cut*100).toFixed(1)} cm</b>
+          <span style="color:var(--text-muted);font-size:.75rem"> (5 cm vuelo × 2 + ${n}×${(pW*100).toFixed(1)} cm${n>1?` + ${n-1}×${(gH*100).toFixed(1)} cm gap`:''})</span>
+        </div>
+        <div style="font-size:.82rem;color:var(--text-muted)">
+          Rieles: <b style="color:var(--g300)">${(clampPos*100).toFixed(1)} cm</b> del borde corto ·
+          Separación: <b style="color:var(--g300)">${(railGap*100).toFixed(1)} cm</b>
+        </div>
+        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:4px">
+          ${feet.length} pata${feet.length>1?'s':''}/riel · span <b style="color:var(--text)">${(span*100).toFixed(1)} cm</b>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${feetMarks}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Consumibles con cantidades exactas
+  const consRows = computedC.length
+    ? computedC.map(c => `
+    <div style="display:flex;justify-content:space-between;align-items:center;
+      padding:8px 12px;border-bottom:1px solid var(--border)">
+      <span style="font-size:.86rem;color:var(--text)">${c.nombre}</span>
+      <span style="font-family:monospace;font-weight:700;font-size:1rem;color:var(--solar)">
+        ${c.qty} <span style="font-size:.75rem;color:var(--text-muted)">${c.unit}</span>
+      </span>
+    </div>`).join('')
+    : '<p style="padding:12px;font-size:.84rem;color:var(--text-muted);margin:0">Sin datos calculados.</p>';
+
+  // Torques
+  const torqRows = torques.map(t => `
+  <div style="padding:8px 12px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.84rem;font-weight:600;color:var(--text)">${t.comp}</span>
+      <span style="font-family:monospace;font-weight:700;color:var(--g300);font-size:.84rem">${t.torque}</span>
+    </div>
+    <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">${t.nota}</div>
+  </div>`).join('');
+
+  return `
+  ${diagCard}
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:10px 14px;background:var(--surface2);display:flex;justify-content:space-between;align-items:center">
+      <h3 class="card-title" style="margin:0">Medidas de instalación</h3>
+      <span style="font-size:.75rem;color:var(--text-muted)">${isAlx?'Aluminex':'K2 Systems'} · ${techo==='cemento'?'Concreto':'Metal'}</span>
+    </div>
+    <div style="padding:12px 14px">${guiaBlocks}</div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:10px 14px;background:var(--surface2)">
+      <h3 class="card-title" style="margin:0">Consumibles — cantidades exactas</h3>
+    </div>
+    ${consRows}
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:10px 14px;background:var(--surface2)">
+      <h3 class="card-title" style="margin:0">Torques de apriete</h3>
+    </div>
+    ${torqRows}
+  </div>`;
 }
 
 // ── Helpers de render ─────────────────────────────────────────────────────────
@@ -193,6 +351,27 @@ window.clUnpublish = async function(projectId) {
   await projects.update(projectId, { checklistData: p.checklistData });
   toast('Aprobación revocada');
   navigate(`#checklist/${projectId}`);
+};
+
+// ── Zoom diagrama en checklist ────────────────────────────────────────────────
+window.clDiagZoom = function(delta) {
+  _clDiagScale = Math.min(3, Math.max(0.3, _clDiagScale + delta));
+  const el = document.getElementById('cl-diag-inner');
+  if (el) el.style.transform = `scale(${_clDiagScale})`;
+};
+window.clDiagZoomReset = function() {
+  _clDiagScale = 1;
+  const el = document.getElementById('cl-diag-inner');
+  if (el) el.style.transform = 'scale(1)';
+};
+window.clDiagFullscreen = function() {
+  const el = document.getElementById('cl-diagram-card');
+  if (!el) return;
+  if (!document.fullscreenElement) {
+    el.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen();
+  }
 };
 
 // ── Exportar PDF ──────────────────────────────────────────────────────────────

@@ -196,7 +196,7 @@ window.capDocFirmado = function() {
 };
 
 window.delDocFirmado = async function(projectId) {
-  if (!confirmDialog('¿Eliminar documento firmado?')) return;
+  if (!await confirmDialog('¿Eliminar documento firmado?')) return;
   const p = await projects.getById(projectId);
   p.auditoria.docFirmado = null;
   await projects.update(projectId, { auditoria: p.auditoria });

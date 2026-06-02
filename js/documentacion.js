@@ -1,8 +1,9 @@
 // documentacion.js — Módulo 2: Levantamiento dinámico + Fases Antes/Durante/Después
 
 import { projects } from './db.js';
-import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog } from './utils.js';
+import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
+import { uploadPhoto } from './firebase.js';
 import { icon } from './icons.js';
 
 // ── Vista principal ────────────────────────────────────────────────────────────
@@ -650,14 +651,16 @@ function renderFase(project, fase, titulo, projectId, edit, required=false) {
 
 window.agregarFoto = function(projectId, fase) {
   capturePhoto(async (b64) => {
-    const nota = prompt('Nota para esta foto (opcional):') || '';
+    toast('Subiendo foto…');
+    const fid = uuid();
+    const url = await uploadPhoto(b64, `projects/${projectId}/${fase}_${fid}.jpg`);
+    const nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
     const p = await projects.getById(projectId);
     p.documentacion = p.documentacion || {};
     p.documentacion.fases = p.documentacion.fases || { antes:[], durante:[], despues:[] };
-    p.documentacion.fases[fase] = [...(p.documentacion.fases[fase]||[]), { data:b64, nota, id:uuid(), createdAt:isoNow() }];
+    p.documentacion.fases[fase] = [...(p.documentacion.fases[fase]||[]), { data:url, nota, id:fid, createdAt:isoNow() }];
     await projects.update(projectId, { documentacion: p.documentacion });
     navigate(`#proyecto/${projectId}/documentacion`);
-    // Auto switch to correct tab
     setTimeout(() => {
       const tabMap = { antes:'d-antes', durante:'d-durante', despues:'d-despues' };
       const tabBtn = document.querySelector(`[data-tab="${tabMap[fase]}"]`);
@@ -668,7 +671,7 @@ window.agregarFoto = function(projectId, fase) {
 };
 
 window.delFotoFase = async function(projectId, fase, idx) {
-  if (!confirmDialog('¿Eliminar esta foto?')) return;
+  if (!await confirmDialog('¿Eliminar esta foto?')) return;
   const p = await projects.getById(projectId);
   p.documentacion.fases[fase].splice(idx,1);
   await projects.update(projectId, { documentacion: p.documentacion });
@@ -678,7 +681,7 @@ window.delFotoFase = async function(projectId, fase, idx) {
 window.editFotaNota = async function(projectId, fase, idx) {
   const p = await projects.getById(projectId);
   const actual = p.documentacion.fases[fase][idx].nota || '';
-  const nueva = prompt('Editar nota:', actual);
+  const nueva = await inputDialog('Editar nota:', actual);
   if (nueva === null) return;
   p.documentacion.fases[fase][idx].nota = nueva;
   await projects.update(projectId, { documentacion: p.documentacion });
@@ -724,7 +727,7 @@ window._submitNotaDoc = async function(projectId) {
 };
 
 window._delNotaDoc = async function(projectId, idx) {
-  if (!confirmDialog('¿Eliminar esta nota?')) return;
+  if (!await confirmDialog('¿Eliminar esta nota?')) return;
   const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
   const p = await projects.getById(projectId);
   p.documentacion.notas = (p.documentacion.notas || []).filter((_,i) => i !== idx);

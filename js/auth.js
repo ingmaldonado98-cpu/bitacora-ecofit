@@ -14,7 +14,7 @@ export const ROLES = {
 // ── Transiciones de estado ─────────────────────────────────────────────────
 export const TRANSITIONS = {
   borrador:           { admin: ['en_progreso','cancelado'],           lider: ['en_progreso'],       apoyo: [] },
-  en_progreso:        { admin: ['pendiente_revision','cancelado'],    lider: ['pendiente_revision'], apoyo: [] },
+  en_progreso:        { admin: ['pendiente_revision','cancelado'],    lider: ['pendiente_revision'], apoyo: ['pendiente_revision'] },
   pendiente_revision: { admin: ['observado','cerrado','en_progreso'], lider: [],                    apoyo: [] },
   observado:          { admin: ['cerrado','cancelado'],               lider: ['en_progreso'],        apoyo: [] },
   cerrado:            { admin: [],                                    lider: [],                     apoyo: [] },
@@ -49,12 +49,16 @@ export async function login(username, password) {
   await seedAdminIfEmpty();
 
   try {
-    const cred = await signInWithEmailAndPassword(fbAuth, toEmail(username), password);
+    // Buscar perfil primero para obtener el authEmail correcto (real o sintético)
+    const profilePre = await fbUsers.getByUsername(username);
+    const authEmail  = profilePre?.authEmail || toEmail(username);
+
+    const cred = await signInWithEmailAndPassword(fbAuth, authEmail, password);
     const uid  = cred.user.uid;
 
     // Cargar perfil desde Firestore
     let profile = await fbUsers.getById(uid);
-    if (!profile) profile = await fbUsers.getByUsername(username);
+    if (!profile) profile = profilePre;
     if (!profile) throw new Error('Perfil de usuario no encontrado en Firestore.');
     if (!profile.activo) throw new Error('Usuario desactivado. Contacta al administrador.');
 
@@ -83,9 +87,20 @@ export function canTransition(session, estadoActual, nuevoEstado) {
 
 export function canEdit(session, project) {
   if (!session) return false;
-  if (session.rol === 'admin')  return true;
-  if (session.rol === 'lider'  && project.tecnicoLiderId === session.id) return true;
-  if (session.rol === 'apoyo'  && (project.tecnicosApoyo || []).includes(session.id)) return true;
+  if (session.rol === 'admin') return true;
+
+  // Proyectos cerrados o cancelados no se editan
+  if (['cerrado', 'cancelado'].includes(project?.estado)) return false;
+
+  // Técnico Líder puede editar cualquier proyecto activo
+  if (session.rol === 'lider') return true;
+
+  // Técnico Apoyo solo puede editar los proyectos donde está asignado
+  if (session.rol === 'apoyo') {
+    return project.tecnicoLiderId === session.id ||
+           (project.tecnicosApoyo || []).includes(session.id);
+  }
+
   return false;
 }
 

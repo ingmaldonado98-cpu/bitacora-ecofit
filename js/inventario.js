@@ -1,6 +1,6 @@
 // inventario.js — Control de Almacén · Bitácora Ecofit V6
 
-import { toast } from './utils.js';
+import { toast, confirmDialog, inputDialog } from './utils.js';
 import { inventario as invStore } from './db.js';
 
 // ── Materiales base (136 items) ────────────────────────────────────────────
@@ -644,7 +644,7 @@ function bindCaptura(){
   const bg=document.getElementById('inv-btn-guardar');
   if(bg) bg.onclick=async()=>{
     if(!S.month.trim()){toast('Ingresa el mes antes de guardar','error');return;}
-    const nota=prompt('¿Alguna observación del inventario? (opcional)\nEj: "Falta revisar Estante B"\n\nDeja vacío si no hay observaciones.','');
+    const nota=await inputDialog('¿Alguna observación del inventario? (opcional)','','Ej: "Falta revisar Estante B"');
     if(nota===null)return;
     S.saving=true;invRender();
     const mesGuardado=S.month;
@@ -658,7 +658,7 @@ function bindCaptura(){
       S.history=[entry,...S.history.filter(h=>h.fecha!==mesGuardado)];
       await invSave();
       S.saving=false;
-      const iniciar=confirm('✅ Mes "'+mesGuardado+'" guardado.\n\n¿Deseas limpiar Stock Actual e iniciar el nuevo mes?');
+      const iniciar=await confirmDialog('✅ Mes "'+mesGuardado+'" guardado.\n\n¿Deseas limpiar Stock Actual e iniciar el nuevo mes?');
       if(iniciar){
         S.stock={};S.month=nowLabel();
         await invSave();
@@ -673,7 +673,7 @@ function bindCaptura(){
   // Nuevo mes
   const bn=document.getElementById('inv-btn-nuevo');
   if(bn) bn.onclick=async()=>{
-    if(!confirm('¿Iniciar nuevo mes?\nSe borrará el Stock Actual.\nAsegúrate de haber guardado "'+S.month+'" primero.'))return;
+    if(!await confirmDialog('¿Iniciar nuevo mes?\nSe borrará el Stock Actual.\nAsegúrate de haber guardado "'+S.month+'" primero.'))return;
     S.stock={};S.month=nowLabel();
     try{await invSave();toast('Inventario limpiado. Listo para '+S.month);}
     catch(e){toast(e.message,'error');}
@@ -700,7 +700,7 @@ function bindCatalogo(){
     };
   });
   document.querySelectorAll('.del-mat').forEach(b=>b.onclick=async()=>{
-    if(!confirm('¿Eliminar este material?'))return;
+    if(!await confirmDialog('¿Eliminar este material?'))return;
     const id=b.dataset.id;
     S.materials=S.materials.filter(m=>m.id!==id);
     delete S.stock[id];
@@ -708,16 +708,16 @@ function bindCatalogo(){
     catch(e){toast(e.message,'error');}
     invRender();
   });
-  document.querySelectorAll('.edit-mat').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.edit-mat').forEach(b=>b.onclick=async()=>{
     const mat=S.materials.find(m=>m.id===b.dataset.id);
     if(!mat)return;
-    const nuevoNombre=prompt('Editar nombre:',mat.material);
+    const nuevoNombre=await inputDialog('Editar nombre:',mat.material);
     if(nuevoNombre===null)return;
     if(!nuevoNombre.trim()){toast('El nombre no puede estar vacío','error');return;}
-    const nuevaUnidad=prompt('Editar unidad:',mat.unidad||'pzas');
+    const nuevaUnidad=await inputDialog('Editar unidad:',mat.unidad||'pzas');
     if(nuevaUnidad===null)return;
     const cats=getCats();
-    const nuevaCat=prompt('Editar categoría:\n'+cats.join(' | '),mat.categoria||'General');
+    const nuevaCat=await inputDialog('Editar categoría:',mat.categoria||'General',cats.join(' | '));
     if(nuevaCat===null)return;
     mat.material=nuevoNombre.trim();
     mat.unidad=nuevaUnidad.trim()||'pzas';
@@ -771,7 +771,7 @@ function bindAreas(){
   };
   document.querySelectorAll('.edit-area').forEach(b=>b.onclick=async()=>{
     const cat=b.dataset.cat;
-    const nuevoNombre=prompt('Editar nombre del área:',cat);
+    const nuevoNombre=await inputDialog('Editar nombre del área:',cat);
     if(!nuevoNombre?.trim()||nuevoNombre.trim()===cat)return;
     const nuevo=nuevoNombre.trim();
     const cats=getCats();
@@ -791,7 +791,7 @@ function bindAreas(){
     const msg=count>0
       ?'El área "'+cat+'" tiene '+count+' material(es).\nEstos pasarán a "General".\n\n¿Continuar?'
       :'¿Eliminar el área "'+cat+'"?';
-    if(!confirm(msg))return;
+    if(!await confirmDialog(msg))return;
     if(!S.areas)S.areas=[...CATS_DEFAULT];
     S.areas=S.areas.filter(c=>c!==cat);
     S.materials.forEach(m=>{if(m.categoria===cat)m.categoria='General';});

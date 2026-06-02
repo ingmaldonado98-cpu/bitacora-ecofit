@@ -5,7 +5,7 @@ import { esc, uuid, isoNow, toast, confirmDialog } from './utils.js';
 import { isAdmin, ROLES } from './auth.js';
 import { PANEL_PRESETS } from '../modules/calculadora/index.js';
 import { icon } from './icons.js';
-import { createFbUser, toEmail, fbUsers } from './firebase.js';
+import { createFbUser, toEmail, fbUsers, resetPassword } from './firebase.js';
 import { getStatus as getOneDriveStatusObj, pickFolder, requestPermission, testAccess } from './onedrive.js';
 
 async function getOneDriveStatus() {
@@ -58,6 +58,10 @@ export async function renderSettings(session) {
             ${Object.entries(ROLES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}
           </select>
         </div>
+      </div>
+      <div class="form-group">
+        <label>Email de recuperación <span style="color:var(--text-muted);font-size:.75rem">(opcional — para reset de contraseña)</span></label>
+        <input type="email" id="nu-email" placeholder="correo@gmail.com" />
       </div>
       <div class="form-actions">
         <button class="btn-outline btn-sm" onclick="document.getElementById('form-nuevo-usuario').style.display='none'">Cancelar</button>
@@ -239,6 +243,7 @@ function renderUsersList(allUsers, session) {
         <button class="btn-icon-sm" onclick="editarUser('${u.id}')" title="Editar">✎</button>
         <button class="btn-icon-sm" onclick="toggleUser('${u.id}',${u.activo})"
                 title="${u.activo?'Desactivar':'Activar'}">${u.activo?'✓':'○'}</button>
+        ${u.authEmail ? `<button class="btn-icon-sm" onclick="resetPassUser('${u.id}','${esc(u.authEmail)}')" title="Enviar reset de contraseña">🔑</button>` : ''}
         <button class="btn-del-sm" onclick="eliminarUser('${u.id}')">✕</button>
       </div>` : `
       <div class="user-actions">
@@ -256,14 +261,19 @@ function renderUsersList(allUsers, session) {
           <input type="text" id="ue-username-${u.id}" value="${esc(u.username)}" /></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Nueva contraseña <span style="color:var(--text-muted);font-size:.75rem">(dejar vacío para no cambiar)</span></label>
-          <input type="password" id="ue-pass-${u.id}" placeholder="mín. 6 chars" /></div>
         <div class="form-group"><label>Rol</label>
           <select id="ue-rol-${u.id}">
             ${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.rol===k?'selected':''}>${v.label}</option>`).join('')}
           </select>
         </div>
       </div>
+      <div class="form-group">
+        <label>Email de recuperación <span style="color:var(--text-muted);font-size:.75rem">(para reset de contraseña)</span></label>
+        <input type="email" id="ue-email-${u.id}" value="${esc(u.email||'')}" placeholder="correo@gmail.com" />
+      </div>
+      <p class="hint-text" style="margin:4px 0">
+        🔒 La contraseña solo puede cambiarla el propio usuario desde su sesión.
+      </p>
       <div class="form-actions">
         <button class="btn-outline btn-sm" onclick="document.getElementById('uedit-${u.id}').style.display='none';document.getElementById('urow-${u.id}').style.display=''">Cancelar</button>
         <button class="btn-primary btn-sm" onclick="guardarEditUser('${u.id}')">Guardar</button>
@@ -355,17 +365,13 @@ window.editarUser = function(id) {
 window.guardarEditUser = async function(id) {
   const nombre   = document.getElementById('ue-nombre-' + id).value.trim();
   const username = document.getElementById('ue-username-' + id).value.trim().toLowerCase();
-  const pass     = document.getElementById('ue-pass-' + id).value;
   const rol      = document.getElementById('ue-rol-' + id).value;
+  const email    = document.getElementById('ue-email-' + id)?.value.trim() || null;
 
   if (!nombre || !username) { toast('Nombre y usuario son obligatorios', 'error'); return; }
-  if (pass && pass.length < 6) { toast('Contraseña mínimo 6 caracteres', 'error'); return; }
-
-  const changes = { nombre, username, rol };
-  // Nota: cambio de contraseña en Firebase Auth requiere Admin SDK (no implementado en cliente)
 
   try {
-    await users.update(id, changes);
+    await users.update(id, { nombre, username, rol, ...(email ? { email } : {}) });
     toast('✅ Usuario actualizado');
     navigate('#settings');
   } catch(err) {
@@ -383,6 +389,7 @@ window.crearUsuario = async function() {
   const username = document.getElementById('nu-username').value.trim().toLowerCase();
   const pass     = document.getElementById('nu-pass').value;
   const rol      = document.getElementById('nu-rol').value;
+  const email    = document.getElementById('nu-email')?.value.trim() || null;
 
   if (!nombre || !username || !pass) { toast('Completa todos los campos','error'); return; }
   if (pass.length < 6) { toast('Contraseña mínimo 6 caracteres','error'); return; }
@@ -392,9 +399,11 @@ window.crearUsuario = async function() {
 
   try {
     // 1. Crear en Firebase Auth (sin cerrar sesión actual)
-    const uid = await createFbUser(username, pass);
+    // Si se proporcionó email real, se usa como email de Firebase Auth (permite reset real)
+    const { uid, authEmail } = await createFbUser(username, pass, email);
     // 2. Crear perfil en Firestore
-    await fbUsers.add({ id: uid, nombre, username, rol, activo: true, createdAt: isoNow() });
+    await fbUsers.add({ id: uid, nombre, username, rol, activo: true,
+      authEmail, ...(email ? { email } : {}), createdAt: isoNow() });
     toast(`✅ Usuario @${username} creado`);
     navigate('#settings');
   } catch(err) {
@@ -409,7 +418,7 @@ window.toggleUser = async function(id, activo) {
 };
 
 window.eliminarUser = async function(id) {
-  if (!confirmDialog('¿Eliminar este usuario? Esta acción es irreversible.')) return;
+  if (!await confirmDialog('¿Eliminar este usuario? Esta acción es irreversible.')) return;
   await users.delete(id);
   toast('Usuario eliminado');
   navigate('#settings');
@@ -466,7 +475,7 @@ window.exportarDatos = async function() {
 
 window.importarDatos = async function(e) {
   const file = e.target.files[0]; if (!file) return;
-  if (!confirmDialog('¿Importar backup? Se reemplazarán todos los proyectos actuales.')) return;
+  if (!await confirmDialog('¿Importar backup? Se reemplazarán todos los proyectos actuales.')) return;
   try {
     const text = await file.text();
     const data = JSON.parse(text);
@@ -535,16 +544,29 @@ window.guardarEditPanel = async function(id) {
 };
 
 window.eliminarPanel = async function(id) {
-  if (!confirmDialog('¿Eliminar este modelo de panel?')) return;
+  if (!await confirmDialog('¿Eliminar este modelo de panel?')) return;
   const existing = (await kv.get('panel_presets_custom')) || [];
   await kv.set('panel_presets_custom', existing.filter(p => p.id !== id));
   toast('Panel eliminado');
   navigate('#settings');
 };
 
+window.resetPassUser = async function(id, authEmail) {
+  const ok = await (await import('./utils.js')).confirmDialog(
+    `¿Enviar link de restablecimiento de contraseña a:\n${authEmail}?`
+  );
+  if (!ok) return;
+  try {
+    await resetPassword(authEmail);
+    toast('📧 Link de restablecimiento enviado');
+  } catch(err) {
+    toast('Error al enviar reset: ' + err.message, 'error');
+  }
+};
+
 window.limpiarDatos = async function() {
-  if (!confirmDialog('¿ELIMINAR TODOS los datos locales? Esta acción es IRREVERSIBLE.')) return;
-  if (!confirmDialog('Segunda confirmación: ¿Seguro? Perderás todos los proyectos.')) return;
+  if (!await confirmDialog('¿ELIMINAR TODOS los datos locales? Esta acción es IRREVERSIBLE.')) return;
+  if (!await confirmDialog('Segunda confirmación: ¿Seguro? Perderás todos los proyectos.')) return;
   const dbs = await indexedDB.databases?.() || [];
   for (const db of dbs) { if (db.name === 'ecofitV6') indexedDB.deleteDatabase(db.name); }
   sessionStorage.clear();

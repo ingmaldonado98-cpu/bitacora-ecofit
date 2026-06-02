@@ -210,6 +210,150 @@ export function buildProjectConfig(cs) {
   };
 }
 
+// ── Diagrama SVG — función pura reutilizable ──────────────────────────────────
+export function buildDiagramSVG(rd, pW, pH, estructura) {
+  const gapH = clampW(estructura);
+  const gapV = 0.0113;
+  const OH   = C.OVERHANG;
+  const totalR = rd.length;
+  const maxC   = Math.max(...rd);
+  const railLen = maxC * pW + (maxC - 1) * gapH + 2 * OH;
+  const distBetweenFeet = maxC > 1 ? (pW + gapH) : pW;
+
+  const ML = 56, MR = 20, MT = 60, MB = 40;
+  let scale = (340 - ML - MR) / railLen;
+  scale = Math.max(scale, 14);
+
+  const pxW = pW * scale, pxH = pH * scale;
+  const pxGH = gapH * scale, pxGV = gapV * scale, pxOH = OH * scale;
+  const cW = ML + railLen * scale + MR + 24;
+  const cH = MT + (totalR * pH + (totalR - 1) * gapV) * scale + MB + 30;
+  const panelOriginX = ML + pxOH;
+
+  const F        = 'Courier New,monospace';
+  const PANEL_S  = '#22a832', PANEL_F = '#172d1c', CELL_L = '#1a4a22';
+  const RAIL_C   = '#60a5fa', FOOT_F  = '#f5c400', FOOT_S = '#c49a00';
+  const COT_C    = '#60a5fa', DIM_C   = '#64748b', RAIL_DIM = '#a78bfa';
+
+  let s = `<svg viewBox="0 0 ${cW} ${cH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:${cW}px;display:block;margin:0 auto">`;
+  s += `<defs>
+    <marker id="ca" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="${COT_C}"/></marker>
+    <marker id="da" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="${DIM_C}"/></marker>
+    <marker id="ra" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="${RAIL_DIM}"/></marker>
+    <marker id="fa" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="${FOOT_F}"/></marker>
+  </defs>`;
+  s += `<rect width="${cW}" height="${cH}" fill="#0e1e11" rx="8"/>`;
+
+  let panelNum = 0;
+  rd.forEach((cols_r, ri) => {
+    const rowY   = MT + ri * (pxH + pxGV);
+    const rowW   = cols_r * pxW + (cols_r - 1) * pxGH;
+    const railX1 = ML;
+    const railX2 = ML + rowW + 2 * pxOH;
+    const railY1 = rowY + pxH * 0.22;
+    const railY2 = rowY + pxH * 0.78;
+
+    for (let ci = 0; ci < cols_r; ci++) {
+      panelNum++;
+      const px = panelOriginX + ci * (pxW + pxGH), py = rowY;
+      s += `<rect x="${px}" y="${py}" width="${pxW}" height="${pxH}" fill="${PANEL_F}" stroke="${PANEL_S}" stroke-width="1.5" rx="2"/>`;
+      const nV = Math.min(4, Math.floor(pxW / 22));
+      for (let l = 1; l <= nV; l++) { const lx = px + l*(pxW/(nV+1)); s += `<line x1="${lx}" y1="${py}" x2="${lx}" y2="${py+pxH}" stroke="${CELL_L}" stroke-width="0.5" opacity="0.5"/>`; }
+      const nH = Math.min(6, Math.floor(pxH / 16));
+      for (let l = 1; l <= nH; l++) { const ly = py + l*(pxH/(nH+1)); s += `<line x1="${px}" y1="${ly}" x2="${px+pxW}" y2="${ly}" stroke="${CELL_L}" stroke-width="0.4" opacity="0.35"/>`; }
+      if (pxW > 18 && pxH > 12) { const fs = Math.min(11, Math.max(6, pxW/5)); s += `<text x="${px+pxW/2}" y="${py+pxH/2+fs*0.35}" text-anchor="middle" fill="#4ade80" font-size="${fs}" font-family="${F}" font-weight="700">${panelNum}</text>`; }
+    }
+
+    s += `<line x1="${railX1}" y1="${railY1}" x2="${railX2}" y2="${railY1}" stroke="${RAIL_C}" stroke-width="2.5" stroke-linecap="round"/>`;
+    s += `<line x1="${railX1}" y1="${railY2}" x2="${railX2}" y2="${railY2}" stroke="${RAIL_C}" stroke-width="2.5" stroke-linecap="round"/>`;
+    if (ri === 0) s += `<text x="${railX1-4}" y="${railY1+3}" text-anchor="end" fill="${RAIL_C}" font-size="8" font-family="${F}">Riel</text>`;
+
+    const footXs = [pxOH];
+    for (let fi = 1; fi < cols_r; fi++) footXs.push(pxOH + fi*(pxW+pxGH) - pxGH/2);
+    footXs.push(pxOH + cols_r*pxW + (cols_r-1)*pxGH);
+    footXs.forEach(fx => {
+      const ax = railX1+fx, fw = 8, fh = 10;
+      s += `<rect x="${ax-fw/2}" y="${railY1-fh+2}" width="${fw}" height="${fh}" fill="${FOOT_F}" stroke="${FOOT_S}" stroke-width="0.8" rx="1.5"/>`;
+      s += `<rect x="${ax-fw/2}" y="${railY2-2}" width="${fw}" height="${fh}" fill="${FOOT_F}" stroke="${FOOT_S}" stroke-width="0.8" rx="1.5"/>`;
+    });
+
+    if (ri === 0 && pxOH > 10) {
+      const ohY = rowY - 14;
+      s += `<line x1="${railX1}" y1="${ohY}" x2="${panelOriginX}" y2="${ohY}" stroke="${RAIL_DIM}" stroke-width="0.8" marker-end="url(#ra)" marker-start="url(#ra)"/>`;
+      s += `<text x="${(railX1+panelOriginX)/2}" y="${ohY-4}" text-anchor="middle" fill="${RAIL_DIM}" font-size="8" font-family="${F}">0.05m</text>`;
+    }
+    if (ri === 0 && footXs.length >= 2 && pxW > 24) {
+      const dY = rowY + pxH + 18;
+      const dx1 = railX1+footXs[0], dx2 = railX1+footXs[1];
+      s += `<line x1="${dx1}" y1="${dY}" x2="${dx2}" y2="${dY}" stroke="${FOOT_F}" stroke-width="0.8" marker-end="url(#fa)" marker-start="url(#fa)"/>`;
+      s += `<text x="${(dx1+dx2)/2}" y="${dY+11}" text-anchor="middle" fill="${FOOT_F}" font-size="8" font-family="${F}" font-weight="700">${distBetweenFeet.toFixed(3)}m</text>`;
+      s += `<text x="${(dx1+dx2)/2}" y="${dY+21}" text-anchor="middle" fill="#475569" font-size="7" font-family="${F}">entre patas</text>`;
+    }
+    if (totalR > 1) s += `<text x="${ML+rowW+2*pxOH+8}" y="${rowY+pxH/2+3}" fill="#475569" font-size="9" font-family="${F}">F${ri+1}</text>`;
+  });
+
+  const cotaY = MT - 28;
+  s += `<line x1="${panelOriginX}" y1="${cotaY}" x2="${panelOriginX+pxW}" y2="${cotaY}" stroke="${COT_C}" stroke-width="1" marker-end="url(#ca)" marker-start="url(#ca)"/>`;
+  s += `<line x1="${panelOriginX}" y1="${cotaY-5}" x2="${panelOriginX}" y2="${cotaY+5}" stroke="${COT_C}" stroke-width="0.8"/>`;
+  s += `<line x1="${panelOriginX+pxW}" y1="${cotaY-5}" x2="${panelOriginX+pxW}" y2="${cotaY+5}" stroke="${COT_C}" stroke-width="0.8"/>`;
+  s += `<text x="${panelOriginX+pxW/2}" y="${cotaY-6}" text-anchor="middle" fill="${COT_C}" font-size="9.5" font-family="${F}" font-weight="700">${pW.toFixed(3)} m</text>`;
+
+  const railCotaY = MT - 44;
+  const railX2c   = ML + maxC*pxW + (maxC>1?(maxC-1)*pxGH:0) + 2*pxOH;
+  s += `<line x1="${ML}" y1="${railCotaY}" x2="${railX2c}" y2="${railCotaY}" stroke="${RAIL_DIM}" stroke-width="1" marker-end="url(#ra)" marker-start="url(#ra)"/>`;
+  s += `<text x="${(ML+railX2c)/2}" y="${railCotaY-5}" text-anchor="middle" fill="${RAIL_DIM}" font-size="9" font-family="${F}" font-weight="700">${railLen.toFixed(3)} m — largo riel</text>`;
+
+  const cotaX = panelOriginX - 30;
+  s += `<line x1="${cotaX}" y1="${MT}" x2="${cotaX}" y2="${MT+pxH}" stroke="${COT_C}" stroke-width="1" marker-end="url(#ca)" marker-start="url(#ca)"/>`;
+  s += `<line x1="${cotaX-5}" y1="${MT}" x2="${cotaX+5}" y2="${MT}" stroke="${COT_C}" stroke-width="0.8"/>`;
+  s += `<line x1="${cotaX-5}" y1="${MT+pxH}" x2="${cotaX+5}" y2="${MT+pxH}" stroke="${COT_C}" stroke-width="0.8"/>`;
+  s += `<text x="${cotaX-9}" y="${MT+pxH/2+3.5}" text-anchor="middle" fill="${COT_C}" font-size="9.5" font-family="${F}" font-weight="700" transform="rotate(-90,${cotaX-9},${MT+pxH/2+3.5})">${pH.toFixed(3)} m</text>`;
+
+  if (maxC > 1) {
+    const tW = maxC*pxW + (maxC-1)*pxGH;
+    s += `<line x1="${panelOriginX}" y1="${MT-16}" x2="${panelOriginX+tW}" y2="${MT-16}" stroke="${DIM_C}" stroke-width="0.8" stroke-dasharray="3,2" marker-end="url(#da)" marker-start="url(#da)"/>`;
+    s += `<text x="${panelOriginX+tW/2}" y="${MT-8}" text-anchor="middle" fill="${DIM_C}" font-size="7.5" font-family="${F}">${(maxC*pW+(maxC-1)*gapH).toFixed(3)} m</text>`;
+  }
+  if (totalR > 1) {
+    const tHpx = totalR*pxH + (totalR-1)*pxGV;
+    const tCX  = panelOriginX - 46;
+    s += `<line x1="${tCX}" y1="${MT}" x2="${tCX}" y2="${MT+tHpx}" stroke="${DIM_C}" stroke-width="0.8" stroke-dasharray="3,2" marker-end="url(#da)" marker-start="url(#da)"/>`;
+    s += `<text x="${tCX-9}" y="${MT+tHpx/2+3}" text-anchor="middle" fill="${DIM_C}" font-size="7.5" font-family="${F}" transform="rotate(-90,${tCX-9},${MT+tHpx/2+3})">${(totalR*pH+(totalR-1)*gapV).toFixed(3)} m total</text>`;
+  }
+  if (maxC > 1 && pxGH > 4) {
+    const gx1 = panelOriginX+pxW, gx2 = panelOriginX+pxW+pxGH, gy = MT+pxH+6;
+    s += `<line x1="${gx1}" y1="${gy}" x2="${gx2}" y2="${gy}" stroke="${DIM_C}" stroke-width="0.8" marker-end="url(#da)" marker-start="url(#da)"/>`;
+    s += `<text x="${(gx1+gx2)/2}" y="${gy-4}" text-anchor="middle" fill="${DIM_C}" font-size="7" font-family="${F}">${gapH.toFixed(4)}m</text>`;
+  }
+  s += '</svg>';
+  return s;
+}
+
+// ── Guía de instalación — datos por grupo de filas ────────────────────────────
+export function buildGuiaData(rd, pW, pH, estructura) {
+  const OH   = C.OVERHANG, S1 = C.S1_OFF, SPAN = C.FOOT_SPAN_MAX, CB = C.CLAMP_B_FRAC;
+  const gH   = clampW(estructura);
+  const groups = {};
+  rd.forEach((n, ri) => {
+    if (!groups[n]) groups[n] = { n, rows: [], cut: 2*OH + n*pW + Math.max(0,n-1)*gH };
+    groups[n].rows.push(ri + 1);
+  });
+  return Object.values(groups).sort((a,b) => a.n - b.n).map(g => {
+    const inner  = g.cut - 2*S1;
+    const nSpans = Math.max(1, Math.ceil(inner / SPAN));
+    const span   = inner / nSpans;
+    return {
+      n:         g.n,
+      rows:      g.rows,
+      cut:       g.cut,
+      clampPos:  CB * pH,
+      railGap:   (1 - 2*CB) * pH,
+      feet:      Array.from({ length: nSpans+1 }, (_, fi) => S1 + fi*span),
+      span,
+    };
+  });
+}
+
 // ── Torques de apriete (tabla de referencia Ecofit) ───────────────────────────
 export function buildTorqueTable(estructura, techo) {
   const rows = [];

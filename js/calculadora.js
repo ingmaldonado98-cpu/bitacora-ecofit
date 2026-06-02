@@ -1,12 +1,13 @@
 // calculadora.js — Calculadora BOM · Bitácora Ecofit V6
 
-import { toast } from './utils.js';
+import { toast, confirmDialog, isoNow } from './utils.js';
 import { icon } from './icons.js';
 import { projects, inventario as invStore, kv } from './db.js';
 import {
   PANEL_PRESETS, C,
   calcBOM, calcConsumibles, buildProjectConfig, buildTorqueTable,
   footsPerRailCalc, railCutForRow, clampW,
+  buildDiagramSVG, buildGuiaData,
 } from '../modules/calculadora/index.js';
 
 // ── Mapeo BOM part-number → ID de inventario ───────────────────────────────
@@ -316,140 +317,14 @@ function renderPanel() {
 
 // ── Diagrama SVG ───────────────────────────────────────────────────────────
 function renderDiagrama() {
-  const rd   = getRowData();
-  const pW   = cs.pW || 1.134;
-  const pH   = cs.pH || 1.990;
+  const rd  = getRowData();
+  const pW  = cs.pW || 1.134;
+  const pH  = cs.pH || 1.990;
   const gapH = clampW(cs.estructura);
-  const gapV = 0.0113;
-  const OVERHANG = C.OVERHANG;
-
-  const totalR  = rd.length;
-  const maxC    = Math.max(...rd);
-  const rawW    = maxC * pW + (maxC - 1) * gapH + 2 * OVERHANG;
-  const rawH    = totalR * pH + (totalR - 1) * gapV;
-
-  // Escala para que quepa bien en ~340px de ancho
-  const ML = 56, MR = 20, MT = 60, MB = 40;
-  const availW = 340 - ML - MR;
-  let scale = availW / rawW;
-  scale = Math.max(scale, 14);
-
-  const pxW = pW * scale, pxH = pH * scale;
-  const pxGH = gapH * scale, pxGV = gapV * scale, pxOH = OVERHANG * scale;
-  const cW = ML + rawW * scale + MR + 24;
-  const cH = MT + rawH * scale + MB + 30;
-
-  const F = 'Courier New,monospace';
-  const PANEL_S = '#22a832', PANEL_F = '#172d1c', CELL_L = '#1a4a22';
-  const RAIL_C = '#60a5fa', FOOT_F = '#f5c400', FOOT_S = '#c49a00';
-  const COT_C = '#60a5fa', DIM_C = '#64748b', RAIL_DIM = '#a78bfa';
-  const panelOriginX = ML + pxOH;
-  const railLen = maxC * pW + (maxC - 1) * gapH + 2 * OVERHANG;
+  const maxC = Math.max(...rd);
+  const railLen         = railCutForRow(maxC, pW, cs.estructura);
   const distBetweenFeet = maxC > 1 ? (pW + gapH) : pW;
-
-  let s = `<svg viewBox="0 0 ${cW} ${cH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:${cW}px;display:block;margin:0 auto">`;
-  s += `<defs>
-    <marker id="ca" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="${COT_C}"/></marker>
-    <marker id="da" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="${DIM_C}"/></marker>
-    <marker id="ra" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="${RAIL_DIM}"/></marker>
-    <marker id="fa" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="${FOOT_F}"/></marker>
-  </defs>`;
-  s += `<rect width="${cW}" height="${cH}" fill="#0e1e11" rx="8"/>`;
-
-  let panelNum = 0;
-  rd.forEach((cols_r, ri) => {
-    const rowY  = MT + ri * (pxH + pxGV);
-    const rowW  = cols_r * pxW + (cols_r - 1) * pxGH;
-    const railX1 = ML;
-    const railX2 = ML + rowW + 2 * pxOH;
-    const railY1 = rowY + pxH * 0.22;
-    const railY2 = rowY + pxH * 0.78;
-
-    // Paneles
-    for (let ci = 0; ci < cols_r; ci++) {
-      panelNum++;
-      const px = panelOriginX + ci * (pxW + pxGH), py = rowY;
-      s += `<rect x="${px}" y="${py}" width="${pxW}" height="${pxH}" fill="${PANEL_F}" stroke="${PANEL_S}" stroke-width="1.5" rx="2"/>`;
-      const nV = Math.min(4, Math.floor(pxW / 22));
-      for (let l = 1; l <= nV; l++) { const lx = px + l * (pxW / (nV + 1)); s += `<line x1="${lx}" y1="${py}" x2="${lx}" y2="${py + pxH}" stroke="${CELL_L}" stroke-width="0.5" opacity="0.5"/>`; }
-      const nH = Math.min(6, Math.floor(pxH / 16));
-      for (let l = 1; l <= nH; l++) { const ly = py + l * (pxH / (nH + 1)); s += `<line x1="${px}" y1="${ly}" x2="${px + pxW}" y2="${ly}" stroke="${CELL_L}" stroke-width="0.4" opacity="0.35"/>`; }
-      if (pxW > 18 && pxH > 12) { const fs = Math.min(11, Math.max(6, pxW / 5)); s += `<text x="${px + pxW / 2}" y="${py + pxH / 2 + fs * 0.35}" text-anchor="middle" fill="#4ade80" font-size="${fs}" font-family="${F}" font-weight="700">${panelNum}</text>`; }
-    }
-
-    // Rieles
-    s += `<line x1="${railX1}" y1="${railY1}" x2="${railX2}" y2="${railY1}" stroke="${RAIL_C}" stroke-width="2.5" stroke-linecap="round"/>`;
-    s += `<line x1="${railX1}" y1="${railY2}" x2="${railX2}" y2="${railY2}" stroke="${RAIL_C}" stroke-width="2.5" stroke-linecap="round"/>`;
-    if (ri === 0) s += `<text x="${railX1 - 4}" y="${railY1 + 3}" text-anchor="end" fill="${RAIL_C}" font-size="8" font-family="${F}">Riel</text>`;
-
-    // Patas (L-feet)
-    const footXs = [pxOH];
-    for (let fi = 1; fi < cols_r; fi++) footXs.push(pxOH + fi * (pxW + pxGH) - pxGH / 2);
-    footXs.push(pxOH + cols_r * pxW + (cols_r - 1) * pxGH);
-    footXs.forEach(fx => {
-      const ax = railX1 + fx, fw = 8, fh = 10;
-      s += `<rect x="${ax - fw / 2}" y="${railY1 - fh + 2}" width="${fw}" height="${fh}" fill="${FOOT_F}" stroke="${FOOT_S}" stroke-width="0.8" rx="1.5"/>`;
-      s += `<rect x="${ax - fw / 2}" y="${railY2 - 2}" width="${fw}" height="${fh}" fill="${FOOT_F}" stroke="${FOOT_S}" stroke-width="0.8" rx="1.5"/>`;
-    });
-
-    // Cota voladizo
-    if (ri === 0 && pxOH > 10) {
-      const ohY = rowY - 14;
-      s += `<line x1="${railX1}" y1="${ohY}" x2="${panelOriginX}" y2="${ohY}" stroke="${RAIL_DIM}" stroke-width="0.8" marker-end="url(#ra)" marker-start="url(#ra)"/>`;
-      s += `<text x="${(railX1 + panelOriginX) / 2}" y="${ohY - 4}" text-anchor="middle" fill="${RAIL_DIM}" font-size="8" font-family="${F}">0.05m</text>`;
-    }
-    // Cota entre patas
-    if (ri === 0 && footXs.length >= 2 && pxW > 24) {
-      const dY = rowY + pxH + 18;
-      const dx1 = railX1 + footXs[0], dx2 = railX1 + footXs[1];
-      s += `<line x1="${dx1}" y1="${dY}" x2="${dx2}" y2="${dY}" stroke="${FOOT_F}" stroke-width="0.8" marker-end="url(#fa)" marker-start="url(#fa)"/>`;
-      s += `<text x="${(dx1 + dx2) / 2}" y="${dY + 11}" text-anchor="middle" fill="${FOOT_F}" font-size="8" font-family="${F}" font-weight="700">${distBetweenFeet.toFixed(3)}m</text>`;
-      s += `<text x="${(dx1 + dx2) / 2}" y="${dY + 21}" text-anchor="middle" fill="#475569" font-size="7" font-family="${F}">entre patas</text>`;
-    }
-    // Etiqueta de fila
-    if (totalR > 1) s += `<text x="${ML + rowW + 2 * pxOH + 8}" y="${rowY + pxH / 2 + 3}" fill="#475569" font-size="9" font-family="${F}">F${ri + 1}</text>`;
-  });
-
-  // Cotas panel ancho
-  const cotaY = MT - 28;
-  s += `<line x1="${panelOriginX}" y1="${cotaY}" x2="${panelOriginX + pxW}" y2="${cotaY}" stroke="${COT_C}" stroke-width="1" marker-end="url(#ca)" marker-start="url(#ca)"/>`;
-  s += `<line x1="${panelOriginX}" y1="${cotaY - 5}" x2="${panelOriginX}" y2="${cotaY + 5}" stroke="${COT_C}" stroke-width="0.8"/>`;
-  s += `<line x1="${panelOriginX + pxW}" y1="${cotaY - 5}" x2="${panelOriginX + pxW}" y2="${cotaY + 5}" stroke="${COT_C}" stroke-width="0.8"/>`;
-  s += `<text x="${panelOriginX + pxW / 2}" y="${cotaY - 6}" text-anchor="middle" fill="${COT_C}" font-size="9.5" font-family="${F}" font-weight="700">${pW.toFixed(3)} m</text>`;
-
-  // Cota riel largo
-  const railCotaY = MT - 44;
-  const railX2c = ML + maxC * pxW + (maxC > 1 ? (maxC - 1) * pxGH : 0) + 2 * pxOH;
-  s += `<line x1="${ML}" y1="${railCotaY}" x2="${railX2c}" y2="${railCotaY}" stroke="${RAIL_DIM}" stroke-width="1" marker-end="url(#ra)" marker-start="url(#ra)"/>`;
-  s += `<text x="${(ML + railX2c) / 2}" y="${railCotaY - 5}" text-anchor="middle" fill="${RAIL_DIM}" font-size="9" font-family="${F}" font-weight="700">${railLen.toFixed(3)} m — largo riel</text>`;
-
-  // Cota panel alto
-  const cotaX = panelOriginX - 30;
-  s += `<line x1="${cotaX}" y1="${MT}" x2="${cotaX}" y2="${MT + pxH}" stroke="${COT_C}" stroke-width="1" marker-end="url(#ca)" marker-start="url(#ca)"/>`;
-  s += `<line x1="${cotaX - 5}" y1="${MT}" x2="${cotaX + 5}" y2="${MT}" stroke="${COT_C}" stroke-width="0.8"/>`;
-  s += `<line x1="${cotaX - 5}" y1="${MT + pxH}" x2="${cotaX + 5}" y2="${MT + pxH}" stroke="${COT_C}" stroke-width="0.8"/>`;
-  s += `<text x="${cotaX - 9}" y="${MT + pxH / 2 + 3.5}" text-anchor="middle" fill="${COT_C}" font-size="9.5" font-family="${F}" font-weight="700" transform="rotate(-90,${cotaX - 9},${MT + pxH / 2 + 3.5})">${pH.toFixed(3)} m</text>`;
-
-  // Cota ancho total (multi-columna)
-  if (maxC > 1) {
-    const tW = maxC * pxW + (maxC - 1) * pxGH;
-    s += `<line x1="${panelOriginX}" y1="${MT - 16}" x2="${panelOriginX + tW}" y2="${MT - 16}" stroke="${DIM_C}" stroke-width="0.8" stroke-dasharray="3,2" marker-end="url(#da)" marker-start="url(#da)"/>`;
-    s += `<text x="${panelOriginX + tW / 2}" y="${MT - 8}" text-anchor="middle" fill="${DIM_C}" font-size="7.5" font-family="${F}">${(maxC * pW + (maxC - 1) * gapH).toFixed(3)} m</text>`;
-  }
-  // Cota alto total (multi-fila)
-  if (totalR > 1) {
-    const tH = totalR * pxH + (totalR - 1) * pxGV;
-    const tCX = panelOriginX - 46;
-    s += `<line x1="${tCX}" y1="${MT}" x2="${tCX}" y2="${MT + tH}" stroke="${DIM_C}" stroke-width="0.8" stroke-dasharray="3,2" marker-end="url(#da)" marker-start="url(#da)"/>`;
-    s += `<text x="${tCX - 9}" y="${MT + tH / 2 + 3}" text-anchor="middle" fill="${DIM_C}" font-size="7.5" font-family="${F}" transform="rotate(-90,${tCX - 9},${MT + tH / 2 + 3})">${(totalR * pH + (totalR - 1) * gapV).toFixed(3)} m total</text>`;
-  }
-  // Cota gap horizontal
-  if (maxC > 1 && pxGH > 4) {
-    const gx1 = panelOriginX + pxW, gx2 = panelOriginX + pxW + pxGH, gy = MT + pxH + 6;
-    s += `<line x1="${gx1}" y1="${gy}" x2="${gx2}" y2="${gy}" stroke="${DIM_C}" stroke-width="0.8" marker-end="url(#da)" marker-start="url(#da)"/>`;
-    s += `<text x="${(gx1 + gx2) / 2}" y="${gy - 4}" text-anchor="middle" fill="${DIM_C}" font-size="7" font-family="${F}">${gapH.toFixed(4)}m</text>`;
-  }
-  s += '</svg>';
+  const FOOT_F = '#f5c400';
 
   return `
   <div class="card" style="padding:0;overflow:hidden" id="diagram-card">
@@ -471,7 +346,7 @@ function renderDiagrama() {
     </div>
     <div id="diag-wrap" style="padding:12px;overflow:auto;background:#0e1e11;cursor:grab">
       <div id="diag-inner" style="transform-origin:top left;transition:transform .15s;display:inline-block">
-        ${s}
+        ${buildDiagramSVG(rd, pW, pH, cs.estructura)}
       </div>
     </div>
   </div>`;
@@ -593,30 +468,16 @@ function renderGuia() {
   const pW  = cs.pW || 1.134;
   const pH  = cs.pH || 1.990;
   const gH  = clampW(cs.estructura);
-  const { OVERHANG: OH, S1_OFF, FOOT_SPAN_MAX, CLAMP_B_FRAC } = C;
-  const isAlx   = cs.estructura === 'aluminex';
+  const isAlx    = cs.estructura === 'aluminex';
   const railName = isAlx ? 'NXT-RX (4.20 m)' : 'CrossRail 48-X (4.70 m)';
 
-  // Agrupar filas por cantidad de paneles
-  const groups = {};
-  rd.forEach((n, ri) => {
-    if (!groups[n]) groups[n] = { n, rows: [], cut: 2*OH + n*pW + Math.max(0,n-1)*gH };
-    groups[n].rows.push(ri+1);
-  });
+  const blocks = buildGuiaData(rd, pW, pH, cs.estructura).map(g => {
+    const { n, rows, cut, clampPos, railGap, feet, span } = g;
+    const rowLbl = rows.length === 1 ? `Fila ${rows[0]}` : `Filas ${rows.join(', ')}`;
 
-  const blocks = Object.values(groups).sort((a,b)=>a.n-b.n).map(g => {
-    const { n, cut } = g;
-    const inner  = cut - 2*S1_OFF;
-    const nSpans = Math.max(1, Math.ceil(inner / FOOT_SPAN_MAX));
-    const span   = inner / nSpans;
-    const feet   = Array.from({ length: nSpans+1 }, (_,fi) => S1_OFF + fi*span);
-    const rowLbl = g.rows.length===1 ? `Fila ${g.rows[0]}` : `Filas ${g.rows.join(', ')}`;
-    const clampPos  = (CLAMP_B_FRAC * pH * 100).toFixed(1);
-    const railGap   = ((1 - 2*CLAMP_B_FRAC) * pH * 100).toFixed(1);
-
-    const feetMarks = feet.map((fp,fi)=>{
-      const isEdge = fi===0 || fi===feet.length-1;
-      const lbl = fi===0 ? 'S1 izq.' : fi===feet.length-1 ? `S${fi+1} der.` : `S${fi+1}`;
+    const feetMarks = feet.map((fp, fi) => {
+      const isEdge = fi === 0 || fi === feet.length - 1;
+      const lbl = fi === 0 ? 'S1 izq.' : fi === feet.length - 1 ? `S${fi+1} der.` : `S${fi+1}`;
       return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;
         padding:6px 10px;border-radius:6px;
         background:${isEdge?'rgba(46,189,66,.12)':'var(--surface2)'};
@@ -633,54 +494,34 @@ function renderGuia() {
         <span style="font-weight:700;font-size:.86rem;color:var(--text)">${rowLbl} — ${n} panel${n>1?'es':''}</span>
         <span style="font-family:monospace;font-size:.9rem;color:var(--solar);font-weight:700">✂ ${(cut*100).toFixed(1)} cm</span>
       </div>
-
       <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
-        <!-- Paso 1: Cortar riel -->
         <div style="display:flex;gap:10px">
-          <div style="width:24px;height:24px;border-radius:50%;background:var(--g500);
-            display:flex;align-items:center;justify-content:center;
-            font-size:.75rem;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px">1</div>
+          <div style="width:24px;height:24px;border-radius:50%;background:var(--g500);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px">1</div>
           <div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">
-              Cortar ${railName}
-            </div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">Cortar ${railName}</div>
             <div style="font-size:.8rem;color:var(--text-muted);margin-top:3px">
               <b style="color:var(--text)">${(cut*100).toFixed(1)} cm</b>
-              = ${(OH*200).toFixed(0)} cm vuelo × 2
+              = ${(C.OVERHANG*200).toFixed(0)} cm vuelo × 2
               + ${n}×${(pW*100).toFixed(1)} cm panel
               ${n>1?`+ ${n-1}×${(gH*100).toFixed(1)} cm gap`:''}
             </div>
           </div>
         </div>
-
-        <!-- Paso 2: Posición de rieles -->
         <div style="display:flex;gap:10px">
-          <div style="width:24px;height:24px;border-radius:50%;background:var(--g500);
-            display:flex;align-items:center;justify-content:center;
-            font-size:.75rem;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px">2</div>
+          <div style="width:24px;height:24px;border-radius:50%;background:var(--g500);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px">2</div>
           <div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">
-              Posición de rieles — regla del ¼
-            </div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">Posición de rieles — regla del ¼</div>
             <div style="font-size:.8rem;color:var(--text-muted);margin-top:3px">
-              Borde corto → centro del riel:
-              <b style="color:var(--g300)">${clampPos} cm</b>
+              Borde corto → centro del riel: <b style="color:var(--g300)">${(clampPos*100).toFixed(1)} cm</b>
               (¼ × ${(pH*100).toFixed(1)} cm alto)<br/>
-              Separación entre rieles:
-              <b style="color:var(--g300)">${railGap} cm</b>
+              Separación entre rieles: <b style="color:var(--g300)">${(railGap*100).toFixed(1)} cm</b>
             </div>
           </div>
         </div>
-
-        <!-- Paso 3: Marcar soportes -->
         <div style="display:flex;gap:10px">
-          <div style="width:24px;height:24px;border-radius:50%;background:var(--g500);
-            display:flex;align-items:center;justify-content:center;
-            font-size:.75rem;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px">3</div>
+          <div style="width:24px;height:24px;border-radius:50%;background:var(--g500);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px">3</div>
           <div style="flex:1">
-            <div style="font-size:.82rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">
-              Marcar soportes — ${feet.length} pata${feet.length>1?'s':''} por riel
-            </div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em">Marcar soportes — ${feet.length} pata${feet.length>1?'s':''} por riel</div>
             <div style="font-size:.78rem;color:var(--text-muted);margin-top:3px;margin-bottom:8px">
               Span entre patas: <b style="color:var(--text)">${(span*100).toFixed(1)} cm</b>
             </div>
@@ -705,14 +546,20 @@ function renderGuia() {
 function renderCTA() {
   return `
   <div class="card">
-    ${_projectId ? `
+    ${_projectId ? (() => {
+      const prevDeduction = _project?.projectConfig?.inventoryDeducted;
+      return `
     <button class="btn-primary btn-full" onclick="calcGuardar()">
       ${icon('floppy-disk', 18)}
       Guardar BOM en proyecto
     </button>
     <p style="font-size:.75rem;color:var(--text-muted);text-align:center;margin-top:8px">
       Se guardará en <b>${_project?.displayId || _projectId}</b>
-    </p>` : `
+    </p>
+    ${prevDeduction ? `<p style="font-size:.72rem;color:var(--g300);text-align:center;margin-top:4px">
+      ✓ Inventario descontado el ${new Date(prevDeduction).toLocaleDateString('es-MX',{day:'2-digit',month:'short'})}
+    </p>` : ''}`;
+    })() : `
     <p style="font-size:.84rem;color:var(--text-muted);margin-bottom:12px">
       Abre esta calculadora desde un proyecto para guardar el BOM directamente.
     </p>
@@ -811,11 +658,58 @@ window.calcSetDims = () => {
   // no re-render aquí para no interrumpir escritura; el BOM se actualiza al navegar
 };
 
+// ── Descuento automático de inventario ────────────────────────────────────
+async function _deductBOMFromStock(bom) {
+  const stockData = await invStore.get('stock');
+  const stock     = { ...(stockData?.data ?? {}) };
+  const month     = stockData?.month ?? '';
+
+  const deducted = [];
+  for (const item of bom) {
+    const invId = BOM_INV_MAP[item.partNum];
+    if (!invId || stock[invId] === undefined) continue;
+    const before = stock[invId] || 0;
+    const after  = Math.max(0, before - item.qty);
+    stock[invId] = after;
+    deducted.push({ invId, name: item.name, qty: item.qty, before, after });
+  }
+
+  if (deducted.length > 0) {
+    await invStore.set('stock', { month, data: stock });
+  }
+  return deducted;
+}
+
 window.calcGuardar = async () => {
   if (!_projectId) return;
   try {
-    const cfg = buildProjectConfig(cs);
+    const cfg              = buildProjectConfig(cs);
+    const prevDeduction    = _project?.projectConfig?.inventoryDeducted;
+    const bom              = cfg.computed?.bom || [];
+    const bomWithMapping   = bom.filter(i => BOM_INV_MAP[i.partNum]);
+
+    // Guardar BOM en proyecto
     await projects.update(_projectId, { projectConfig: cfg });
+
+    // Preguntar descuento de inventario solo si hay ítems mapeados
+    if (bomWithMapping.length > 0) {
+      const msg = prevDeduction
+        ? `Este BOM ya fue descontado del inventario el ${new Date(prevDeduction).toLocaleDateString('es-MX')}.\n\n¿Volver a descontar los materiales actuales?`
+        : `¿Descontar estos ${bomWithMapping.length} materiales del inventario de bodega?\n\n(Confirma solo si los materiales ya salieron físicamente)`;
+
+      const deduct = await confirmDialog(msg);
+
+      if (deduct) {
+        const result = await _deductBOMFromStock(bom);
+        await projects.update(_projectId, {
+          projectConfig: { ...cfg, inventoryDeducted: isoNow() }
+        });
+        toast(`✅ BOM guardado — ${result.length} ítem${result.length !== 1 ? 's' : ''} descontado${result.length !== 1 ? 's' : ''} del inventario`);
+        navigate(`#proyecto/${_projectId}`);
+        return;
+      }
+    }
+
     toast('BOM guardado en el proyecto ✓');
     navigate(`#proyecto/${_projectId}`);
   } catch(e) {

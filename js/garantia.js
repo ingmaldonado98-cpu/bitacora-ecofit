@@ -1,9 +1,10 @@
 // garantia.js — Módulo 1: Garantía (fotos técnicas, equipos, estructura, paneles)
 
 import { projects } from './db.js';
-import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog,
+import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
          uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
+import { uploadPhoto } from './firebase.js';
 import { icon } from './icons.js';
 import { scanOnce, startContinuousScan, stopScanner } from './scanner.js';
 
@@ -108,20 +109,19 @@ export async function renderGarantia(projectId, session) {
 // ── 1A Foto del sistema ────────────────────────────────────────────────────────
 window.capturarFotoSistema = function(projectId) {
   capturePhoto(async (b64) => {
-    await projects.update(projectId, { 'garantia.fotoSistema': b64 });
-    // Actualizar solo el slot sin re-render completo
+    toast('Subiendo foto…');
+    const url = await uploadPhoto(b64, `projects/${projectId}/sistema.jpg`);
     const slot = document.getElementById('slot-foto-sistema');
-    slot.innerHTML = `${fotoMini(b64,'Foto general')}<button class="btn-del-foto" onclick="delFotoGeneral('${projectId}')">✕</button>`;
-    toast('✅ Foto guardada');
-    // Guardar vía deep update
+    slot.innerHTML = `${fotoMini(url,'Foto general')}<button class="btn-del-foto" onclick="delFotoGeneral('${projectId}')">✕</button>`;
     const p = await projects.getById(projectId);
-    p.garantia.fotoSistema = b64;
+    p.garantia.fotoSistema = url;
     await projects.update(projectId, { garantia: p.garantia });
+    toast('✅ Foto guardada');
   });
 };
 
 window.delFotoGeneral = async function(projectId) {
-  if (!confirmDialog('¿Eliminar foto del sistema?')) return;
+  if (!await confirmDialog('¿Eliminar foto del sistema?')) return;
   const p = await projects.getById(projectId);
   p.garantia.fotoSistema = null;
   await projects.update(projectId, { garantia: p.garantia });
@@ -154,11 +154,14 @@ function renderFotosAdicionales(fotos, projectId, edit) {
 
 window.capFotoAdicional = function(projectId) {
   capturePhoto(async (b64) => {
-    const nota = prompt('Nota para esta foto (opcional):') || '';
+    toast('Subiendo foto…');
+    const fid = uuid();
+    const url = await uploadPhoto(b64, `projects/${projectId}/adicional_${fid}.jpg`);
+    const nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
     const p = await projects.getById(projectId);
     p.garantia = p.garantia || {};
     p.garantia.fotosAdicionales = [...(p.garantia.fotosAdicionales || []),
-      { data: b64, nota, id: uuid(), createdAt: isoNow() }];
+      { data: url, nota, id: fid, createdAt: isoNow() }];
     await projects.update(projectId, { garantia: p.garantia });
     navigate(`#proyecto/${projectId}/garantia`);
     toast('✅ Foto guardada');
@@ -166,7 +169,7 @@ window.capFotoAdicional = function(projectId) {
 };
 
 window.delFotoAdicional = async function(projectId, idx) {
-  if (!confirmDialog('¿Eliminar esta foto?')) return;
+  if (!await confirmDialog('¿Eliminar esta foto?')) return;
   const p = await projects.getById(projectId);
   p.garantia.fotosAdicionales.splice(idx, 1);
   await projects.update(projectId, { garantia: p.garantia });
@@ -176,7 +179,7 @@ window.delFotoAdicional = async function(projectId, idx) {
 window.editFotoAdicionalNota = async function(projectId, idx) {
   const p = await projects.getById(projectId);
   const actual = p.garantia.fotosAdicionales[idx].nota || '';
-  const nueva = prompt('Editar nota:', actual);
+  const nueva = await inputDialog('Editar nota:', actual);
   if (nueva === null) return;
   p.garantia.fotosAdicionales[idx].nota = nueva;
   await projects.update(projectId, { garantia: p.garantia });
@@ -212,9 +215,11 @@ function renderFotosTecnicas(ft, projectId, edit) {
 
 window.capFotoTecnica = function(projectId, key) {
   capturePhoto(async (b64) => {
+    toast('Subiendo foto…');
+    const url = await uploadPhoto(b64, `projects/${projectId}/tecnica_${key}.jpg`);
     const p = await projects.getById(projectId);
     p.garantia.fotosTecnicas = p.garantia.fotosTecnicas || {};
-    p.garantia.fotosTecnicas[key] = b64;
+    p.garantia.fotosTecnicas[key] = url;
     await projects.update(projectId, { garantia: p.garantia });
     navigate(`#proyecto/${projectId}/garantia`);
     toast('✅ Foto técnica guardada');
@@ -222,7 +227,7 @@ window.capFotoTecnica = function(projectId, key) {
 };
 
 window.delFotoTecnica = async function(projectId, key) {
-  if (!confirmDialog('¿Eliminar esta foto?')) return;
+  if (!await confirmDialog('¿Eliminar esta foto?')) return;
   const p = await projects.getById(projectId);
   p.garantia.fotosTecnicas[key] = null;
   await projects.update(projectId, { garantia: p.garantia });
@@ -305,10 +310,12 @@ function formEquipo(projectId) {
 
 const _eqFotos = {};
 window.capEqFoto = function(tipo, slotId) {
-  capturePhoto((b64) => {
-    _eqFotos[tipo] = b64;
+  capturePhoto(async (b64) => {
+    toast('Subiendo foto…');
+    const url = await uploadPhoto(b64, `projects/equipo_${tipo}_${Date.now()}.jpg`);
+    _eqFotos[tipo] = url;
     const slot = document.getElementById(slotId);
-    slot.innerHTML = fotoMini(b64, tipo);
+    slot.innerHTML = fotoMini(url, tipo);
   });
 };
 
@@ -351,7 +358,7 @@ window.guardarEquipo = async function(projectId) {
 };
 
 window.delEquipo = async function(projectId, idx) {
-  if (!confirmDialog('¿Eliminar este equipo?')) return;
+  if (!await confirmDialog('¿Eliminar este equipo?')) return;
   const p = await projects.getById(projectId);
   p.garantia.equipos = p.garantia.equipos.filter((_,i) => i !== idx);
   await projects.update(projectId, { garantia: p.garantia });
@@ -622,7 +629,7 @@ window.agregarString = async function(projectId) {
 };
 
 window.delString = async function(projectId, idx) {
-  if (!confirmDialog('¿Eliminar este string y todos sus paneles?')) return;
+  if (!await confirmDialog('¿Eliminar este string y todos sus paneles?')) return;
   const p = await projects.getById(projectId);
   p.garantia.paneles.strings.splice(idx,1);
   await projects.update(projectId, { garantia: p.garantia });
@@ -687,7 +694,7 @@ window.startScanString = async function(projectId, stringIdx) {
 };
 
 window.addPanelManual = async function(projectId, stringIdx) {
-  const serial = prompt('Número de serie del panel:');
+  const serial = await inputDialog('Número de serie del panel:');
   if (serial === null) return;
   const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const p = await projects.getById(projectId);
@@ -699,7 +706,7 @@ window.addPanelManual = async function(projectId, stringIdx) {
 };
 
 window.delPanel = async function(projectId, stringIdx, panelIdx) {
-  if (!confirmDialog('¿Eliminar este panel?')) return;
+  if (!await confirmDialog('¿Eliminar este panel?')) return;
   const p = await projects.getById(projectId);
   p.garantia.paneles.strings[stringIdx].paneles.splice(panelIdx,1);
   await projects.update(projectId, { garantia: p.garantia });
@@ -745,7 +752,7 @@ window._submitNotaGarantia = async function(projectId) {
 };
 
 window._delNota = async function(projectId, scope, idx) {
-  if (!confirmDialog('¿Eliminar esta nota?')) return;
+  if (!await confirmDialog('¿Eliminar esta nota?')) return;
   const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
   const p = await projects.getById(projectId);
   if (scope === 'garantia') {
