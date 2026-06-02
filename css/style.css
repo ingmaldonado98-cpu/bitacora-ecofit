@@ -374,8 +374,22 @@ body {
 .pc-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .pc-tag  { font-size: .72rem; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
 .pc-obs  { font-size: .78rem; color: var(--text-muted); padding: 6px 8px; border-radius: 6px; background: var(--surface2); margin-bottom: 6px; display: flex; gap: 5px; align-items: flex-start; }
-.pc-footer { display: flex; align-items: center; justify-content: space-between; }
-.pc-updated { font-size: .7rem; color: var(--text-muted); }
+.pc-footer { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+.pc-updated { font-size: .7rem; color: var(--text-muted); flex: 1; }
+.pc-fest, .fest-badge {
+  font-size: .68rem; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+  white-space: nowrap;
+}
+.fest-vencido { background: rgba(248,113,113,.15); color: var(--red); }
+.fest-hoy     { background: rgba(251,191,36,.15);  color: var(--solar); }
+.fest-proximo { background: rgba(251,191,36,.10);  color: var(--solar); }
+.fest-ok      { background: rgba(74,222,128,.1);   color: var(--g300); }
+.hint-opt     { font-size: .75rem; color: var(--text-muted); font-weight: 400; }
+.dash-pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 4px; gap: 8px;
+}
+.dash-pag-info { font-size: .75rem; color: var(--text-muted); }
 .pc-arrow   { color: var(--text-muted); }
 
 /* ── Sync badge ───────────────────────────────────────────────────────────── */

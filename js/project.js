@@ -81,6 +81,13 @@ export async function renderProjectDetail(id, session) {
     </div>` : ''}
     ${project.direccion ? `<div class="meta-item"><span class="meta-lbl">Dirección</span>
       <span class="meta-val">${esc(project.direccion)}</span></div>` : ''}
+    ${project.fechaEstimada ? `
+    <div class="card-row">
+      <div class="meta-item">
+        <span class="meta-lbl">Fecha estimada</span>
+        <span class="meta-val">${fmtFecha(project.fechaEstimada)}${fechaEstimadaBadge(project.fechaEstimada, project.estado)}</span>
+      </div>
+    </div>` : ''}
     <div class="card-row">
       <div class="meta-item">
         <span class="meta-lbl">Técnico Líder</span>
@@ -302,6 +309,16 @@ function renderChecklistProgreso(project) {
       </details>
     </div>
   </div>`;
+}
+
+// ── Badge fecha estimada ──────────────────────────────────────────────────────
+function fechaEstimadaBadge(fechaIso, estado) {
+  if (!fechaIso || ['cerrado','cancelado'].includes(estado)) return '';
+  const diff = Math.ceil((new Date(fechaIso) - new Date()) / 86400000);
+  if (diff < 0)  return ` <span class="fest-badge fest-vencido">Vencido hace ${Math.abs(diff)} día${Math.abs(diff)!==1?'s':''}</span>`;
+  if (diff === 0) return ` <span class="fest-badge fest-hoy">Vence hoy</span>`;
+  if (diff <= 3)  return ` <span class="fest-badge fest-proximo">En ${diff} día${diff!==1?'s':''}</span>`;
+  return '';
 }
 
 // ── Historial de cambios de estado ────────────────────────────────────────────
@@ -570,6 +587,12 @@ export async function renderProjectForm(id, session) {
              value="${(project?.fechaInicio||'').split('T')[0]}" />
     </div>
 
+    <div class="form-group">
+      <label>Fecha estimada de entrega <span class="hint-opt">(opcional)</span></label>
+      <input type="date" name="fechaEstimada"
+             value="${(project?.fechaEstimada||'').split('T')[0]}" />
+    </div>
+
     <div class="form-actions">
       <button type="button" class="btn-outline" onclick="history.back()">Cancelar</button>
       <button type="submit" class="btn-primary">${isEditing ? 'Guardar cambios' : 'Crear proyecto'}</button>
@@ -611,7 +634,8 @@ window._submitProject = async function(e, editId) {
     tecnicoLiderId:  fd.get('tecnicoLiderId') || null,
     tecnicosApoyo:   JSON.parse(fd.get('tecnicosApoyo') || '[]'),
     direccion:       fd.get('direccion').trim(),
-    fechaInicio:     fd.get('fechaInicio') ? new Date(fd.get('fechaInicio')).toISOString() : null,
+    fechaInicio:     fd.get('fechaInicio')    ? new Date(fd.get('fechaInicio')).toISOString()    : null,
+    fechaEstimada:   fd.get('fechaEstimada') ? new Date(fd.get('fechaEstimada')).toISOString() : null,
     // Campos sistema pequeño (null si no aplica)
     bateria:      esPequeno ? (fd.get('bateria')?.trim() || null)       : null,
     mppt:         esPequeno ? (fd.get('mppt')?.trim() || null)          : null,

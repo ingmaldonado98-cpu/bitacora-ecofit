@@ -15,6 +15,7 @@ export function updateNavBadge(count) {
 // ── Render dashboard completo ──────────────────────────────────────────────────
 export async function renderDashboard(session) {
   _tecnicoFilter = null;
+  _page = 0;
   const [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
   const stats = calcStats(all);
 
@@ -132,6 +133,8 @@ export function initDashboardFilters(all) {
   _allProjects = all;
 }
 
+const PAGE_SIZE = 20;
+let _page = 0;
 let _tecnicoFilter = null;
 window._dashFilterTecnico = function(uid) {
   _tecnicoFilter = _tecnicoFilter === uid ? null : uid;
@@ -145,10 +148,12 @@ window._dashFilterTecnico = function(uid) {
 window._dashSearch = async function(q) {
   const all = q.trim() ? await projects.search(q) : await projects.getAll();
   _allProjects = all;
+  _page = 0;
   applyFilters();
 };
 
-window._dashFilter = function() { applyFilters(); };
+window._dashFilter = function() { _page = 0; applyFilters(); };
+window._dashPage   = function(dir) { _page += dir; applyFilters(); };
 
 function applyFilters() {
   const estado = document.getElementById('dash-filter-estado')?.value;
@@ -167,10 +172,20 @@ function applyFilters() {
 // ── Tarjetas de proyecto ───────────────────────────────────────────────────────
 function renderProjectList(list) {
   if (!list.length) return `<p class="empty-msg">Sin proyectos. Crea el primero con <strong>+</strong>.</p>`;
-  return list
-    .sort((a,b) => new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt))
-    .map(projectCard)
-    .join('');
+  const sorted = list.sort((a,b) => new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
+  const total  = sorted.length;
+  const pages  = Math.ceil(total / PAGE_SIZE);
+  _page = Math.max(0, Math.min(_page, pages - 1));
+  const slice  = sorted.slice(_page * PAGE_SIZE, (_page + 1) * PAGE_SIZE);
+
+  const pagination = pages > 1 ? `
+  <div class="dash-pagination">
+    <button class="btn-outline btn-sm" onclick="window._dashPage(-1)" ${_page === 0 ? 'disabled' : ''}>‹ Anterior</button>
+    <span class="dash-pag-info">Pág. ${_page + 1} de ${pages} · ${total} proyectos</span>
+    <button class="btn-outline btn-sm" onclick="window._dashPage(1)" ${_page >= pages - 1 ? 'disabled' : ''}>Siguiente ›</button>
+  </div>` : '';
+
+  return slice.map(projectCard).join('') + pagination;
 }
 
 function projectCard(p) {
@@ -208,6 +223,13 @@ function projectCard(p) {
 
     <div class="pc-footer">
       <span class="pc-updated">Actualizado ${fmtRelativa(p.updatedAt||p.createdAt)}</span>
+      ${p.fechaEstimada && !['cerrado','cancelado'].includes(p.estado) ? (() => {
+        const diff = Math.ceil((new Date(p.fechaEstimada) - new Date()) / 86400000);
+        if (diff < 0)   return `<span class="pc-fest fest-vencido">⚠ Vencido</span>`;
+        if (diff === 0) return `<span class="pc-fest fest-hoy">Vence hoy</span>`;
+        if (diff <= 3)  return `<span class="pc-fest fest-proximo">En ${diff}d</span>`;
+        return `<span class="pc-fest fest-ok">${fmtFecha(p.fechaEstimada)}</span>`;
+      })() : ''}
       <ph-icon name="caret-right" class="pc-arrow"></ph-icon>
     </div>
   </div>`;
