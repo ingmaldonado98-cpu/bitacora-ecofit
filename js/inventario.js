@@ -827,11 +827,15 @@ function autoGenId(cat,materials){
 // ── Exportación Excel (SheetJS lazy) ──────────────────────────────────────
 function loadXLSX(cb){
   if(window.XLSX){cb();return;}
+  if(!navigator.onLine){
+    toast('Sin conexión — usa el botón Excel estando en línea la primera vez para cachear la librería','error',6000);
+    return;
+  }
   toast('Preparando Excel…','info');
   const s=document.createElement('script');
   s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
   s.onload=()=>{cb();};
-  s.onerror=()=>toast('Error al cargar librería Excel','error');
+  s.onerror=()=>toast('Error al cargar librería Excel. Verifica tu conexión.','error');
   document.head.appendChild(s);
 }
 
