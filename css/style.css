@@ -409,6 +409,18 @@ body {
 .obs-prio   { font-size: .7rem; font-weight: 700; }
 .obs-texto  { font-size: .85rem; white-space: pre-wrap; }
 
+.obs-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.btn-resolver {
+  font-size: .7rem; font-weight: 600; padding: 2px 8px;
+  border-radius: 20px; border: 1px solid var(--g300); color: var(--g300);
+  background: transparent; cursor: pointer; white-space: nowrap;
+}
+.btn-resolver:hover { background: var(--g300); color: #000; }
+.obs-resuelta { opacity: .65; }
+.obs-resuelta .obs-texto { text-decoration: line-through; color: var(--text-muted); }
+.obs-badge-resuelta { font-size: .7rem; font-weight: 700; color: var(--g300); }
+.obs-resuelta-meta { font-size: .72rem; color: var(--text-muted); margin: 4px 0 0; }
+
 .obs-form-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
 
 /* ── Notas (módulos) ──────────────────────────────────────────────────────── */
