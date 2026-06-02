@@ -4,11 +4,23 @@ import { projects, users } from './db.js';
 import { esc, fmtFecha, fmtRelativa, fmtProjectId, ESTADOS, PRIORIDADES, TIPOS_SISTEMA, syncBadge } from './utils.js';
 import { isAdmin, isLider } from './auth.js';
 
+// ── Badge del nav ─────────────────────────────────────────────────────────────
+export function updateNavBadge(count) {
+  const badge = document.getElementById('nav-badge-revision');
+  if (!badge) return;
+  badge.textContent = count > 9 ? '9+' : String(count);
+  badge.style.display = count > 0 ? '' : 'none';
+}
+
 // ── Render dashboard completo ──────────────────────────────────────────────────
 export async function renderDashboard(session) {
   _tecnicoFilter = null;
   const [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
   const stats = calcStats(all);
+
+  const pendientes = all.filter(p => p.estado === 'pendiente_revision')
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+  updateNavBadge(pendientes.length);
 
   return `
   <div class="view-header">
@@ -54,6 +66,7 @@ export async function renderDashboard(session) {
     </div>
   </div>
 
+  ${isAdmin(session) && pendientes.length ? renderParaRevisar(pendientes, allUsers) : ''}
   ${isAdmin(session) ? renderWorkload(all, allUsers) : ''}
 
   <div class="search-filter-bar">
@@ -197,6 +210,34 @@ function projectCard(p) {
       <span class="pc-updated">Actualizado ${fmtRelativa(p.updatedAt||p.createdAt)}</span>
       <ph-icon name="caret-right" class="pc-arrow"></ph-icon>
     </div>
+  </div>`;
+}
+
+// ── Sección "Para revisar" (solo admin) ───────────────────────────────────────
+function renderParaRevisar(pendientes, allUsers) {
+  const rows = pendientes.map(p => {
+    const lider = allUsers.find(u => u.id === p.tecnicoLiderId);
+    return `
+    <div class="pr-row" onclick="navigate('#proyecto/${p.id}')">
+      <div class="pr-info">
+        <span class="pr-id">${esc(p.displayId)}</span>
+        <span class="pr-cliente">${esc(p.clientName || '—')}</span>
+      </div>
+      <div class="pr-meta">
+        ${lider ? `<span class="pr-lider">${esc(lider.nombre.split(' ')[0])}</span>` : ''}
+        <span class="pr-time">${fmtRelativa(p.updatedAt || p.createdAt)}</span>
+        <span class="pr-arrow">›</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="para-revisar-card">
+    <div class="pr-header">
+      <span class="pr-icon">⏳</span>
+      <span class="pr-title">${pendientes.length} proyecto${pendientes.length !== 1 ? 's' : ''} esperan revisión</span>
+    </div>
+    ${rows}
   </div>`;
 }
 

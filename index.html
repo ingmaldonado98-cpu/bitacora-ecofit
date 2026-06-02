@@ -73,7 +73,10 @@
   <!-- ── Bottom navigation ───────────────────────────────────────────────────── -->
   <nav id="bottom-nav" class="bottom-nav" style="display:none">
     <a class="nav-link" data-view="dashboard" onclick="navigate('#dashboard')">
-      <ph-icon name="house" size="24"></ph-icon>
+      <div class="nav-icon-wrap">
+        <ph-icon name="house" size="24"></ph-icon>
+        <span id="nav-badge-revision" class="nav-badge" style="display:none">0</span>
+      </div>
       <span>Inicio</span>
     </a>
     <a class="nav-link" data-view="checklists" onclick="navigate('#checklists')">

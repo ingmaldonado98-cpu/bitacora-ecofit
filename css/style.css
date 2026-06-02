@@ -198,7 +198,16 @@ body {
   border-radius: var(--radius-sm);
 }
 .nav-link ph-icon { transition: transform .15s; }
-.nav-link.nav-active { color: var(--g500); }  /* verde logo exacto */
+.nav-link.nav-active { color: var(--g500); }
+.nav-icon-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+.nav-badge {
+  position: absolute; top: -5px; right: -8px;
+  background: var(--solar); color: #000;
+  font-size: .6rem; font-weight: 800; line-height: 1;
+  padding: 2px 4px; border-radius: 20px;
+  min-width: 16px; text-align: center;
+  box-shadow: 0 0 0 2px var(--bg);
+}
 .nav-link.nav-active ph-icon { transform: scale(1.1); }
 .nav-link:hover { color: var(--text); }
 
@@ -272,6 +281,33 @@ body {
 .meta-item { display: flex; flex-direction: column; gap: 2px; }
 .meta-lbl  { font-size: .68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing:.04em; font-weight:600; }
 .meta-val  { font-size: .9rem; color: var(--text); }
+
+/* ── Para revisar (admin) ────────────────────────────────────────────────── */
+.para-revisar-card {
+  background: var(--surface); border: 1.5px solid var(--solar);
+  border-radius: var(--radius); margin-bottom: 14px; overflow: hidden;
+}
+.pr-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; background: rgba(251,191,36,.08);
+  border-bottom: 1px solid var(--border);
+}
+.pr-icon { font-size: 1rem; }
+.pr-title { font-size: .85rem; font-weight: 700; color: var(--solar); }
+.pr-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; gap: 8px; transition: background .15s;
+}
+.pr-row:last-child { border-bottom: none; }
+.pr-row:hover { background: var(--surface2); }
+.pr-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pr-id { font-size: .72rem; font-weight: 700; color: var(--text-muted); }
+.pr-cliente { font-size: .88rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.pr-lider { font-size: .75rem; color: var(--text-muted); }
+.pr-time { font-size: .72rem; color: var(--text-muted); }
+.pr-arrow { color: var(--text-muted); font-size: 1.1rem; }
 
 /* ── Stats ────────────────────────────────────────────────────────────────── */
 .stats-row {

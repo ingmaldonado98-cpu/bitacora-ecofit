@@ -1,7 +1,7 @@
 // app.js — Router principal de la Bitácora Ecofit V6
 
 import { renderLogin, getSession, logout, requireAuth } from './auth.js';
-import { renderDashboard, initDashboardFilters } from './dashboard.js';
+import { renderDashboard, initDashboardFilters, updateNavBadge } from './dashboard.js';
 import { renderProjectDetail, renderProjectForm } from './project.js';
 import { renderGarantia, renderEstructuraForm } from './garantia.js';
 import { renderDocumentacion } from './documentacion.js';
@@ -142,6 +142,13 @@ async function route() {
   }
 
   window.scrollTo(0, 0);
+
+  // Actualizar badge en segundo plano para rutas que no son dashboard
+  if (view !== 'dashboard' && view !== '' && session?.rol === 'admin') {
+    projects.getAll().then(all => {
+      updateNavBadge(all.filter(p => p.estado === 'pendiente_revision').length);
+    }).catch(() => {});
+  }
 }
 
 // ── Header dinámico ───────────────────────────────────────────────────────────
