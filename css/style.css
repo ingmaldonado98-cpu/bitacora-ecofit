@@ -772,8 +772,36 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
   background: var(--surface2); border-radius: var(--radius-sm);
   padding: 6px 8px; white-space: pre-wrap;
 }
-@keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
-@keyframes slideUp { from { transform:translateY(12px);opacity:0 } to { transform:translateY(0);opacity:1 } }
+@keyframes fadeIn    { from { opacity:0 } to { opacity:1 } }
+@keyframes slideUp   { from { transform:translateY(12px);opacity:0 } to { transform:translateY(0);opacity:1 } }
+@keyframes viewFadeIn { from { opacity:0; transform:translateY(7px) } to { opacity:1; transform:translateY(0) } }
+
+/* ── Empty states con CTA ─────────────────────────────────────────────────── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 32px 16px; gap: 10px; text-align: center;
+}
+.empty-state-icon { font-size: 2.2rem; opacity: .4; }
+.empty-state-msg  { font-size: .88rem; color: var(--text-muted); line-height: 1.5; }
+.empty-state-cta  {
+  margin-top: 4px; padding: 8px 20px; border-radius: 20px;
+  background: var(--accent, var(--g500)); color: #fff;
+  font-size: .82rem; font-weight: 600; border: none; cursor: pointer;
+  transition: opacity .15s;
+}
+.empty-state-cta:hover { opacity: .85; }
+
+/* ── Btn spinner ──────────────────────────────────────────────────────────── */
+.btn-saving {
+  opacity: .7; cursor: not-allowed; position: relative;
+}
+.btn-saving::after {
+  content: ''; display: inline-block; width: 12px; height: 12px;
+  border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+  border-radius: 50%; animation: spin .6s linear infinite;
+  margin-left: 8px; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Barra de progreso de subida ─────────────────────────────────────────── */
 .upload-progress-bar {

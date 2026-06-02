@@ -621,6 +621,12 @@ window.toggleApoyo = function(id, btn) {
 
 window._submitProject = async function(e, editId) {
   e.preventDefault();
+  const btn = e.target.querySelector('[type="submit"]');
+  const btnLabel = btn.textContent;
+  btn.disabled = true;
+  btn.classList.add('btn-saving');
+  btn.textContent = 'Guardando';
+
   const fd = new FormData(e.target);
   const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
 
@@ -644,29 +650,36 @@ window._submitProject = async function(e, editId) {
     breakerPolo:  esPequeno ? (fd.get('breakerPolo')?.trim() || null)   : null,
   };
 
-  if (editId) {
-    await projects.update(editId, data);
-    toast('Proyecto actualizado');
-    navigate(`#proyecto/${editId}`);
-  } else {
-    const counter = await kv.inc('project_counter', 1);
-    const newProject = {
-      id: uuid(),
-      displayId: fmtProjectId(counter),
-      ...data,
-      estado: 'borrador',
-      observaciones: [],
-      garantia: { fotoSistema: null, fotosTecnicas: {}, equipos: [], estructura: null, paneles: { marca:'', modelo:'', wp:0, strings:[] } },
-      documentacion: { levantamiento: {}, fases: { antes:[], durante:[], despues:[] } },
-      auditoria: null,
-      driveSynced: false,
-      createdBy: session?.id,
-      createdAt: isoNow(),
-      updatedAt: isoNow(),
-    };
-    await projects.add(newProject);
-    toast(`Proyecto ${newProject.displayId} creado`);
-    navigate(`#proyecto/${newProject.id}`);
+  try {
+    if (editId) {
+      await projects.update(editId, data);
+      toast('Proyecto actualizado');
+      navigate(`#proyecto/${editId}`);
+    } else {
+      const counter = await kv.inc('project_counter', 1);
+      const newProject = {
+        id: uuid(),
+        displayId: fmtProjectId(counter),
+        ...data,
+        estado: 'borrador',
+        observaciones: [],
+        garantia: { fotoSistema: null, fotosTecnicas: {}, equipos: [], estructura: null, paneles: { marca:'', modelo:'', wp:0, strings:[] } },
+        documentacion: { levantamiento: {}, fases: { antes:[], durante:[], despues:[] } },
+        auditoria: null,
+        driveSynced: false,
+        createdBy: session?.id,
+        createdAt: isoNow(),
+        updatedAt: isoNow(),
+      };
+      await projects.add(newProject);
+      toast(`Proyecto ${newProject.displayId} creado`);
+      navigate(`#proyecto/${newProject.id}`);
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.classList.remove('btn-saving');
+    btn.textContent = btnLabel;
+    toast(err.message || 'Error al guardar. Verifica conexión.', 'error');
   }
 };
 

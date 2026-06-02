@@ -634,7 +634,13 @@ function renderFase(project, fase, titulo, projectId, edit, required=false) {
       ${icon('camera')} Agregar fotos</button>`:''}
 </div>
   ${fotos.length===0
-    ? `<p class="empty-msg-sm">${required?'⚠ Se requiere al menos una foto.':'Sin fotos aún.'}</p>`
+    ? (edit
+        ? `<div class="empty-state">
+             <div class="empty-state-icon">${required ? '⚠️' : '📷'}</div>
+             <p class="empty-state-msg">${required ? 'Se requiere al menos una foto.<br>Puedes seleccionar varias a la vez.' : 'Sin fotos aún.'}</p>
+             <button class="empty-state-cta" onclick="agregarFoto('${projectId}','${fase}')">Agregar fotos</button>
+           </div>`
+        : `<p class="empty-msg-sm">${required?'⚠ Se requiere al menos una foto.':'Sin fotos aún.'}</p>`)
     : `<div class="fotos-grid" id="fotos-${fase}">
         ${fotos.map((f,i)=>`
           <div class="foto-card">

@@ -171,7 +171,12 @@ function applyFilters() {
 
 // ── Tarjetas de proyecto ───────────────────────────────────────────────────────
 function renderProjectList(list) {
-  if (!list.length) return `<p class="empty-msg">Sin proyectos. Crea el primero con <strong>+</strong>.</p>`;
+  if (!list.length) return `
+  <div class="empty-state">
+    <div class="empty-state-icon">☀️</div>
+    <p class="empty-state-msg">No hay proyectos aún.<br>Crea el primero para empezar.</p>
+    <button class="empty-state-cta" onclick="navigate('#nuevo-proyecto')">+ Nuevo proyecto</button>
+  </div>`;
   const sorted = list.sort((a,b) => new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
   const total  = sorted.length;
   const pages  = Math.ceil(total / PAGE_SIZE);

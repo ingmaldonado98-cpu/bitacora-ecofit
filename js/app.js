@@ -31,6 +31,10 @@ async function render(html, skeleton = '') {
     newScript.textContent = oldScript.textContent;
     oldScript.replaceWith(newScript);
   });
+  // Fade-in suave entre vistas
+  app.style.animation = 'none';
+  app.offsetHeight; // fuerza reflow para reiniciar la animación
+  app.style.animation = 'viewFadeIn .2s ease';
 }
 
 // ── Pull-to-refresh (solo dashboard) ─────────────────────────────────────────

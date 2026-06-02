@@ -137,7 +137,11 @@ function renderFotosAdicionales(fotos, projectId, edit) {
       ${icon('camera')} Agregar fotos</button>` : ''}
   </div>
   ${fotos.length === 0
-    ? `<p class="empty-msg-sm">Sin fotos adicionales.</p>`
+    ? (edit
+        ? `<div class="empty-state"><div class="empty-state-icon">📷</div>
+           <p class="empty-state-msg">Sin fotos adicionales de cierre.<br>Puedes seleccionar varias a la vez.</p>
+           <button class="empty-state-cta" onclick="capFotoAdicional('${projectId}')">Agregar fotos</button></div>`
+        : '<p class="empty-msg-sm">Sin fotos adicionales.</p>')
     : `<div class="fotos-grid">
         ${fotos.map((f, i) => `
           <div class="foto-card">
@@ -248,7 +252,11 @@ window.delFotoTecnica = async function(projectId, key) {
 
 // ── 1C Equipos ────────────────────────────────────────────────────────────────
 function renderEquipos(equipos, projectId, edit, admin) {
-  if (!equipos.length) return '<p class="empty-msg-sm">Sin equipos registrados.</p>';
+  if (!equipos.length) return edit
+    ? `<div class="empty-state"><div class="empty-state-icon">⚡</div>
+       <p class="empty-state-msg">Sin equipos registrados.<br>Agrega inversor, microinversor o cargador.</p>
+       <button class="empty-state-cta" onclick="document.getElementById('form-equipo')?.scrollIntoView({behavior:'smooth'})">+ Agregar equipo</button></div>`
+    : '<p class="empty-msg-sm">Sin equipos registrados.</p>';
   return equipos.map((eq, i) => `
     <div class="equipo-card">
       <div class="eq-header">
