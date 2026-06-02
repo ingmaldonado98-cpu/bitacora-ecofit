@@ -203,6 +203,14 @@ window.editFotoAdicionalNota = async function(projectId, idx) {
 };
 
 // ── 1B Fotos técnicas ─────────────────────────────────────────────────────────
+// Retrocompat: el campo puede ser string (viejo) o array [{url,id,createdAt}] (nuevo)
+function getFotosTecnicas(ft, key) {
+  const v = ft[key];
+  if (!v) return [];
+  if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
+  return Array.isArray(v) ? v : [];
+}
+
 function renderFotosTecnicas(ft, projectId, edit) {
   const slots = [
     { key:'tableroAC',          label:'Tablero AC terminado',       req:true  },
@@ -212,40 +220,64 @@ function renderFotosTecnicas(ft, projectId, edit) {
     { key:'puestaATierra',      label:'Puesta a tierra',            req:false },
     { key:'etiquetado',         label:'Etiquetado',                 req:false },
   ];
-  return slots.map(s => `
+
+  return slots.map(s => {
+    const fotos = getFotosTecnicas(ft, s.key);
+    const tiene = fotos.length > 0;
+    return `
     <div class="foto-tecnica-row">
       <div class="ft-label">
-        <ph-icon name="${ft[s.key]?'check-circle':'circle'}" class="${ft[s.key]?'icon-ok':'icon-pending'}"></ph-icon>
-        ${s.label} ${s.req ? '<span class="req-badge">OBLIG.</span>' : '<span class="opt-badge">Rec.</span>'}
+        <ph-icon name="${tiene ? 'check-circle' : 'circle'}" class="${tiene ? 'icon-ok' : 'icon-pending'}"></ph-icon>
+        ${s.label}
+        ${s.req ? '<span class="req-badge">OBLIG.</span>' : '<span class="opt-badge">Rec.</span>'}
+        ${tiene ? `<span class="ft-count">${fotos.length}</span>` : ''}
       </div>
-      <div class="ft-slot">
-        ${ft[s.key]
-          ? `${fotoMini(ft[s.key],s.label)}<button class="btn-del-foto" onclick="delFotoTecnica('${projectId}','${s.key}')">✕</button>`
-          : (edit ? `<button class="btn-foto-sm" onclick="capFotoTecnica('${projectId}','${s.key}')">
-              ${icon('camera')} Tomar
-            </button>` : '—')}
+      <div class="ft-fotos-grid">
+        ${fotos.map((f, i) => `
+          <div class="ft-foto-item">
+            ${fotoMini(f.url, s.label)}
+            ${edit ? `<button class="btn-del-foto-abs" onclick="delFotoTecnica('${projectId}','${s.key}',${i})">✕</button>` : ''}
+          </div>`).join('')}
+        ${edit ? `<button class="btn-foto-sm ft-add-btn" onclick="capFotoTecnica('${projectId}','${s.key}')">
+            ${icon('camera')} ${tiene ? '+' : 'Tomar'}
+          </button>` : (!tiene ? '<span class="ft-empty">—</span>' : '')}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 window.capFotoTecnica = function(projectId, key) {
-  capturePhoto(async (b64) => {
-    toast('Subiendo foto…');
-    const url = await uploadPhoto(b64, `projects/${projectId}/tecnica_${key}.jpg`);
+  capturePhoto(async (b64Array) => {
+    const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
+    const total = fotos.length;
+    const prog = uploadProgressBar(total);
     const p = await projects.getById(projectId);
     p.garantia.fotosTecnicas = p.garantia.fotosTecnicas || {};
-    p.garantia.fotosTecnicas[key] = url;
+
+    // Normalizar valor existente a array
+    const existentes = getFotosTecnicas(p.garantia.fotosTecnicas, key);
+
+    for (let i = 0; i < total; i++) {
+      prog.update(i + 1);
+      const fid = uuid();
+      const url = await uploadPhoto(fotos[i], `projects/${projectId}/tecnica_${key}_${fid}.jpg`);
+      existentes.push({ url, id: fid, createdAt: isoNow() });
+    }
+    prog.done();
+
+    p.garantia.fotosTecnicas[key] = existentes;
     await projects.update(projectId, { garantia: p.garantia });
     navigate(`#proyecto/${projectId}/garantia`);
-    toast('✅ Foto técnica guardada');
-  });
+    toast(`✅ ${total} foto${total > 1 ? 's' : ''} guardada${total > 1 ? 's' : ''}`);
+  }, { multiple: true });
 };
 
-window.delFotoTecnica = async function(projectId, key) {
+window.delFotoTecnica = async function(projectId, key, idx) {
   if (!await confirmDialog('¿Eliminar esta foto?')) return;
   const p = await projects.getById(projectId);
-  p.garantia.fotosTecnicas[key] = null;
+  const fotos = getFotosTecnicas(p.garantia.fotosTecnicas, key);
+  fotos.splice(idx, 1);
+  p.garantia.fotosTecnicas[key] = fotos.length ? fotos : null;
   await projects.update(projectId, { garantia: p.garantia });
   navigate(`#proyecto/${projectId}/garantia`);
 };

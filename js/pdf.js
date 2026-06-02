@@ -362,27 +362,37 @@ window.exportarPDFTecnico = async function(projectId) {
     }
   }
 
-  // Fotos técnicas
+  // Fotos técnicas (retrocompat: string legacy o array nuevo)
   if (sec('sec-fotos-tec')) {
     const ft = project.garantia?.fotosTecnicas || {};
+    const normFT = v => {
+      if (!v) return [];
+      if (typeof v === 'string') return [{ url: v }];
+      return Array.isArray(v) ? v : [];
+    };
     const slots = [
       { key:'tableroAC',           label:'Tablero AC terminado'       },
       { key:'tableroDC',           label:'Tablero DC terminado'       },
       { key:'protecciones',        label:'Protecciones instaladas'    },
       { key:'inversorEnergizado',  label:'Inversor energizado'        },
-      { key:'canaleta',            label:'Canalización'               },
-      { key:'puesta_tierra',       label:'Puesta a tierra'            },
-    ].filter(s => ft[s.key]);
+      { key:'puestaATierra',       label:'Puesta a tierra'            },
+      { key:'etiquetado',          label:'Etiquetado'                 },
+    ].filter(s => normFT(ft[s.key]).length);
+
     if (slots.length) {
       doc.addPage(); addHeader(doc,'Fotos técnicas de instalación',project); y=44;
       let col=0;
       for (const s of slots) {
-        const fx = 14 + col*98;
-        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
-        doc.text(s.label.toUpperCase(), fx, y); y+=4;
-        const newY = await addImage(doc, ft[s.key], fx, y, 88, 62);
-        if (col===1) { y=newY+4; col=0; } else col=1;
-        if (y>230) { doc.addPage(); addHeader(doc,'Fotos técnicas (cont.)',project); y=44; col=0; }
+        const fotos = normFT(ft[s.key]);
+        for (let fi=0; fi<fotos.length; fi++) {
+          const fx = 14 + col*98;
+          const lbl = fotos.length > 1 ? `${s.label.toUpperCase()} (${fi+1}/${fotos.length})` : s.label.toUpperCase();
+          doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
+          doc.text(lbl, fx, y); y+=4;
+          const newY = await addImage(doc, fotos[fi].url || fotos[fi], fx, y, 88, 62);
+          if (col===1) { y=newY+4; col=0; } else col=1;
+          if (y>230) { doc.addPage(); addHeader(doc,'Fotos técnicas (cont.)',project); y=44; col=0; }
+        }
       }
     }
   }

@@ -687,9 +687,35 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 }
 .foto-mini:hover { transform: scale(1.05); }
 
-.foto-tecnica-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
-.ft-label { display: flex; align-items: center; gap: 6px; font-size: .83rem; flex: 1; }
-.ft-slot  { display: flex; align-items: center; gap: 8px; }
+.foto-tecnica-row {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.ft-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .83rem; flex-wrap: wrap;
+}
+.ft-count {
+  font-size: .7rem; font-weight: 700; background: var(--g500);
+  color: #000; padding: 1px 6px; border-radius: 10px; margin-left: 2px;
+}
+.ft-fotos-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+}
+.ft-foto-item {
+  position: relative; flex-shrink: 0;
+}
+.ft-foto-item .foto-mini { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
+.ft-foto-item .btn-del-foto-abs {
+  position: absolute; top: 2px; right: 2px;
+  width: 20px; height: 20px; font-size: .65rem;
+}
+.ft-add-btn {
+  height: 72px; min-width: 56px; border-radius: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; font-size: .72rem;
+}
+.ft-empty { font-size: .8rem; color: var(--text-muted); }
 .icon-ok      { color: var(--g300); }
 .icon-pending { color: var(--text-muted); }
 
