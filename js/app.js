@@ -19,19 +19,55 @@ import { icon } from './icons.js';
 const app = document.getElementById('app');
 
 // ── Render helper ─────────────────────────────────────────────────────────────
-async function render(html) {
+async function render(html, skeleton = '') {
   if (typeof html === 'string') {
     app.innerHTML = html;
   } else {
+    if (skeleton) app.innerHTML = skeleton;
     app.innerHTML = await html;
   }
-  // Re-ejecutar cualquier <script> inline generado dinámicamente
   app.querySelectorAll('script').forEach(oldScript => {
     const newScript = document.createElement('script');
     newScript.textContent = oldScript.textContent;
     oldScript.replaceWith(newScript);
   });
 }
+
+// ── Pull-to-refresh (solo dashboard) ─────────────────────────────────────────
+(function initPullToRefresh() {
+  let startY = 0;
+  let indicator = null;
+
+  app.addEventListener('touchstart', e => {
+    if (app.scrollTop === 0) startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  app.addEventListener('touchmove', e => {
+    if (!startY) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 0 && app.scrollTop === 0 && window.location.hash.startsWith('#dashboard')) {
+      if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.className = 'ptr-indicator';
+        indicator.textContent = '↓ Soltar para actualizar';
+        app.prepend(indicator);
+      }
+      indicator.style.opacity = Math.min(dy / 70, 1);
+      indicator.classList.toggle('ptr-ready', dy > 70);
+      indicator.textContent = dy > 70 ? '↑ Actualizando…' : '↓ Soltar para actualizar';
+    }
+  }, { passive: true });
+
+  app.addEventListener('touchend', e => {
+    if (indicator) { indicator.remove(); indicator = null; }
+    if (!startY) return;
+    const dy = e.changedTouches[0].clientY - startY;
+    startY = 0;
+    if (dy > 70 && window.location.hash.startsWith('#dashboard')) {
+      navigate('#dashboard');
+    }
+  }, { passive: true });
+})();
 
 // ── Router ────────────────────────────────────────────────────────────────────
 async function route() {
@@ -71,7 +107,7 @@ async function route() {
       case '': {
         const all = await projects.getAll();
         initDashboardFilters(all);
-        await render(renderDashboard(session));
+        await render(renderDashboard(session), skeletonDashboard());
         break;
       }
       case 'nuevo-proyecto':
@@ -85,7 +121,7 @@ async function route() {
       case 'proyecto':
         if (!id) { navigate('#dashboard'); return; }
         if (!sub) {
-          await render(renderProjectDetail(id, session));
+          await render(renderProjectDetail(id, session), skeletonProject());
         } else if (sub === 'garantia') {
           const subsub = parts[3];
           if (subsub === 'estructura') {
@@ -247,16 +283,82 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// ── Theme (dark / light) ──────────────────────────────────────────────────────
+// ── Theme: auto por OS + override manual ──────────────────────────────────────
 (function initTheme() {
-  if (localStorage.getItem('ecofit-theme') === 'light')
-    document.body.classList.add('theme-light');
+  const saved   = localStorage.getItem('ecofit-theme');
+  const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+
+  if (saved === 'light')       document.body.classList.add('theme-light');
+  else if (saved === 'dark')   document.body.classList.remove('theme-light');
+  else if (prefersLight)       document.body.classList.add('theme-light'); // auto
+
+  // Seguir cambios del sistema si no hay preferencia guardada
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
+    if (!localStorage.getItem('ecofit-theme'))
+      document.body.classList.toggle('theme-light', e.matches);
+  });
 })();
 
 window._toggleTheme = function () {
   const isLight = document.body.classList.toggle('theme-light');
   localStorage.setItem('ecofit-theme', isLight ? 'light' : 'dark');
 };
+
+window._setThemeAuto = function () {
+  localStorage.removeItem('ecofit-theme');
+  const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+  document.body.classList.toggle('theme-light', prefersLight);
+  toast('Tema automático activado');
+};
+
+// ── Skeleton screens ──────────────────────────────────────────────────────────
+function skeletonDashboard() {
+  const card = `
+  <div class="sk-card">
+    <div class="sk-row">
+      <div class="sk-block" style="width:60%;height:14px"></div>
+      <div class="sk-block" style="width:20%;height:20px;border-radius:20px"></div>
+    </div>
+    <div class="sk-block" style="width:80%;height:12px;margin-top:8px"></div>
+    <div class="sk-row" style="margin-top:10px">
+      <div class="sk-block" style="width:30%;height:10px"></div>
+      <div class="sk-block" style="width:25%;height:10px"></div>
+    </div>
+  </div>`;
+  return `
+  <div class="sk-header">
+    <div class="sk-block" style="width:140px;height:24px"></div>
+    <div class="sk-block" style="width:32px;height:32px;border-radius:50%"></div>
+  </div>
+  <div class="sk-stats-row">
+    ${[1,2,3,4].map(() => `<div class="sk-block sk-stat-pill"></div>`).join('')}
+  </div>
+  ${card}${card}${card}`;
+}
+
+function skeletonProject() {
+  return `
+  <div class="sk-header">
+    <div class="sk-block" style="width:32px;height:32px;border-radius:50%"></div>
+    <div class="sk-block" style="width:120px;height:20px"></div>
+    <div class="sk-block" style="width:60px;height:20px;border-radius:20px"></div>
+  </div>
+  <div class="sk-card">
+    ${[1,2,3].map(() => `
+    <div class="sk-row" style="margin-bottom:12px">
+      <div style="flex:1"><div class="sk-block" style="width:40%;height:10px;margin-bottom:5px"></div>
+      <div class="sk-block" style="width:70%;height:14px"></div></div>
+      <div style="flex:1"><div class="sk-block" style="width:40%;height:10px;margin-bottom:5px"></div>
+      <div class="sk-block" style="width:55%;height:14px"></div></div>
+    </div>`).join('')}
+  </div>
+  <div class="sk-chips-row">
+    ${[1,2,3,4,5].map(() => `<div class="sk-block sk-chip"></div>`).join('')}
+  </div>
+  <div class="sk-modules-grid">
+    ${[1,2,3,4,5,6].map(() => `<div class="sk-block sk-module"></div>`).join('')}
+  </div>`;
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 route();
