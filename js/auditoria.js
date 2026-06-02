@@ -1,7 +1,7 @@
 // auditoria.js — Módulo 3: Auditoría Técnica
 
 import { projects } from './db.js';
-import { esc, fotoMini, capturePhoto, toast, isoNow, confirmDialog } from './utils.js';
+import { esc, fotoMini, capturePhoto, toast, isoNow, confirmDialog, inputDialog } from './utils.js';
 import { canEdit, isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
 
@@ -37,6 +37,8 @@ export async function renderAuditoria(projectId, session) {
   const aud  = project.auditoria || {};
   const checkMap = {};
   (aud.checklist || []).forEach(i => { checkMap[i.itemId] = i.resultado; });
+  // Sincronizar el _checkMap del módulo con los datos del proyecto al renderizar
+  _checkMap = { ...checkMap };
 
   return `
   <div class="view-header">
@@ -79,7 +81,18 @@ export async function renderAuditoria(projectId, session) {
 
     <!-- Checklist 11 ítems -->
     <div class="card">
-      <h3 class="card-title">Checklist técnico</h3>
+      <div class="card-title-row">
+        <h3 class="card-title">Checklist técnico</h3>
+        <span id="aud-progress-lbl" class="aud-prog-lbl">
+          ${(() => {
+            const done = CHECKLIST_ITEMS.filter(i => checkMap[i.id]).length;
+            return `${done} / ${CHECKLIST_ITEMS.length}`;
+          })()}
+        </span>
+      </div>
+      <div class="aud-prog-bar-wrap">
+        <div id="aud-prog-bar" class="aud-prog-bar" style="width:${Math.round((Object.keys(checkMap).length / CHECKLIST_ITEMS.length) * 100)}%"></div>
+      </div>
       <div class="checklist-grid">
         ${CHECKLIST_ITEMS.map(item => {
           const val = checkMap[item.id] || '';
@@ -88,12 +101,12 @@ export async function renderAuditoria(projectId, session) {
             <span class="check-item-num">${item.id}</span>
             <span class="check-item-label">${item.label}</span>
             <div class="check-item-btns">
-              <button type="button" class="chk-btn chk-ok    ${val==='ok'?'chk-active':''}"
-                onclick="setCheck(${item.id},'ok',    this)">✅ OK</button>
-              <button type="button" class="chk-btn chk-no    ${val==='no_cumple'?'chk-active':''}"
-                onclick="setCheck(${item.id},'no_cumple',this)">❌ No</button>
-              <button type="button" class="chk-btn chk-na    ${val==='na'?'chk-active':''}"
-                onclick="setCheck(${item.id},'na',   this)">N/A</button>
+              <button type="button" class="chk-btn chk-ok ${val==='ok'?'chk-active':''}"
+                onclick="setCheck(${item.id},'ok',this)" ${!edit?'disabled':''}>✓ OK</button>
+              <button type="button" class="chk-btn chk-no ${val==='no_cumple'?'chk-active':''}"
+                onclick="setCheck(${item.id},'no_cumple',this)" ${!edit?'disabled':''}>✕ No</button>
+              <button type="button" class="chk-btn chk-na ${val==='na'?'chk-active':''}"
+                onclick="setCheck(${item.id},'na',this)" ${!edit?'disabled':''}>N/A</button>
             </div>
           </div>`;
         }).join('')}
@@ -126,10 +139,12 @@ export async function renderAuditoria(projectId, session) {
       <div class="foto-slot">
         ${aud.docFirmado
           ? `${fotoMini(aud.docFirmado,'Documento firmado')}
-             ${edit?`<button type="button" class="btn-del-foto" onclick="delDocFirmado('${projectId}')">✕</button>`:'`'}`
-          : (edit ? `<button type="button" class="btn-foto-add" onclick="capDocFirmado()">
-              ${icon('camera', 28)}<span>Foto / Escaneo</span>
-            </button>` : '<p class="empty-msg-sm">Sin documento.</p>')}
+             ${edit ? `<button type="button" class="btn-del-foto" onclick="delDocFirmado('${projectId}')">✕</button>` : ''}`
+          : (edit ? `<div class="empty-state">
+              <div class="empty-state-icon">📄</div>
+              <p class="empty-state-msg">Sin documento firmado.<br>Fotografía o escanea la hoja de entrega.</p>
+              <button type="button" class="empty-state-cta" onclick="capDocFirmado()">Capturar documento</button>
+            </div>` : '<p class="empty-msg-sm">Sin documento.</p>')}
       </div>
       <div id="slot-doc-firmado"></div>
       <div class="form-group" style="margin-top:12px">
@@ -141,9 +156,9 @@ export async function renderAuditoria(projectId, session) {
       </div>
     </div>
 
-    ${edit?`<div class="form-actions">
-      <button type="submit" class="btn-primary">Guardar auditoría</button>
-    </div>`:''}
+    ${edit ? `<div class="form-actions">
+      <button type="submit" class="btn-primary" id="btn-guardar-aud">Guardar auditoría</button>
+    </div>` : ''}
   </form>
 
   ${aud.resultado ? `
@@ -162,13 +177,36 @@ let _checkMap = {};
 
 window.setCheck = function(itemId, resultado, btn) {
   _checkMap[itemId] = resultado;
-  // Actualizar UI
-  const parent = btn.closest('.check-item-btns');
-  parent.querySelectorAll('.chk-btn').forEach(b => b.classList.remove('chk-active'));
+
+  // Actualizar botones del ítem
+  btn.closest('.check-item-btns').querySelectorAll('.chk-btn')
+    .forEach(b => b.classList.remove('chk-active'));
   btn.classList.add('chk-active');
-  // Serializar
+
+  // Serializar al hidden input
   const checklist = Object.entries(_checkMap).map(([id, res]) => ({ itemId: parseInt(id), resultado: res }));
   document.getElementById('checklist-json').value = JSON.stringify(checklist);
+
+  // Actualizar barra de progreso
+  const total = CHECKLIST_ITEMS.length;
+  const done  = Object.keys(_checkMap).length;
+  const pct   = Math.round(done / total * 100);
+  const bar   = document.getElementById('aud-prog-bar');
+  const lbl   = document.getElementById('aud-progress-lbl');
+  if (bar) bar.style.width = pct + '%';
+  if (lbl) lbl.textContent = `${done} / ${total}`;
+
+  // Auto-sugerir resultado si todos los ítems están evaluados
+  if (done === total) {
+    const hayNo = checklist.some(i => i.resultado === 'no_cumple');
+    const sugerido = hayNo ? 'rechazado' : 'aprobado';
+    const resVal = document.getElementById('resultado-val');
+    if (resVal && !resVal.value) {
+      // Solo sugerir si no hay resultado ya seleccionado
+      const chip = document.querySelector(`.resultado-chip[onclick*="${sugerido}"]`);
+      if (chip) { chip.click(); toast(`Resultado sugerido: ${chip.textContent.trim()}`); }
+    }
+  }
 };
 
 window.setResultado = function(val, color, btn) {
@@ -206,27 +244,35 @@ window.delDocFirmado = async function(projectId) {
 // ── Guardar auditoría ─────────────────────────────────────────────────────────
 window.guardarAuditoria = async function(e, projectId) {
   e.preventDefault();
-  const fd = new FormData(e.target);
-  const p  = await projects.getById(projectId);
+  const btn = document.getElementById('btn-guardar-aud');
+  if (btn) { btn.disabled = true; btn.classList.add('btn-saving'); btn.textContent = 'Guardando'; }
 
-  const auditoriaData = {
-    tipo:     fd.get('tipo'),
-    auditor: {
-      nombre:       fd.get('auditorNombre').trim(),
-      empresa:      fd.get('auditorEmpresa').trim(),
-      acreditacion: fd.get('auditorAcreditacion').trim(),
-    },
-    norma:        fd.get('norma').trim(),
-    checklist:    JSON.parse(fd.get('checklistJson') || '[]'),
-    resultado:    fd.get('resultado'),
-    observaciones:fd.get('observaciones').trim(),
-    docFirmado:   _docFirmadoB64 || p.auditoria?.docFirmado || null,
-    incluirEnPDF: fd.get('incluirEnPDF') === 'on',
-    fecha:        isoNow(),
-  };
+  try {
+    const fd = new FormData(e.target);
+    const p  = await projects.getById(projectId);
 
-  await projects.update(projectId, { auditoria: auditoriaData });
-  _docFirmadoB64 = null;
-  toast('✅ Auditoría guardada');
-  navigate(`#proyecto/${projectId}`);
+    const auditoriaData = {
+      tipo:     fd.get('tipo'),
+      auditor: {
+        nombre:       fd.get('auditorNombre').trim(),
+        empresa:      fd.get('auditorEmpresa').trim(),
+        acreditacion: fd.get('auditorAcreditacion').trim(),
+      },
+      norma:        fd.get('norma').trim(),
+      checklist:    JSON.parse(fd.get('checklistJson') || '[]'),
+      resultado:    fd.get('resultado'),
+      observaciones:fd.get('observaciones').trim(),
+      docFirmado:   _docFirmadoB64 || p.auditoria?.docFirmado || null,
+      incluirEnPDF: fd.get('incluirEnPDF') === 'on',
+      fecha:        isoNow(),
+    };
+
+    await projects.update(projectId, { auditoria: auditoriaData });
+    _docFirmadoB64 = null;
+    toast('✅ Auditoría guardada');
+    navigate(`#proyecto/${projectId}`);
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.classList.remove('btn-saving'); btn.textContent = 'Guardar auditoría'; }
+    toast(err.message || 'Error al guardar', 'error');
+  }
 };

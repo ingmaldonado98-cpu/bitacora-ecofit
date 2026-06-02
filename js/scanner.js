@@ -4,10 +4,30 @@
 import { icon } from './icons.js';
 
 let _activeReader = null;
+let _torchOn = false;
+let _videoTrack = null;
+
+// ── Toggle linterna ────────────────────────────────────────────────────────────
+function toggleTorch() {
+  if (!_videoTrack) return;
+  _torchOn = !_torchOn;
+  _videoTrack.applyConstraints({ advanced: [{ torch: _torchOn }] }).catch(() => {});
+  const btn = document.getElementById('scanner-torch');
+  if (btn) { btn.classList.toggle('torch-on', _torchOn); btn.title = _torchOn ? 'Apagar linterna' : 'Linterna'; }
+}
+
+// ── Flash visual en scan exitoso ──────────────────────────────────────────────
+function scanFlash(viewport) {
+  const flash = document.createElement('div');
+  flash.className = 'scanner-flash';
+  viewport.appendChild(flash);
+  setTimeout(() => flash.remove(), 300);
+}
 
 // ── Escáner individual (una lectura y cierra) ──────────────────────────────────
 export function scanOnce(onResult, onError) {
   if (_activeReader) { _activeReader.reset(); _activeReader = null; }
+  _torchOn = false; _videoTrack = null;
 
   const overlay = document.createElement('div');
   overlay.className = 'scanner-overlay';
@@ -15,13 +35,16 @@ export function scanOnce(onResult, onError) {
     <div class="scanner-modal">
       <div class="scanner-header">
         <span>Escanear código</span>
-        <button id="close-scanner" class="scanner-close">✕</button>
+        <div style="display:flex;gap:8px">
+          <button id="scanner-torch" class="scanner-torch-btn" title="Linterna">🔦</button>
+          <button id="close-scanner" class="scanner-close">✕</button>
+        </div>
       </div>
-      <div class="scanner-viewport">
+      <div class="scanner-viewport" id="scanner-vp">
         <video id="scanner-video" autoplay playsinline muted></video>
         <div class="scanner-frame"></div>
       </div>
-      <p class="scanner-hint">Apunta al código de barras del equipo</p>
+      <p class="scanner-hint">Apunta al QR o código de barras</p>
       <div class="scanner-fallback">
         <input type="text" id="scanner-manual" placeholder="Escribe el serial manualmente" />
         <button id="scanner-manual-ok" class="btn-outline btn-sm">OK</button>
@@ -30,27 +53,23 @@ export function scanOnce(onResult, onError) {
   `;
   document.body.appendChild(overlay);
 
-  document.getElementById('close-scanner').onclick = () => { cleanup(); };
+  document.getElementById('close-scanner').onclick = () => cleanup();
+  document.getElementById('scanner-torch').onclick  = () => toggleTorch();
   document.getElementById('scanner-manual-ok').onclick = () => {
     const val = document.getElementById('scanner-manual').value.trim();
     if (val) { cleanup(); onResult(val); }
   };
-  document.getElementById('scanner-manual').onkeydown = (e) => {
-    if (e.key === 'Enter') {
-      const val = e.target.value.trim();
-      if (val) { cleanup(); onResult(val); }
-    }
+  document.getElementById('scanner-manual').onkeydown = e => {
+    if (e.key === 'Enter') { const val = e.target.value.trim(); if (val) { cleanup(); onResult(val); } }
   };
 
   function cleanup() {
+    _torchOn = false; _videoTrack = null;
     if (_activeReader) { try { _activeReader.reset(); } catch(e){} _activeReader = null; }
     overlay.remove();
   }
 
-  if (!window.ZXing) {
-    console.warn('ZXing no disponible — usando modo manual');
-    return;
-  }
+  if (!window.ZXing) { console.warn('ZXing no disponible — modo manual'); return; }
 
   try {
     const reader = new ZXing.BrowserMultiFormatReader();
@@ -61,6 +80,7 @@ export function scanOnce(onResult, onError) {
       reader.decodeFromVideoDevice(back?.deviceId, 'scanner-video', (result, err) => {
         if (result) {
           if (navigator.vibrate) navigator.vibrate(80);
+          scanFlash(document.getElementById('scanner-vp'));
           cleanup();
           onResult(result.getText());
         }
@@ -68,13 +88,24 @@ export function scanOnce(onResult, onError) {
           if (onError) onError(err);
         }
       });
-    }).catch(err => {
-      console.warn('No se pudo acceder a la cámara:', err);
-      if (onError) onError(err);
-    });
-  } catch(err) {
-    console.warn('Error iniciando ZXing:', err);
-  }
+      // Capturar video track para linterna
+      const video = document.getElementById('scanner-video');
+      if (video) {
+        video.addEventListener('loadedmetadata', () => {
+          const stream = video.srcObject;
+          if (stream) _videoTrack = stream.getVideoTracks()[0] || null;
+          // Ocultar botón linterna si no soporta torch
+          if (_videoTrack) {
+            const caps = _videoTrack.getCapabilities?.() || {};
+            if (!caps.torch) {
+              const btn = document.getElementById('scanner-torch');
+              if (btn) btn.style.display = 'none';
+            }
+          }
+        }, { once: true });
+      }
+    }).catch(err => { console.warn('No se pudo acceder a la cámara:', err); if (onError) onError(err); });
+  } catch(err) { console.warn('Error iniciando ZXing:', err); }
 }
 
 // ── Modo escaneo continuo de paneles ───────────────────────────────────────────
@@ -87,10 +118,10 @@ export function startContinuousScan(containerId, onResult, onError) {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="scanner-continuous">
+    <div class="scanner-continuous" id="scanner-cont-wrap">
       <video id="scanner-cont-video" autoplay playsinline muted class="scanner-cont-video"></video>
       <div class="scanner-frame-cont"></div>
-      <p class="scanner-hint-sm">Apunta al código del panel</p>
+      <p class="scanner-hint-sm">Apunta al QR del panel</p>
     </div>
   `;
 
@@ -117,6 +148,7 @@ export function startContinuousScan(containerId, onResult, onError) {
           lastCode = code;
           lastTime = now;
           if (navigator.vibrate) navigator.vibrate(60);
+          scanFlash(document.getElementById('scanner-cont-wrap') || container);
           onResult(code);
         }
         if (err && !(err instanceof ZXing.NotFoundException) && !(err?.name === 'NotFoundException')) {

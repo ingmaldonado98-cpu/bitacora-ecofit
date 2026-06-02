@@ -946,6 +946,31 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 .scanner-frame-cont { position: absolute; border: 2px solid var(--g300); }
 .scanner-hint-sm { font-size: .75rem; color: var(--text-muted); text-align: center; padding: 6px; }
 .scanner-continuous { position: relative; }
+/* Linterna */
+.scanner-torch-btn {
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+  border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: .9rem;
+  transition: background .15s;
+}
+.scanner-torch-btn.torch-on { background: var(--solar); color: #000; }
+/* Flash visual al escanear */
+.scanner-flash {
+  position: absolute; inset: 0; background: rgba(255,255,255,.55);
+  pointer-events: none; animation: scanFlashAnim .3s ease forwards;
+  border-radius: 4px;
+}
+@keyframes scanFlashAnim { 0% { opacity:1 } 100% { opacity:0 } }
+
+/* ── Auditoría progreso ───────────────────────────────────────────────────── */
+.aud-prog-lbl { font-size: .78rem; font-weight: 700; color: var(--g300); }
+.aud-prog-bar-wrap {
+  height: 4px; background: var(--border2); border-radius: 2px;
+  margin: 6px 0 14px; overflow: hidden;
+}
+.aud-prog-bar {
+  height: 100%; background: var(--g300); border-radius: 2px;
+  transition: width .3s ease; width: 0%;
+}
 
 /* ── Levantamiento / Formularios dinámicos ────────────────────────────────── */
 .recibo-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
