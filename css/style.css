@@ -549,6 +549,7 @@ body {
 .autosave-indicator { font-size:.8rem; color:var(--text-muted); transition:color .3s; }
 .autosave-indicator.saving { color:#f4a261; }
 .autosave-indicator.saved  { color:var(--g300); }
+.autosave-indicator.error  { color:var(--red); }
 
 /* ── Tab bar ──────────────────────────────────────────────────────────────── */
 .tab-bar {

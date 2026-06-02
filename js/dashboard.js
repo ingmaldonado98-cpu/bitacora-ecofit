@@ -145,15 +145,23 @@ window._dashFilterTecnico = function(uid) {
   applyFilters();
 };
 
-window._dashSearch = async function(q) {
-  const all = q.trim() ? await projects.search(q) : await projects.getAll();
-  _allProjects = all;
-  _page = 0;
-  applyFilters();
+let _searchTimer = null;
+window._dashSearch = function(q) {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(async () => {
+    const all = q.trim() ? await projects.search(q) : await projects.getAll();
+    _allProjects = all;
+    _page = 0;
+    applyFilters();
+  }, 350);
 };
 
 window._dashFilter = function() { _page = 0; applyFilters(); };
-window._dashPage   = function(dir) { _page += dir; applyFilters(); };
+window._dashPage   = function(dir) {
+  _page += dir;
+  applyFilters();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 function applyFilters() {
   const estado = document.getElementById('dash-filter-estado')?.value;

@@ -168,3 +168,6 @@ export function stopScanner() {
     _activeReader = null;
   }
 }
+
+// Expuesto para que app.js pueda limpiar al navegar
+window._stopScannerGlobal = stopScanner;

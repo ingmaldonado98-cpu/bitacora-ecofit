@@ -113,6 +113,12 @@ export const fbProjects = {
     await deleteDoc(doc(fbDB, 'projects', id));
   },
 
+  // Actualización atómica de un campo anidado sin read-modify-write
+  // path: ej. 'checklistData.herr.herr-001'
+  setField: async (id, path, value) => {
+    await updateDoc(doc(fbDB, 'projects', id), { [path]: value });
+  },
+
   search: async (q) => {
     const all = await fbProjects.getAll();
     const ql  = q.toLowerCase();

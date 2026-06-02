@@ -212,6 +212,7 @@ function updateHeader(session) {
 
 // ── Navegación global ─────────────────────────────────────────────────────────
 window.navigate = function(hash) {
+  window._stopScannerGlobal?.();
   if (window.location.hash === hash) {
     route();
   } else {

@@ -319,12 +319,9 @@ function renderProgress(done, total) {
 }
 
 // ── Persistencia ──────────────────────────────────────────────────────────────
+// Usa updateDoc con dot-notation para evitar race condition entre toggles rápidos
 async function _saveField(projectId, field, key, value) {
-  const p = await projects.getById(projectId);
-  p.checklistData = p.checklistData || {};
-  p.checklistData[field] = p.checklistData[field] || {};
-  p.checklistData[field][key] = value;
-  await projects.update(projectId, { checklistData: p.checklistData });
+  await projects.setField(projectId, `checklistData.${field}.${key}`, value);
 }
 
 window.clToggleHerr  = (pid, id, v)  => _saveField(pid, 'herr',  id,         v);

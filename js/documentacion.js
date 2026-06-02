@@ -601,7 +601,10 @@ window._levAutoSave = function(projectId) {
     fakeEvent._auto = true;
     fakeEvent.preventDefault = () => {};
     fakeEvent.target = form;
-    window.guardarLevantamiento(fakeEvent, projectId);
+    Promise.resolve(window.guardarLevantamiento(fakeEvent, projectId)).catch(() => {
+      const ind = document.getElementById('lev-autosave');
+      if (ind) { ind.textContent = '⚠ Error al guardar'; ind.className = 'autosave-indicator error'; }
+    });
   }, 3000);
 };
 

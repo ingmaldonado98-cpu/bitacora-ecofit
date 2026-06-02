@@ -351,7 +351,7 @@ function renderStatusLog(log) {
 }
 
 // ── Check requisitos para revisión ────────────────────────────────────────────
-function checklistFaltantes(project) {
+function _getFaltantes(project) {
   const faltantes = [];
   if (!project.garantia?.fotoSistema) faltantes.push('Foto general del sistema');
   if (!(project.documentacion?.fases?.despues?.length > 0)) faltantes.push('Al menos una foto en fase "Después"');
@@ -359,7 +359,11 @@ function checklistFaltantes(project) {
   if (totalPaneles === 0) faltantes.push('Al menos un panel registrado con número de serie');
   if (!project.garantia?.fotosTecnicas?.tableroAC) faltantes.push('Foto del tablero AC terminado');
   if (!project.garantia?.fotosTecnicas?.inversorEnergizado) faltantes.push('Foto del inversor energizado');
+  return faltantes;
+}
 
+function checklistFaltantes(project) {
+  const faltantes = _getFaltantes(project);
   if (!faltantes.length) return '';
   return `<div class="faltantes-list">
     <p class="falt-title">${icon('warning')} Pendiente para enviar a revisión:</p>
@@ -477,6 +481,16 @@ window._eliminarProyecto = async function(id) {
 };
 
 window._cambiarEstado = async function(id, nuevoEstado) {
+  // Validar requisitos antes de enviar a revisión
+  if (nuevoEstado === 'pendiente_revision') {
+    const project = await projects.getById(id);
+    const faltantes = _getFaltantes(project);
+    if (faltantes.length) {
+      const msg = `Faltan datos requeridos para enviar a revisión:\n\n${faltantes.map(f => `• ${f}`).join('\n')}\n\n¿Continuar de todas formas?`;
+      if (!await confirmDialog(msg)) return;
+    }
+  }
+
   const notaRequerida = ['observado', 'cancelado'].includes(nuevoEstado);
   const result = await cambioEstadoDialog(ESTADOS[nuevoEstado]?.label || nuevoEstado, notaRequerida);
   if (!result) return;
