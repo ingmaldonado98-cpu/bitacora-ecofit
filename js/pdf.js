@@ -1,9 +1,11 @@
 // pdf.js — Exportación PDF dual: Cliente limpio + Técnico completo
 
 import { projects, config } from './db.js';
-import { esc, fmtFecha, TIPOS_SISTEMA } from './utils.js';
+import { esc, fmtFecha, fmtRelativa, TIPOS_SISTEMA, ESTADOS } from './utils.js';
 import { isAdmin } from './auth.js';
 import { icon } from './icons.js';
+
+const ESTADOS_LABEL = Object.fromEntries(Object.entries(ESTADOS).map(([k,v]) => [k, v.label]));
 
 const VERDE    = [27, 67, 50];   // #1B4332
 const VERDE_MED= [64,145,108];   // #40916C
@@ -62,20 +64,23 @@ export async function renderPDFExport(projectId, session) {
       <p class="hint" style="margin-bottom:12px">Selecciona las secciones a incluir:</p>
       <div class="pdf-sections">
         ${[
-          ['sec-equipos',    '⚡ Equipos con seriales y fotos de placa'],
+          ['sec-equipos',    '⚡ Equipos con seriales y fotos'],
+          ['sec-fotos-tec',  '📸 Fotos técnicas (tableros, inversor)'],
           ['sec-estructura', '🏗️ Estructura de montaje'],
-          ['sec-paneles',    '☀️ Paneles por string con todos los seriales'],
-          ['sec-levant',     '📋 Levantamiento técnico completo'],
+          ['sec-paneles',    '☀️ Paneles por string con seriales'],
+          ['sec-levant',     '📋 Levantamiento técnico'],
           ['sec-consumo',    '🔌 Consumo del cliente'],
           ['sec-antes',      '🔍 Fotos: Antes'],
           ['sec-durante',    '🔧 Fotos: Durante'],
           ['sec-despues',    '✅ Fotos: Después'],
+          ['sec-observ',     '💬 Observaciones del proyecto'],
+          ['sec-historial',  '🕓 Historial de cambios'],
           ['sec-auditoria',  '📋 Auditoría técnica'],
           ['sec-qr',         '📱 QR del cliente'],
         ].map(([id, label]) => `
-          <label class="check-chip pdf-check ${['sec-equipos','sec-paneles','sec-despues'].includes(id)?'check-active':''}">
+          <label class="check-chip pdf-check ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-despues'].includes(id)?'check-active':''}">
             <input type="checkbox" id="${id}"
-              ${['sec-equipos','sec-paneles','sec-despues'].includes(id)?'checked':''}>
+              ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-despues'].includes(id)?'checked':''}>
             ${label}
           </label>`).join('')}
       </div>
@@ -93,23 +98,43 @@ function newDoc() {
   return new window.jspdf.jsPDF({ orientation:'p', unit:'mm', format:'a4' });
 }
 
+let _logoB64 = null;
+async function getLogoB64() {
+  if (_logoB64) return _logoB64;
+  try {
+    const res = await fetch('./icons/logo.png');
+    const blob = await res.blob();
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => { _logoB64 = e.target.result; resolve(_logoB64); };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
 function addHeader(doc, title, proyecto) {
-  // Degradado simulado con rect verde
   doc.setFillColor(...VERDE);
   doc.rect(0, 0, 210, 32, 'F');
   doc.setFillColor(...VERDE_MED);
   doc.rect(0, 28, 210, 4, 'F');
 
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(18);
-  doc.setTextColor(...BLANCO);
-  doc.text('Ecofit Solar Solutions', 14, 14);
-
-  doc.setFontSize(10);
-  doc.setFont('helvetica','normal');
-  doc.text(title, 14, 22);
+  // Logo (si ya está en caché)
+  if (_logoB64) {
+    try { doc.addImage(_logoB64, 'PNG', 14, 4, 22, 22); } catch {}
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(...BLANCO);
+    doc.text('Ecofit Solar Solutions', 40, 13);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.text(title, 40, 21);
+  } else {
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...BLANCO);
+    doc.text('Ecofit Solar Solutions', 14, 14);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text(title, 14, 22);
+  }
 
   doc.setFontSize(9);
+  doc.setTextColor(...BLANCO);
   doc.text(proyecto.displayId, 196, 14, { align:'right' });
   doc.text(fmtFecha(new Date().toISOString()), 196, 22, { align:'right' });
 }
@@ -150,6 +175,7 @@ window.exportarPDFCliente = async function(projectId) {
   const [project, contacto] = await Promise.all([
     projects.getById(projectId),
     config.get('contactoEcofit'),
+    getLogoB64(),
   ]);
   const doc = newDoc(); if (!doc) return;
   const tipo = TIPOS_SISTEMA[project.tipoSistema];
@@ -170,6 +196,7 @@ window.exportarPDFCliente = async function(projectId) {
   y = campo(doc,'Capacidad instalada', `${totalKwp.toFixed(2)} kWp`, 14, y);
   y = campo(doc,'Paneles solares', `${totalPaneles} paneles · ${project.garantia?.paneles?.marca||''} ${project.garantia?.paneles?.modelo||''}`, 14, y);
   y = campo(doc,'Fecha de instalación', fmtFecha(project.fechaInicio), 14, y);
+  if (project.fechaEstimada) y = campo(doc,'Fecha de entrega estimada', fmtFecha(project.fechaEstimada), 14, y);
 
   // Equipos (sin seriales)
   const equipos = project.garantia?.equipos || [];
@@ -222,7 +249,7 @@ window.exportarPDFCliente = async function(projectId) {
 
 // ── PDF Técnico ───────────────────────────────────────────────────────────────
 window.exportarPDFTecnico = async function(projectId) {
-  const project = await projects.getById(projectId);
+  const [project] = await Promise.all([projects.getById(projectId), getLogoB64()]);
   const doc = newDoc(); if (!doc) return;
 
   const sec = (id) => document.getElementById(id)?.checked;
@@ -240,8 +267,9 @@ window.exportarPDFTecnico = async function(projectId) {
   doc.text(project.clientName || '—', 14, y); y += 6;
   if (project.direccion) { doc.text(project.direccion, 14, y); y += 6; }
   y = campo(doc,'Tipo de sistema',tipo?.label||'—',14,y);
-  y = campo(doc,'Estado',project.estado,14,y);
+  y = campo(doc,'Estado', ESTADOS_LABEL[project.estado] || project.estado, 14,y);
   y = campo(doc,'Capacidad',`${totalKwp.toFixed(2)} kWp · ${totalPaneles} paneles`,14,y);
+  if (project.fechaEstimada) y = campo(doc,'Fecha estimada entrega',fmtFecha(project.fechaEstimada),14,y);
 
   // Equipos con seriales
   if (sec('sec-equipos')) {
@@ -331,6 +359,76 @@ window.exportarPDFTecnico = async function(projectId) {
       const newY = await addImage(doc,f.data,fx,y,88,65);
       if (col===1) { y=newY; col=0; } else col=1;
       if (y>230) { doc.addPage(); addHeader(doc,titulo+' (cont.)',project); y=44; col=0; }
+    }
+  }
+
+  // Fotos técnicas
+  if (sec('sec-fotos-tec')) {
+    const ft = project.garantia?.fotosTecnicas || {};
+    const slots = [
+      { key:'tableroAC',           label:'Tablero AC terminado'       },
+      { key:'tableroDC',           label:'Tablero DC terminado'       },
+      { key:'protecciones',        label:'Protecciones instaladas'    },
+      { key:'inversorEnergizado',  label:'Inversor energizado'        },
+      { key:'canaleta',            label:'Canalización'               },
+      { key:'puesta_tierra',       label:'Puesta a tierra'            },
+    ].filter(s => ft[s.key]);
+    if (slots.length) {
+      doc.addPage(); addHeader(doc,'Fotos técnicas de instalación',project); y=44;
+      let col=0;
+      for (const s of slots) {
+        const fx = 14 + col*98;
+        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
+        doc.text(s.label.toUpperCase(), fx, y); y+=4;
+        const newY = await addImage(doc, ft[s.key], fx, y, 88, 62);
+        if (col===1) { y=newY+4; col=0; } else col=1;
+        if (y>230) { doc.addPage(); addHeader(doc,'Fotos técnicas (cont.)',project); y=44; col=0; }
+      }
+    }
+  }
+
+  // Observaciones
+  if (sec('sec-observ')) {
+    const obs = project.observaciones || [];
+    if (obs.length) {
+      doc.addPage(); addHeader(doc,'Observaciones del proyecto',project); y=44;
+      for (const o of obs) {
+        const estado = o.resuelta ? '[RESUELTA]' : `[${(o.prioridad||'normal').toUpperCase()}]`;
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+        doc.text(`${estado} ${esc(o.autorNombre||'—')} · ${fmtFecha(o.timestamp)}`, 14, y); y+=5;
+        doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+        const lineas = doc.splitTextToSize(o.texto||'', 180);
+        doc.text(lineas, 18, y); y += lineas.length * 5 + 3;
+        if (o.resuelta && o.resueltaPor) {
+          doc.setTextColor(...GRIS_CLR);
+          doc.text(`  ✓ Resuelta por ${esc(o.resueltaPor)} · ${fmtFecha(o.resueltaAt)}`, 18, y); y+=6;
+        }
+        doc.setDrawColor(200,220,200); doc.line(14, y, 196, y); y+=4;
+        if (y>260) { doc.addPage(); addHeader(doc,'Observaciones (cont.)',project); y=44; }
+      }
+    }
+  }
+
+  // Historial de cambios
+  if (sec('sec-historial')) {
+    const log = project.statusLog || [];
+    if (log.length) {
+      doc.addPage(); addHeader(doc,'Historial de cambios de estado',project); y=44;
+      [...log].reverse().forEach(e => {
+        const fromL = ESTADOS_LABEL[e.from] || e.from;
+        const toL   = ESTADOS_LABEL[e.to]   || e.to;
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+        doc.text(`${fromL}  →  ${toL}`, 14, y); y+=5;
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
+        doc.text(`${esc(e.by||'—')}  ·  ${fmtFecha(e.at)}`, 18, y); y+=4;
+        if (e.nota) {
+          doc.setTextColor(...GRIS);
+          const lineas = doc.splitTextToSize(`Nota: ${e.nota}`, 170);
+          doc.text(lineas, 18, y); y += lineas.length * 4 + 2;
+        }
+        doc.setDrawColor(200,220,200); doc.line(14, y, 196, y); y+=5;
+        if (y>260) { doc.addPage(); addHeader(doc,'Historial (cont.)',project); y=44; }
+      });
     }
   }
 
