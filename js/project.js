@@ -396,7 +396,7 @@ function renderObservaciones(obs, session, projectId, edit = false) {
         </div>
       </div>
       <p class="obs-texto">${esc(o.texto)}</p>
-      ${resuelta ? `<p class="obs-resuelta-meta">Resuelta por ${esc(o.resueltaPor || '—')} · ${fmtRelativa(o.resueltaAt)}</p>` : ''}
+      ${resuelta ? `<p class="obs-resuelta-meta">✓ Resuelta por ${esc(o.resueltaPor || '—')} · ${fmtRelativa(o.resueltaAt)}${o.resueltaNota ? ` — ${esc(o.resueltaNota)}` : ''}</p>` : ''}
     </div>`;
   }).join('');
 }
@@ -436,9 +436,17 @@ window._resolverObs = async function(id, idx, resolver) {
   const [session, project] = await Promise.all([getSession(), projects.getById(id)]);
   const obs = [...(project.observaciones || [])];
   if (resolver) {
-    obs[idx] = { ...obs[idx], resuelta: true, resueltaPor: session?.nombre || '—', resueltaAt: isoNow() };
+    const nota = await inputDialog('¿Cómo se resolvió? (opcional):', '');
+    if (nota === null) return; // canceló
+    obs[idx] = {
+      ...obs[idx],
+      resuelta: true,
+      resueltaPor: session?.nombre || '—',
+      resueltaAt: isoNow(),
+      resueltaNota: nota.trim() || null,
+    };
   } else {
-    const { resuelta, resueltaPor, resueltaAt, ...rest } = obs[idx];
+    const { resuelta, resueltaPor, resueltaAt, resueltaNota, ...rest } = obs[idx];
     obs[idx] = rest;
   }
   await projects.update(id, { observaciones: obs });

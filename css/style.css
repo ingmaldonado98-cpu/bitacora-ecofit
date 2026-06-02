@@ -37,6 +37,8 @@
   --orange:    #f09a50;
   --green-vivo:#2ebd42;
 
+  --accent:    #2ebd42;   /* alias de --g500, usado en inputs focus y CTA */
+
   --radius:    12px;
   --radius-sm: 8px;
   --shadow:    0 2px 20px rgba(0,0,0,.6);
@@ -71,6 +73,7 @@ body.theme-light {
   --blue:      #1d6cc8;
   --orange:    #b85000;
   --green-vivo:#22a832;
+  --accent:    #178a26;
 
   --shadow:    0 2px 16px rgba(0,0,0,.1);
 }
@@ -699,6 +702,49 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 .foto-nota { font-size: .72rem; color: var(--text-muted); padding: 4px 6px; background: var(--surface2); }
 
 /* ── Photo overlay ────────────────────────────────────────────────────────── */
+/* ── Lightbox ─────────────────────────────────────────────────────────────── */
+.lb-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.95);
+  z-index: 1100; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 16px;
+  animation: fadeIn .15s ease;
+}
+.lb-close {
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(255,255,255,.15); border: none; color: #fff;
+  font-size: 1.1rem; width: 38px; height: 38px;
+  border-radius: 50%; cursor: pointer; z-index: 2;
+}
+.lb-counter {
+  position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+  font-size: .75rem; color: rgba(255,255,255,.6); letter-spacing: .06em;
+}
+.lb-img-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  width: 100%; overflow: hidden;
+}
+.lb-img {
+  max-width: 100%; max-height: 80dvh; object-fit: contain;
+  border-radius: 8px; transition: transform .25s ease; cursor: zoom-in;
+  user-select: none; -webkit-user-drag: none;
+}
+.lb-img.lb-zoomed { transform: scale(2); cursor: zoom-out; }
+.lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,.15); border: none; color: #fff;
+  font-size: 2rem; width: 44px; height: 60px; border-radius: 8px;
+  cursor: pointer; line-height: 1; transition: background .15s;
+}
+.lb-nav:hover:not([disabled]) { background: rgba(255,255,255,.3); }
+.lb-nav[disabled] { opacity: .2; cursor: default; }
+.lb-prev { left: 8px; }
+.lb-next { right: 8px; }
+.lb-hint {
+  font-size: .7rem; color: rgba(255,255,255,.35);
+  margin-top: 10px; letter-spacing: .04em;
+}
+
+/* ── (legacy) photo-overlay — mantenido por compatibilidad ───────────────── */
 .photo-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 999;
   display: flex; align-items: center; justify-content: center; padding: 16px;

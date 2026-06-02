@@ -253,14 +253,67 @@ export function fotoMini(src, alt = '', onClick) {
     onclick="window._viewPhoto('${id}')" />`;
 }
 
-// Visor de foto ampliada
+// ── Lightbox con swipe, zoom y navegación entre fotos del grupo ───────────────
 window._viewPhoto = function(imgId) {
-  const src = document.getElementById(imgId)?.src;
-  if (!src) return;
+  const img = document.getElementById(imgId);
+  if (!img) return;
+
+  // Recopilar todas las fotos del mismo contenedor
+  const grid = img.closest('.fotos-grid') || img.closest('.card') || document.body;
+  const siblings = [...grid.querySelectorAll('.foto-mini')];
+  const srcs  = siblings.map(i => i.src).filter(Boolean);
+  let idx     = siblings.indexOf(img);
+  if (idx < 0) { idx = 0; }
+
+  let zoomed   = false;
+  let touchX0  = 0;
+  let touchY0  = 0;
+
   const overlay = document.createElement('div');
-  overlay.className = 'photo-overlay';
-  overlay.innerHTML = `<img src="${src}" /><button onclick="this.parentElement.remove()">✕</button>`;
+  overlay.className = 'lb-overlay';
+
+  function render() {
+    const total = srcs.length;
+    overlay.innerHTML = `
+      <button class="lb-close" aria-label="Cerrar">✕</button>
+      ${total > 1 ? `<span class="lb-counter">${idx + 1} / ${total}</span>` : ''}
+      <div class="lb-img-wrap">
+        <img class="lb-img ${zoomed ? 'lb-zoomed' : ''}" src="${srcs[idx]}" draggable="false" />
+      </div>
+      ${total > 1 ? `
+        <button class="lb-nav lb-prev" ${idx === 0 ? 'disabled' : ''}>‹</button>
+        <button class="lb-nav lb-next" ${idx === total - 1 ? 'disabled' : ''}>›</button>
+      ` : ''}
+      <p class="lb-hint">${zoomed ? 'Toca para reducir' : total > 1 ? 'Desliza o toca para ampliar' : 'Toca para ampliar'}</p>`;
+
+    overlay.querySelector('.lb-close').onclick = () => overlay.remove();
+    overlay.querySelector('.lb-img').onclick    = () => { zoomed = !zoomed; render(); };
+    overlay.querySelector('.lb-prev')?.addEventListener('click', e => { e.stopPropagation(); if (idx > 0) { idx--; zoomed = false; render(); } });
+    overlay.querySelector('.lb-next')?.addEventListener('click', e => { e.stopPropagation(); if (idx < srcs.length - 1) { idx++; zoomed = false; render(); } });
+  }
+
+  render();
   document.body.appendChild(overlay);
+
+  // Swipe horizontal para navegar, vertical para cerrar
+  overlay.addEventListener('touchstart', e => {
+    touchX0 = e.touches[0].clientX;
+    touchY0 = e.touches[0].clientY;
+  }, { passive: true });
+
+  overlay.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchX0;
+    const dy = e.changedTouches[0].clientY - touchY0;
+    if (Math.abs(dy) > Math.abs(dx) && dy > 60) { overlay.remove(); return; }
+    if (Math.abs(dx) > 50) {
+      if (dx < 0 && idx < srcs.length - 1) { idx++; zoomed = false; render(); }
+      if (dx > 0 && idx > 0)               { idx--; zoomed = false; render(); }
+    }
+  }, { passive: true });
+
+  // Cerrar con Escape
+  const onKey = e => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
 };
 
 // ── Indicador de sync ──────────────────────────────────────────────────────────

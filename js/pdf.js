@@ -401,7 +401,9 @@ window.exportarPDFTecnico = async function(projectId) {
         doc.text(lineas, 18, y); y += lineas.length * 5 + 3;
         if (o.resuelta && o.resueltaPor) {
           doc.setTextColor(...GRIS_CLR);
-          doc.text(`  ✓ Resuelta por ${esc(o.resueltaPor)} · ${fmtFecha(o.resueltaAt)}`, 18, y); y+=6;
+          const resLine = `  ✓ Resuelta por ${esc(o.resueltaPor)} · ${fmtFecha(o.resueltaAt)}${o.resueltaNota ? ` — ${esc(o.resueltaNota)}` : ''}`;
+          const resLineas = doc.splitTextToSize(resLine, 175);
+          doc.text(resLineas, 18, y); y += resLineas.length * 4 + 2;
         }
         doc.setDrawColor(200,220,200); doc.line(14, y, 196, y); y+=4;
         if (y>260) { doc.addPage(); addHeader(doc,'Observaciones (cont.)',project); y=44; }
