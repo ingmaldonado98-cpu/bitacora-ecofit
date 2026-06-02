@@ -1038,6 +1038,23 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 .pwa-steps strong { color: var(--text); }
 .settings-footer { text-align: center; font-size: .75rem; color: var(--text-muted); padding: 20px 0 8px; line-height: 1.8; }
 
+/* ── Modo oscuro programado — icono header ────────────────────────────────── */
+body:not(.theme-sched) .ico-sched { display: none; }
+body.theme-sched .ico-auto        { display: none; }
+body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
+
+/* ── Toggle switch ────────────────────────────────────────────────────────── */
+.toggle-switch { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-slider { width: 40px; height: 22px; background: var(--border); border-radius: 11px; transition: background .2s; flex-shrink: 0; }
+.toggle-slider::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: transform .2s; }
+.toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+.toggle-switch input:checked + .toggle-slider::after { transform: translateX(18px); }
+
+/* ── Schedule time inputs ─────────────────────────────────────────────────── */
+.sched-config { transition: opacity .2s; }
+.sched-config.sched-disabled { opacity: .45; pointer-events: none; }
+
 /* ── Login ────────────────────────────────────────────────────────────────── */
 .login-screen { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--bg); }
 .login-card { width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px 24px; }

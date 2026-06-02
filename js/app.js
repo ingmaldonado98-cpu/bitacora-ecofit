@@ -287,9 +287,41 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// ── Theme: auto por OS + override manual ──────────────────────────────────────
+// ── Theme: auto por OS + override manual + horario programado ────────────────
+function _parseSched() {
+  try {
+    const v = localStorage.getItem('ecofit-theme-sched');
+    if (!v) return null;
+    const [from, to] = v.split('-');
+    if (!from || !to) return null;
+    return { from, to };
+  } catch { return null; }
+}
+
+function _isInDarkWindow(from, to) {
+  const now = new Date();
+  const cur = now.getHours() * 60 + now.getMinutes();
+  const [fh, fm] = from.split(':').map(Number);
+  const [th, tm] = to.split(':').map(Number);
+  const start = fh * 60 + fm;
+  const end   = th * 60 + tm;
+  // Si from > to cruza la medianoche (ej. 19:00–07:00)
+  return start > end ? (cur >= start || cur < end) : (cur >= start && cur < end);
+}
+
+window._applyScheduledTheme = function() {
+  const sched = _parseSched();
+  if (!sched) {
+    document.body.classList.remove('theme-sched');
+    return;
+  }
+  document.body.classList.add('theme-sched');
+  const isDark = _isInDarkWindow(sched.from, sched.to);
+  document.body.classList.toggle('theme-light', !isDark);
+};
+
 (function initTheme() {
-  const saved   = localStorage.getItem('ecofit-theme');
+  const saved        = localStorage.getItem('ecofit-theme');
   const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
 
   if (saved === 'light')       document.body.classList.add('theme-light');
@@ -298,9 +330,13 @@ if ('serviceWorker' in navigator) {
 
   // Seguir cambios del sistema si no hay preferencia guardada
   window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
-    if (!localStorage.getItem('ecofit-theme'))
+    if (!localStorage.getItem('ecofit-theme') && !_parseSched())
       document.body.classList.toggle('theme-light', e.matches);
   });
+
+  // Aplicar horario programado (tiene prioridad) y revisar cada minuto
+  window._applyScheduledTheme();
+  setInterval(window._applyScheduledTheme, 60_000);
 })();
 
 window._toggleTheme = function () {
@@ -310,6 +346,8 @@ window._toggleTheme = function () {
 
 window._setThemeAuto = function () {
   localStorage.removeItem('ecofit-theme');
+  localStorage.removeItem('ecofit-theme-sched');
+  document.body.classList.remove('theme-sched');
   const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
   document.body.classList.toggle('theme-light', prefersLight);
   toast('Tema automático activado');

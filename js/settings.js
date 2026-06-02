@@ -29,6 +29,12 @@ export async function renderSettings(session) {
     kv.get('panel_presets_custom'),
   ]);
 
+  const schedRaw    = localStorage.getItem('ecofit-theme-sched');
+  const schedParts  = schedRaw ? schedRaw.split('-') : null;
+  const schedFrom   = schedParts?.[0] || '19:00';
+  const schedTo     = schedParts?.[1] || '07:00';
+  const schedActive = !!schedRaw;
+
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#dashboard')">${icon('caret-left')}</button>
@@ -83,6 +89,36 @@ export async function renderSettings(session) {
       >${esc(contacto||'')}</textarea>
     </div>
     <button class="btn-primary btn-sm" onclick="guardarContacto()">Guardar contacto</button>
+  </div>
+
+  <!-- Modo oscuro programado -->
+  <div class="card">
+    <div class="card-title-row">
+      <h3 class="card-title">Modo oscuro programado</h3>
+      <label class="toggle-switch">
+        <input type="checkbox" id="sched-enabled" ${schedActive ? 'checked' : ''}
+               onchange="toggleSchedMode(this.checked)" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <p class="hint-text">El tema cambia a oscuro automáticamente en el horario configurado (por dispositivo).</p>
+    <div id="sched-config" class="sched-config${schedActive ? '' : ' sched-disabled'}">
+      <div class="form-row" style="margin-top:10px">
+        <div class="form-group">
+          <label>Oscuro desde</label>
+          <input type="time" id="sched-from" class="input-field" value="${schedFrom}"
+                 onchange="saveSched()" />
+        </div>
+        <div class="form-group">
+          <label>Oscuro hasta</label>
+          <input type="time" id="sched-to" class="input-field" value="${schedTo}"
+                 onchange="saveSched()" />
+        </div>
+      </div>
+      <p class="hint-text" style="margin-top:6px">
+        Ejemplo: 19:00 – 07:00 activa el modo oscuro de noche hasta la mañana siguiente.
+      </p>
+    </div>
   </div>
 
   <!-- OneDrive -->
@@ -561,6 +597,33 @@ window.resetPassUser = async function(id, authEmail) {
   } catch(err) {
     toast('Error al enviar reset: ' + err.message, 'error');
   }
+};
+
+// ── Modo oscuro programado ─────────────────────────────────────────────────────
+window.toggleSchedMode = function(enabled) {
+  const cfg = document.getElementById('sched-config');
+  if (enabled) {
+    const from = document.getElementById('sched-from').value || '19:00';
+    const to   = document.getElementById('sched-to').value   || '07:00';
+    localStorage.setItem('ecofit-theme-sched', `${from}-${to}`);
+    cfg?.classList.remove('sched-disabled');
+    toast(`🌙 Modo oscuro: ${from} – ${to}`);
+  } else {
+    localStorage.removeItem('ecofit-theme-sched');
+    cfg?.classList.add('sched-disabled');
+    toast('Modo oscuro programado desactivado');
+  }
+  window._applyScheduledTheme?.();
+};
+
+window.saveSched = function() {
+  if (!document.getElementById('sched-enabled')?.checked) return;
+  const from = document.getElementById('sched-from').value;
+  const to   = document.getElementById('sched-to').value;
+  if (!from || !to) return;
+  localStorage.setItem('ecofit-theme-sched', `${from}-${to}`);
+  window._applyScheduledTheme?.();
+  toast(`🌙 Horario actualizado: ${from} – ${to}`);
 };
 
 window.limpiarDatos = async function() {
