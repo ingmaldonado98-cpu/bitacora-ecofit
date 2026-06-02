@@ -105,6 +105,30 @@ export function capturePhoto(callback, { multiple = false } = {}) {
   input.click();
 }
 
+// ── Barra de progreso de subida ───────────────────────────────────────────────
+export function uploadProgressBar(total) {
+  const el = document.createElement('div');
+  el.className = 'upload-progress-bar';
+  el.innerHTML = `
+    <span class="upb-icon">⬆</span>
+    <div class="upb-body">
+      <span class="upb-text">Subiendo 0 de ${total}…</span>
+      <div class="upb-track"><div class="upb-fill"></div></div>
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('upb-visible'));
+  return {
+    update(current) {
+      el.querySelector('.upb-text').textContent = `Subiendo ${current} de ${total}…`;
+      el.querySelector('.upb-fill').style.width = `${Math.round(current / total * 100)}%`;
+    },
+    done() {
+      el.classList.remove('upb-visible');
+      setTimeout(() => el.remove(), 300);
+    },
+  };
+}
+
 // ── Toast ──────────────────────────────────────────────────────────────────────
 export function toast(msg, type = 'info', duration = 3000) {
   let el = document.getElementById('toast-container');

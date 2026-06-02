@@ -698,6 +698,23 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 @keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
 @keyframes slideUp { from { transform:translateY(12px);opacity:0 } to { transform:translateY(0);opacity:1 } }
 
+/* ── Barra de progreso de subida ─────────────────────────────────────────── */
+.upload-progress-bar {
+  position: fixed; bottom: 68px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 10px 16px;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4); z-index: 900;
+  min-width: 240px; max-width: 320px;
+  opacity: 0; transition: opacity .2s, transform .2s;
+}
+.upload-progress-bar.upb-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.upb-icon { font-size: 1.1rem; flex-shrink: 0; }
+.upb-body { flex: 1; min-width: 0; }
+.upb-text { display: block; font-size: .8rem; color: var(--text-muted); margin-bottom: 5px; white-space: nowrap; }
+.upb-track { height: 4px; background: var(--border2); border-radius: 2px; overflow: hidden; }
+.upb-fill { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width .3s ease; }
+
 /* ── Equipos ──────────────────────────────────────────────────────────────── */
 .equipo-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
 .eq-header   { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }

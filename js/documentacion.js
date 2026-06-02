@@ -1,7 +1,7 @@
 // documentacion.js — Módulo 2: Levantamiento dinámico + Fases Antes/Durante/Después
 
 import { projects } from './db.js';
-import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog } from './utils.js';
+import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
 import { uploadPhoto } from './firebase.js';
 import { icon } from './icons.js';
@@ -631,7 +631,7 @@ function renderFase(project, fase, titulo, projectId, edit, required=false) {
     <h3 class="card-title">${titulo}</h3>
     ${required?'<span class="req-badge">OBLIGATORIA</span>':''}
     ${edit?`<button class="btn-primary btn-sm" onclick="agregarFoto('${projectId}','${fase}')">
-      ${icon('camera')} Foto</button>`:''}
+      ${icon('camera')} Agregar fotos</button>`:''}
 </div>
   ${fotos.length===0
     ? `<p class="empty-msg-sm">${required?'⚠ Se requiere al menos una foto.':'Sin fotos aún.'}</p>`
@@ -650,15 +650,28 @@ function renderFase(project, fase, titulo, projectId, edit, required=false) {
 }
 
 window.agregarFoto = function(projectId, fase) {
-  capturePhoto(async (b64) => {
-    toast('Subiendo foto…');
-    const fid = uuid();
-    const url = await uploadPhoto(b64, `projects/${projectId}/${fase}_${fid}.jpg`);
-    const nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
+  capturePhoto(async (b64Array) => {
+    const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
+    const total = fotos.length;
+    const prog = uploadProgressBar(total);
+    const nuevas = [];
+
+    for (let i = 0; i < total; i++) {
+      prog.update(i + 1);
+      const fid = uuid();
+      const url = await uploadPhoto(fotos[i], `projects/${projectId}/${fase}_${fid}.jpg`);
+      nuevas.push({ data: url, nota: '', id: fid, createdAt: isoNow() });
+    }
+    prog.done();
+
+    if (total === 1) {
+      nuevas[0].nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
+    }
+
     const p = await projects.getById(projectId);
     p.documentacion = p.documentacion || {};
     p.documentacion.fases = p.documentacion.fases || { antes:[], durante:[], despues:[] };
-    p.documentacion.fases[fase] = [...(p.documentacion.fases[fase]||[]), { data:url, nota, id:fid, createdAt:isoNow() }];
+    p.documentacion.fases[fase] = [...(p.documentacion.fases[fase]||[]), ...nuevas];
     await projects.update(projectId, { documentacion: p.documentacion });
     navigate(`#proyecto/${projectId}/documentacion`);
     setTimeout(() => {
@@ -666,8 +679,8 @@ window.agregarFoto = function(projectId, fase) {
       const tabBtn = document.querySelector(`[data-tab="${tabMap[fase]}"]`);
       if (tabBtn) tabBtn.click();
     }, 200);
-    toast('✅ Foto guardada');
-  });
+    toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
+  }, { multiple: true });
 };
 
 window.delFotoFase = async function(projectId, fase, idx) {

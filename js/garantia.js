@@ -2,7 +2,7 @@
 
 import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
-         uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION } from './utils.js';
+         uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
 import { uploadPhoto } from './firebase.js';
 import { icon } from './icons.js';
@@ -134,7 +134,7 @@ function renderFotosAdicionales(fotos, projectId, edit) {
   <div class="card-title-row">
     <h3 class="card-title">1B+ · Fotos adicionales de cierre</h3>
     ${edit ? `<button class="btn-primary btn-sm" onclick="capFotoAdicional('${projectId}')">
-      ${icon('camera')} Foto</button>` : ''}
+      ${icon('camera')} Agregar fotos</button>` : ''}
   </div>
   ${fotos.length === 0
     ? `<p class="empty-msg-sm">Sin fotos adicionales.</p>`
@@ -153,19 +153,31 @@ function renderFotosAdicionales(fotos, projectId, edit) {
 }
 
 window.capFotoAdicional = function(projectId) {
-  capturePhoto(async (b64) => {
-    toast('Subiendo foto…');
-    const fid = uuid();
-    const url = await uploadPhoto(b64, `projects/${projectId}/adicional_${fid}.jpg`);
-    const nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
+  capturePhoto(async (b64Array) => {
+    const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
+    const total = fotos.length;
+    const prog = uploadProgressBar(total);
+    const nuevas = [];
+
+    for (let i = 0; i < total; i++) {
+      prog.update(i + 1);
+      const fid = uuid();
+      const url = await uploadPhoto(fotos[i], `projects/${projectId}/adicional_${fid}.jpg`);
+      nuevas.push({ data: url, nota: '', id: fid, createdAt: isoNow() });
+    }
+    prog.done();
+
+    if (total === 1) {
+      nuevas[0].nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
+    }
+
     const p = await projects.getById(projectId);
     p.garantia = p.garantia || {};
-    p.garantia.fotosAdicionales = [...(p.garantia.fotosAdicionales || []),
-      { data: url, nota, id: fid, createdAt: isoNow() }];
+    p.garantia.fotosAdicionales = [...(p.garantia.fotosAdicionales || []), ...nuevas];
     await projects.update(projectId, { garantia: p.garantia });
     navigate(`#proyecto/${projectId}/garantia`);
-    toast('✅ Foto guardada');
-  });
+    toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
+  }, { multiple: true });
 };
 
 window.delFotoAdicional = async function(projectId, idx) {
