@@ -90,14 +90,23 @@ export function capturePhoto(callback, { multiple = false } = {}) {
   input.onchange = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    const compressed = await Promise.all(files.map(f => compressImage(f)));
-    callback(multiple ? compressed : compressed[0], files);
+    try {
+      const compressed = await Promise.all(files.map(f => compressImage(f)));
+      await callback(multiple ? compressed : compressed[0], files);
+    } catch (err) {
+      if (err.code === 'offline') {
+        toast('Sin conexión — la foto no se guardó. Conéctate e intenta de nuevo.', 'error', 6000);
+      } else {
+        console.error('capturePhoto error:', err);
+        toast('Error al guardar la foto: ' + (err.message || 'intenta de nuevo'), 'error');
+      }
+    }
   };
   input.click();
 }
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
-export function toast(msg, type = 'info') {
+export function toast(msg, type = 'info', duration = 3000) {
   let el = document.getElementById('toast-container');
   if (!el) { el = document.createElement('div'); el.id = 'toast-container'; document.body.appendChild(el); }
   const t = document.createElement('div');
@@ -105,7 +114,7 @@ export function toast(msg, type = 'info') {
   t.textContent = msg;
   el.appendChild(t);
   requestAnimationFrame(() => t.classList.add('toast-show'));
-  setTimeout(() => { t.classList.remove('toast-show'); setTimeout(() => t.remove(), 300); }, 3000);
+  setTimeout(() => { t.classList.remove('toast-show'); setTimeout(() => t.remove(), 300); }, duration);
 }
 
 // ── Modal de confirmación ─────────────────────────────────────────────────────

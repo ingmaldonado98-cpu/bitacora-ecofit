@@ -32,6 +32,11 @@ const _storage = getStorage(_app);
 
 // ── Subir foto a Firebase Storage ─────────────────────────────────────────
 export async function uploadPhoto(base64DataUrl, path) {
+  if (!navigator.onLine) {
+    const err = new Error('Sin conexión — conéctate a internet e intenta de nuevo');
+    err.code = 'offline';
+    throw err;
+  }
   const sRef = storageRef(_storage, path);
   await uploadString(sRef, base64DataUrl, 'data_url');
   return getDownloadURL(sRef);
