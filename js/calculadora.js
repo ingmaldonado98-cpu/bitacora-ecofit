@@ -12,6 +12,7 @@ import {
 
 // ── Mapeo BOM part-number → ID de inventario ───────────────────────────────
 const BOM_INV_MAP = {
+  // ── Aluminex / NextRail ──────────────────────────────────────
   'NXT-AUA-30/46-2': 'C2-006',
   'NXT-CLIP-5':      'C2-007',
   'NXT-RS':          'C2-009',
@@ -21,7 +22,17 @@ const BOM_INV_MAP = {
   'NXT-SFA-1':       'C2-002',
   'NXT-ARL-10/20':   'C2-003',
   'NXT-GC-1':        'ELE-005',
-  '4000630':         'C2-004',
+  // ── K2 Systems ───────────────────────────────────────────────
+  '4000669':         'K2-001',  // CrossRail 48-X (4.70 m)
+  '4000385':         'K2-002',  // RailConn CR 48-X (empalme)
+  '4000630':         'K2-003',  // L-Foot Slotted Set K2
+  '4000116':         'K2-004',  // Simple Tilt Knee Set
+  '4000135':         'K2-005',  // MidClamp K2 Cross Clamp
+  '4000135e':        'K2-006',  // EndClamp K2 Cross Clamp
+  '4000431':         'K2-007',  // CrossRail Flat EndCap
+  '4000006-H':       'K2-008',  // K2 Ground Lug (tierra)
+  '4000505':         'K2-009',  // CrossRail Tilt Connector Set
+  '4006042-H':       'K2-010',  // CrossRail Climber Set c/Hole
 };
 
 // ── Estado del módulo ──────────────────────────────────────────────────────

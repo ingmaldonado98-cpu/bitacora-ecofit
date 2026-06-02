@@ -77,7 +77,17 @@ const RAW=[
  ["EST-001","Clamps","pzas","Estructura"],["EST-002","Empalme","pzas","Estructura"],
  ["EST-003","End Clamps","pzas","Estructura"],["EST-004","Soporte Frontal","pzas","Estructura"],
  ["EST-005","Soporte Trasero","pzas","Estructura"],["EST-006","Tapadera Final","pzas","Estructura"],
- ["GEN-001","Clips para riel","pzas","General"]
+ ["GEN-001","Clips para riel","pzas","General"],
+ ["K2-001","CrossRail 48-X (4.70 m)","pzas","K2 Systems"],
+ ["K2-002","RailConn CR 48-X (empalme)","pzas","K2 Systems"],
+ ["K2-003","L-Foot Slotted Set K2","pzas","K2 Systems"],
+ ["K2-004","Simple Tilt Knee Set","pzas","K2 Systems"],
+ ["K2-005","MidClamp K2 Cross Clamp","pzas","K2 Systems"],
+ ["K2-006","EndClamp K2 Cross Clamp","pzas","K2 Systems"],
+ ["K2-007","CrossRail Flat EndCap","pzas","K2 Systems"],
+ ["K2-008","K2 Ground Lug (tierra)","pzas","K2 Systems"],
+ ["K2-009","CrossRail Tilt Connector Set","pzas","K2 Systems"],
+ ["K2-010","CrossRail Climber Set c/Hole","pzas","K2 Systems"]
 ];
 
 const MATS_DEFAULT=RAW.map(([id,material,unidad,categoria])=>({id,material,unidad,categoria,stockMin:0}));
@@ -105,7 +115,7 @@ const STOCK_MARZO={
 
 const CATS_DEFAULT=["Estante A2","Tornillería","Estante A3","Estante A4","Estante A5","Estante A6",
  "Estante B","Estante B3","Estante B5","Estante B6","Estante B7","Estante C2",
- "Cableado","Eléctrica","Estructura","General"];
+ "Cableado","Eléctrica","Estructura","K2 Systems","General"];
 
 const CAT_C={"Estante A2":"#60a5fa","Tornillería":"#a78bfa","Estante A3":"#34d399",
  "Estante A4":"#f472b6","Estante A5":"#fbbf24","Estante A6":"#fb923c",
@@ -806,7 +816,7 @@ function autoGenId(cat,materials){
   const MAP={'Estante A2':'A2','Estante A3':'A3','Estante A4':'A4','Estante A5':'A5',
     'Estante A6':'A6','Estante B':'EB','Estante B3':'B3','Estante B5':'B5',
     'Estante B6':'B6','Estante B7':'B7','Estante C2':'C2','Cableado':'CAB',
-    'Eléctrica':'ELE','Estructura':'EST','Tornillería':'TOR','General':'GEN'};
+    'Eléctrica':'ELE','Estructura':'EST','Tornillería':'TOR','K2 Systems':'K2','General':'GEN'};
   const prefix=MAP[cat]||cat.replace(/[^A-Z0-9]/gi,'').slice(0,4).toUpperCase()||'MAT';
   const existing=materials.filter(m=>m.id.startsWith(prefix+'-'))
     .map(m=>parseInt(m.id.split('-')[1]||0)).filter(n=>!isNaN(n));
@@ -884,6 +894,16 @@ export async function renderInventario(session) {
   ]);
 
   S.materials  = (catalog || MATS_DEFAULT.map(m=>({...m}))).map(m=>({...m,categoria:normCat(m.categoria)}));
+
+  // Migración: agregar K2 items que no existan aún en el catálogo
+  const K2_SEED = MATS_DEFAULT.filter(m => m.id.startsWith('K2-'));
+  const existingIds = new Set(S.materials.map(m => m.id));
+  const missing = K2_SEED.filter(m => !existingIds.has(m.id));
+  if (missing.length) {
+    S.materials = [...S.materials, ...missing];
+    invStore.set('catalog', S.materials).catch(() => {});
+  }
+
   S.areas      = areasData?.list ?? null;
   S.areaColors = areasData?.colors ?? {};
   S.month      = stockData?.month ?? nowLabel();
