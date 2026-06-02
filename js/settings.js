@@ -1,11 +1,10 @@
 // settings.js — Configuración Admin
 
 import { users, config, kv, exportBackup, importBackup } from './db.js';
-import { esc, uuid, isoNow, toast, confirmDialog } from './utils.js';
+import { esc, isoNow, toast, confirmDialog } from './utils.js';
 import { isAdmin, ROLES } from './auth.js';
-import { PANEL_PRESETS } from '../modules/calculadora/index.js';
 import { icon } from './icons.js';
-import { createFbUser, toEmail, fbUsers, resetPassword } from './firebase.js';
+import { createFbUser, fbUsers, resetPassword } from './firebase.js';
 import { getStatus as getOneDriveStatusObj, pickFolder, requestPermission, testAccess } from './onedrive.js';
 
 async function getOneDriveStatus() {
@@ -567,8 +566,7 @@ window.resetPassUser = async function(id, authEmail) {
 window.limpiarDatos = async function() {
   if (!await confirmDialog('¿ELIMINAR TODOS los datos locales? Esta acción es IRREVERSIBLE.')) return;
   if (!await confirmDialog('Segunda confirmación: ¿Seguro? Perderás todos los proyectos.')) return;
-  const dbs = await indexedDB.databases?.() || [];
-  for (const db of dbs) { if (db.name === 'ecofitV6') indexedDB.deleteDatabase(db.name); }
+  indexedDB.deleteDatabase('ecofitV6');
   sessionStorage.clear();
   toast('Datos eliminados. Recargando…');
   setTimeout(() => location.reload(), 1500);

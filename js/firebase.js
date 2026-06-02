@@ -191,9 +191,20 @@ export const fbKV = {
 
 // ── Backup completo ────────────────────────────────────────────────────────
 export async function exportFbBackup() {
-  const [projs, usrs] = await Promise.all([fbProjects.getAll(), fbUsers.getAll()]);
+  const [projs, usrs, cfgSnap, kvSnap] = await Promise.all([
+    fbProjects.getAll(),
+    fbUsers.getAll(),
+    getDocs(collection(fbDB, 'config')),
+    getDocs(collection(fbDB, 'kv')),
+  ]);
+  const cfg = {};
+  cfgSnap.docs.forEach(d => { cfg[d.id] = d.data().value; });
+  const kv = {};
+  kvSnap.docs.forEach(d => {
+    if (d.id !== 'onedrive_folder_handle') kv[d.id] = d.data().value;
+  });
   return {
     version: 6, exportedAt: new Date().toISOString(),
-    projects: projs, users: usrs,
+    projects: projs, users: usrs, config: cfg, kv,
   };
 }

@@ -16,14 +16,20 @@ export async function exportBackup()       { return exportFbBackup(); }
 export async function importBackup(data) {
   if (!data?.version) throw new Error('Formato de backup inválido');
 
-  // Restaurar proyectos
   for (const p of (data.projects || [])) {
     await fbProjects.add(p);
   }
 
-  // Restaurar perfiles de usuario (sin contraseñas — Firebase Auth maneja eso)
   for (const u of (data.users || [])) {
     if (u.id) await fbUsers.add(u).catch(() => {});
+  }
+
+  for (const [k, v] of Object.entries(data.config || {})) {
+    await fbConfig.set(k, v);
+  }
+
+  for (const [k, v] of Object.entries(data.kv || {})) {
+    await fbKV.set(k, v);
   }
 }
 
