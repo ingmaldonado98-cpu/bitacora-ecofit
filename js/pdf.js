@@ -1,7 +1,7 @@
 // pdf.js — Exportación PDF dual: Cliente limpio + Técnico completo
 
 import { projects, config } from './db.js';
-import { esc, fmtFecha, fmtRelativa, TIPOS_SISTEMA, ESTADOS } from './utils.js';
+import { esc, fmtFecha, fmtRelativa, TIPOS_SISTEMA, ESTADOS, toast } from './utils.js';
 import { isAdmin } from './auth.js';
 import { icon } from './icons.js';
 
@@ -170,6 +170,18 @@ async function addImage(doc, b64, x, y, maxW, maxH) {
   } catch { return y; }
 }
 
+// ── OneDrive: guardar PDF si hay carpeta configurada ─────────────────────────
+async function _tryOneDriveSave(doc, filename) {
+  try {
+    const { getFolderHandle, saveFile } = await import('./onedrive.js');
+    const handle = await getFolderHandle();
+    if (!handle) return;
+    const blob = doc.output('blob');
+    const path = await saveFile(filename, blob, 'application/pdf');
+    toast(`☁️ Guardado en OneDrive: ${path}`, 'success', 5000);
+  } catch { /* OneDrive es opcional — no interrumpir si falla */ }
+}
+
 // ── PDF Cliente ───────────────────────────────────────────────────────────────
 window.exportarPDFCliente = async function(projectId) {
   const [project, contacto] = await Promise.all([
@@ -244,7 +256,9 @@ window.exportarPDFCliente = async function(projectId) {
   const totalPages = doc.getNumberOfPages();
   for (let i=1;i<=totalPages;i++) { doc.setPage(i); addFooter(doc,i,totalPages); }
 
-  doc.save(`EFS-Cliente-${project.displayId}-${project.clientName?.replace(/\s+/g,'_')}.pdf`);
+  const filenameC = `EFS-Cliente-${project.displayId}-${project.clientName?.replace(/\s+/g,'_')}.pdf`;
+  doc.save(filenameC);
+  await _tryOneDriveSave(doc, filenameC);
 };
 
 // ── PDF Técnico ───────────────────────────────────────────────────────────────
@@ -472,5 +486,7 @@ window.exportarPDFTecnico = async function(projectId) {
   const totalPages = doc.getNumberOfPages();
   for (let i=1;i<=totalPages;i++) { doc.setPage(i); addFooter(doc,i,totalPages); }
 
-  doc.save(`EFS-Tecnico-${project.displayId}.pdf`);
+  const filenameT = `EFS-Tecnico-${project.displayId}.pdf`;
+  doc.save(filenameT);
+  await _tryOneDriveSave(doc, filenameT);
 };
