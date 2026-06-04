@@ -242,15 +242,36 @@ export function fmtProjectId(counter) {
   return `EFS-${year}-${String(counter).padStart(4, '0')}`;
 }
 
-// ── Render foto miniatura ──────────────────────────────────────────────────────
-export function fotoMini(src, alt = '', onClick) {
-  if (!src) return '';
-  const id = 'img_' + uuid().replace(/-/g, '').slice(0, 10);
-  if (onClick) {
-    return `<img id="${id}" src="${src}" alt="${esc(alt)}" class="foto-mini" onclick="${onClick}" />`;
+// ── Obtener URL de una foto (maneja pendientes offline) ────────────────────────
+// item puede ser: string URL, string data:, u objeto {url?, data?, pending?, pendingId?}
+export function getPendingSrc(item) {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  if (item.pending && item.pendingId) {
+    return window._pendingPhotoMap?.[item.pendingId] || '';
   }
-  return `<img id="${id}" src="${src}" alt="${esc(alt)}" class="foto-mini"
-    onclick="window._viewPhoto('${id}')" />`;
+  return item.url || item.data || '';
+}
+
+// ── Render foto miniatura ──────────────────────────────────────────────────────
+// src: string URL, data URL, u objeto foto {url?, data?, pending?, pendingId?}
+export function fotoMini(src, alt = '', onClick, isPending = false) {
+  const resolvedSrc = getPendingSrc(src);
+  if (!resolvedSrc && !isPending) return '';
+  const id = 'img_' + uuid().replace(/-/g, '').slice(0, 10);
+  const pendingAttr = (isPending || (src && typeof src === 'object' && src.pending))
+    ? `data-pending="true"` : '';
+  const pendingBadge = pendingAttr
+    ? `<span class="foto-pending-badge" title="Pendiente de subir">⬆</span>` : '';
+
+  const imgHtml = resolvedSrc
+    ? `<img id="${id}" src="${resolvedSrc}" alt="${esc(alt)}" class="foto-mini"
+         ${pendingAttr}
+         onclick="${onClick || `window._viewPhoto('${id}')`}" />`
+    : `<div class="foto-mini foto-mini-placeholder" title="Foto pendiente de subir">⬆</div>`;
+
+  if (!pendingBadge) return imgHtml;
+  return `<div class="foto-mini-wrap">${imgHtml}${pendingBadge}</div>`;
 }
 
 // ── Lightbox con swipe, zoom y navegación entre fotos del grupo ───────────────

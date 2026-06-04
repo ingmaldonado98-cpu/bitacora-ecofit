@@ -1,7 +1,7 @@
-// scanner.js — ZXing barcode / QR scanner wrapper
+// scanner.js — ZXing (web) / ML Kit (Android) barcode scanner wrapper
 
-// ZXing se carga desde CDN como variable global window.ZXing
 import { icon } from './icons.js';
+import { isNative, getPlugin, hapticImpact } from './platform.js';
 
 let _activeReader = null;
 let _torchOn = false;
@@ -24,8 +24,56 @@ function scanFlash(viewport) {
   setTimeout(() => flash.remove(), 300);
 }
 
+// ── Escáner nativo Android (ML Kit) ───────────────────────────────────────────
+async function scanOnceNative(onResult, onError) {
+  const BarcodeScanner = getPlugin('BarcodeScanner');
+  if (!BarcodeScanner) { onError?.(new Error('Plugin no disponible')); return; }
+
+  try {
+    const perm = await BarcodeScanner.requestPermissions();
+    if (perm.camera !== 'granted' && perm.camera !== 'limited') {
+      onError?.(new Error('Permiso de cámara denegado'));
+      return;
+    }
+
+    // UI superpuesta al visor de cámara
+    const ui = document.createElement('div');
+    ui.className = 'scanner-native-ui';
+    ui.innerHTML = `
+      <div class="scanner-native-frame"></div>
+      <p class="scanner-native-hint">Apunta al código QR o de barras</p>
+      <button class="scanner-native-cancel">Cancelar</button>
+    `;
+    document.body.appendChild(ui);
+    document.body.classList.add('scanner-native-active');
+
+    let listener;
+
+    const cleanup = async () => {
+      document.body.classList.remove('scanner-native-active');
+      ui.remove();
+      await listener?.remove();
+      await BarcodeScanner.stopScan().catch(() => {});
+    };
+
+    ui.querySelector('.scanner-native-cancel').onclick = () => { cleanup(); };
+
+    listener = await BarcodeScanner.addListener('barcodeScanned', async ev => {
+      await cleanup();
+      hapticImpact('MEDIUM');
+      onResult(ev.barcode.rawValue);
+    });
+
+    await BarcodeScanner.startScan();
+  } catch (err) {
+    document.body.classList.remove('scanner-native-active');
+    onError?.(err);
+  }
+}
+
 // ── Escáner individual (una lectura y cierra) ──────────────────────────────────
 export function scanOnce(onResult, onError) {
+  if (isNative()) { scanOnceNative(onResult, onError); return; }
   if (_activeReader) { _activeReader.reset(); _activeReader = null; }
   _torchOn = false; _videoTrack = null;
 
@@ -79,7 +127,7 @@ export function scanOnce(onResult, onError) {
       const back = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
       reader.decodeFromVideoDevice(back?.deviceId, 'scanner-video', (result, err) => {
         if (result) {
-          if (navigator.vibrate) navigator.vibrate(80);
+          hapticImpact('MEDIUM');
           scanFlash(document.getElementById('scanner-vp'));
           cleanup();
           onResult(result.getText());
@@ -147,7 +195,7 @@ export function startContinuousScan(containerId, onResult, onError) {
           if (code === lastCode && now - lastTime < 2000) return;
           lastCode = code;
           lastTime = now;
-          if (navigator.vibrate) navigator.vibrate(60);
+          hapticImpact('LIGHT');
           scanFlash(document.getElementById('scanner-cont-wrap') || container);
           onResult(code);
         }

@@ -15,6 +15,9 @@ import { renderChecklistModule, renderChecklistsList } from './checklist.js';
 import { projects } from './db.js';
 import { toast, esc } from './utils.js';
 import { icon } from './icons.js';
+import { isNative, getPlugin } from './platform.js';
+import { renderMapView } from './map.js';
+import { initPendingMap, processQueue } from './photo-queue.js';
 
 const app = document.getElementById('app');
 
@@ -104,6 +107,8 @@ async function route() {
   window.__showNav?.();
   // Actualizar header con usuario
   updateHeader(session);
+  // Push notifications Android (solo una vez por sesión)
+  if (isNative() && !window._pushInited) { window._pushInited = true; _initPushAndroid(session); }
 
   try {
     switch (view) {
@@ -142,6 +147,12 @@ async function route() {
         } else if (sub === 'pdf') {
           await render(renderPDFExport(id, session));
         }
+        break;
+
+      case 'mapa':
+        // Destruir mapa anterior si existe (Leaflet necesita cleanup)
+        if (window._activeMap) { window._activeMap.remove(); window._activeMap = null; }
+        await render(renderMapView(session));
         break;
 
       case 'inventario':
@@ -247,9 +258,16 @@ function updateOnline() {
   const banner = document.getElementById('offline-banner');
   if (banner) banner.style.display = navigator.onLine ? 'none' : 'block';
 }
-window.addEventListener('online',  updateOnline);
+window.addEventListener('online', () => {
+  updateOnline();
+  // Procesar cola de fotos offline al reconectar
+  processQueue().catch(() => {});
+});
 window.addEventListener('offline', updateOnline);
 updateOnline();
+
+// Inicializar mapa de fotos pendientes (para renderizar mientras se sube)
+initPendingMap().catch(() => {})
 
 // ── SW update banner ──────────────────────────────────────────────────────────
 function showUpdateBanner(newSW) {
@@ -267,8 +285,45 @@ function showUpdateBanner(newSW) {
   document.body.appendChild(banner);
 }
 
-// ── Service Worker ────────────────────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
+// ── Android: botón Back ───────────────────────────────────────────────────────
+if (isNative()) {
+  getPlugin('App')?.addListener('backButton', () => {
+    const hash = window.location.hash;
+    if (!hash || hash === '#dashboard' || hash === '#login') {
+      getPlugin('App')?.exitApp();
+    } else {
+      history.back();
+    }
+  });
+}
+
+// ── Android: Push Notifications ──────────────────────────────────────────────
+async function _initPushAndroid(session) {
+  const Push = getPlugin('PushNotifications');
+  if (!Push) return;
+  try {
+    const perm = await Push.requestPermissions();
+    if (perm.receive !== 'granted') return;
+    await Push.register();
+    Push.addListener('registration', async token => {
+      try {
+        const { fbDB } = await import('./firebase.js');
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+        await updateDoc(doc(fbDB, 'users', session.uid), { fcmToken: token.value, fcmUpdatedAt: new Date().toISOString() });
+      } catch { /* silencioso */ }
+    });
+    Push.addListener('pushNotificationReceived', notification => {
+      toast(`${notification.title}: ${notification.body}`, 'info', 6000);
+    });
+    Push.addListener('pushNotificationActionPerformed', action => {
+      const data = action.notification.data;
+      if (data?.projectId) window.location.hash = `#proyecto/${data.projectId}`;
+    });
+  } catch { /* silencioso si el dispositivo no soporta push */ }
+}
+
+// ── Service Worker (solo web, Capacitor usa WebView propio) ──────────────────
+if ('serviceWorker' in navigator && !isNative()) {
   navigator.serviceWorker.register('./sw.js').then(reg => {
     reg.addEventListener('updatefound', () => {
       const newSW = reg.installing;

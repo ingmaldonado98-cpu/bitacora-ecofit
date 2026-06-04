@@ -42,6 +42,31 @@ export async function uploadPhoto(base64DataUrl, path) {
   return getDownloadURL(sRef);
 }
 
+// ── Subir foto con cola offline ────────────────────────────────────────────
+// op / opArgs: describen cómo actualizar Firestore al completar el sync.
+// Retorna { url, pending, pendingId }
+export async function uploadPhotoQueued(base64DataUrl, path, projectId, op, opArgs = {}) {
+  if (navigator.onLine) {
+    const url = await uploadPhoto(base64DataUrl, path);
+    return { url, pending: false, pendingId: null };
+  }
+
+  // Sin internet → guardar en cola
+  const { enqueuePhoto } = await import('./photo-queue.js');
+  const { uuid } = await import('./utils.js');
+  const pendingId = uuid();
+  await enqueuePhoto({
+    id: pendingId,
+    projectId,
+    storagePath: path,
+    base64: base64DataUrl,
+    createdAt: new Date().toISOString(),
+    op,
+    opArgs,
+  });
+  return { url: null, pending: true, pendingId };
+}
+
 // ── Username → email interno ───────────────────────────────────────────────
 // Los usuarios entran con "username", internamente usamos username@ecofit.app
 export const toEmail = u => `${u.toLowerCase().trim()}@ecofit.app`;

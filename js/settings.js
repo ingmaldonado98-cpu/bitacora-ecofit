@@ -6,6 +6,7 @@ import { isAdmin, ROLES } from './auth.js';
 import { icon } from './icons.js';
 import { createFbUser, fbUsers, resetPassword } from './firebase.js';
 import { getStatus as getOneDriveStatusObj, pickFolder, requestPermission, testAccess } from './onedrive.js';
+import { isNative } from './platform.js';
 
 async function getOneDriveStatus() {
   const st = await getOneDriveStatusObj();
@@ -121,7 +122,8 @@ export async function renderSettings(session) {
     </div>
   </div>
 
-  <!-- OneDrive -->
+  <!-- OneDrive — solo web (File System Access API no disponible en Android) -->
+  ${!isNative() ? `
   <div class="card">
     <h3 class="card-title">OneDrive Empresarial — Respaldo documental</h3>
     <p class="hint-text">
@@ -142,7 +144,7 @@ export async function renderSettings(session) {
     <p class="hint-text" style="margin-top:8px">
       Selecciona la carpeta <strong>OneDrive - Ecofit Solar Solutions</strong> o la subcarpeta donde quieras guardar los respaldos.
     </p>
-  </div>
+  </div>` : ''}
 
   <!-- Instalación PWA -->
   <div class="card">

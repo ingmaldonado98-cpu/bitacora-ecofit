@@ -2,9 +2,15 @@
 
 import { projects, users, kv } from './db.js';
 import { esc, fmtFecha, fmtFechaHora, fmtRelativa, fmtProjectId, uuid, isoNow, toast,
-         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, CAMPOS_SISTEMA_PEQUENO, confirmDialog, cambioEstadoDialog } from './utils.js';
+         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, CAMPOS_SISTEMA_PEQUENO, confirmDialog, cambioEstadoDialog,
+         capturePhoto, fotoMini, getPendingSrc } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } from './auth.js';
 import { icon } from './icons.js';
+import { uploadPhotoQueued } from './firebase.js';
+
+// Foto de cliente pendiente de subir en el form actual
+let _clienteFotoB64 = null;
+let _clienteFotoUrl = null;
 
 // ── Vista detalle del proyecto ─────────────────────────────────────────────────
 export async function renderProjectDetail(id, session) {
@@ -81,6 +87,17 @@ export async function renderProjectDetail(id, session) {
     </div>` : ''}
     ${project.direccion ? `<div class="meta-item"><span class="meta-lbl">Dirección</span>
       <span class="meta-val">${esc(project.direccion)}</span></div>` : ''}
+    ${project.coordenadas?.lat ? `
+    <div class="meta-item coords-row">
+      <span class="meta-lbl">Coordenadas GPS</span>
+      <span class="meta-val">
+        ${esc(Number(project.coordenadas.lat).toFixed(6))}, ${esc(Number(project.coordenadas.lng).toFixed(6))}
+        <a class="btn-maps" href="https://maps.google.com/?q=${encodeURIComponent(project.coordenadas.lat)},${encodeURIComponent(project.coordenadas.lng)}"
+           target="_blank" rel="noopener">
+          ${icon('map-pin', 14)} Abrir en Maps
+        </a>
+      </span>
+    </div>` : ''}
     ${project.fechaEstimada ? `
     <div class="card-row">
       <div class="meta-item">
@@ -99,6 +116,30 @@ export async function renderProjectDetail(id, session) {
       </div>` : ''}
     </div>
   </div>
+
+  <!-- Datos del cliente (solo sistemas pequeños) -->
+  ${project.tipoSistema === 'sistema_pequeno' && (project.clienteFoto || project.clienteTelefono) ? `
+  <div class="card card-cliente">
+    ${project.clienteFoto ? `
+    <div class="cliente-foto-wrap">
+      ${fotoMini(getPendingSrc({url: project.clienteFoto}) || project.clienteFoto, 'Foto del cliente')}
+    </div>` : ''}
+    <div class="cliente-info">
+      <span class="meta-lbl">Datos de contacto</span>
+      <span class="cliente-nombre">${esc(project.clientName || '—')}</span>
+      ${project.clienteTelefono ? `
+      <div class="cliente-tel-actions">
+        <a class="btn-action-tel" href="tel:${esc(project.clienteTelefono.replace(/\D/g,''))}">
+          ${icon('phone', 14)} Llamar
+        </a>
+        <a class="btn-action-wa" href="https://wa.me/52${esc(project.clienteTelefono.replace(/\D/g,'').replace(/^52/,''))}"
+           target="_blank" rel="noopener">
+          ${icon('chat-circle-dots', 14)} WhatsApp
+        </a>
+      </div>
+      <span class="cliente-tel-num">${esc(project.clienteTelefono)}</span>` : ''}
+    </div>
+  </div>` : ''}
 
   <!-- Progreso rápido -->
   <div class="progress-chips">
@@ -481,6 +522,16 @@ window._eliminarProyecto = async function(id) {
 };
 
 window._cambiarEstado = async function(id, nuevoEstado) {
+  // Advertencia si está offline
+  if (!navigator.onLine) {
+    const ok = await confirmDialog(
+      '⚠ Sin conexión a internet\n\n' +
+      'El cambio de estado se guardará localmente y se sincronizará automáticamente cuando haya conexión.\n\n' +
+      '¿Continuar?'
+    );
+    if (!ok) return;
+  }
+
   // Validar requisitos antes de enviar a revisión
   if (nuevoEstado === 'pendiente_revision') {
     const project = await projects.getById(id);
@@ -597,6 +648,49 @@ export async function renderProjectForm(id, session) {
       </div>`).join('')}
     </div>
 
+    <!-- Datos extra para sistema pequeño -->
+    <div id="campos-cliente" style="display:${project?.tipoSistema === 'sistema_pequeno' ? '' : 'none'}">
+      <div class="form-section-title">
+        ${icon('user', 14)} Datos del cliente
+        <span class="hint-badge">Solo sistema pequeño</span>
+      </div>
+      <div class="form-group">
+        <label>Teléfono / WhatsApp <span class="hint-opt">(opcional)</span></label>
+        <input type="tel" name="clienteTelefono" placeholder="Ej: 612 123 4567"
+               value="${esc(project?.clienteTelefono||'')}" />
+      </div>
+      <div class="form-group">
+        <label>Foto del cliente <span class="hint-opt">(referencia visual)</span></label>
+        <div class="foto-cliente-form" id="foto-cliente-preview">
+          ${project?.clienteFoto
+            ? `<img src="${esc(project.clienteFoto)}" class="foto-cliente-thumb" />
+               <button type="button" class="btn-outline btn-sm" onclick="window._capClienteFoto()">Cambiar</button>`
+            : `<button type="button" class="btn-outline btn-sm" onclick="window._capClienteFoto()">
+                ${icon('camera', 14)} Tomar foto</button>`}
+        </div>
+      </div>
+    </div>
+
+    <!-- Coordenadas GPS (todos los tipos, importante en sistema pequeño) -->
+    <div class="form-group">
+      <label>
+        ${icon('map-pin', 14)} Coordenadas GPS
+        <span class="hint-opt">(opcional)</span>
+      </label>
+      <div class="coords-inputs">
+        <input type="number" name="coordLat" id="coord-lat" step="any"
+               placeholder="Latitud  Ej: 24.1234"
+               value="${project?.coordenadas?.lat || ''}" />
+        <input type="number" name="coordLng" id="coord-lng" step="any"
+               placeholder="Longitud  Ej: -110.5678"
+               value="${project?.coordenadas?.lng || ''}" />
+      </div>
+      <button type="button" class="btn-outline btn-sm btn-gps" onclick="window._captureGPS()">
+        ${icon('crosshair', 14)} Capturar mi ubicación actual
+      </button>
+      <p class="hint-text" style="margin-top:4px">El GPS del dispositivo funciona sin internet.</p>
+    </div>
+
     <div class="form-group">
       <label>Dirección / Ubicación</label>
       <input type="text" name="direccion" placeholder="Colonia, calle, municipio"
@@ -630,6 +724,8 @@ window.selChip = function(groupId, value, inputId, btn) {
   if (inputId === 'tipo-val') {
     const campos = document.getElementById('campos-pequeno');
     if (campos) campos.style.display = value === 'sistema_pequeno' ? '' : 'none';
+    const camposCliente = document.getElementById('campos-cliente');
+    if (camposCliente) camposCliente.style.display = value === 'sistema_pequeno' ? '' : 'none';
   }
 };
 
@@ -639,6 +735,42 @@ window.toggleApoyo = function(id, btn) {
   let ids = JSON.parse(input.value || '[]');
   ids = ids.includes(id) ? ids.filter(i=>i!==id) : [...ids, id];
   input.value = JSON.stringify(ids);
+};
+
+// ── Capturar GPS ───────────────────────────────────────────────────────────────
+window._captureGPS = function() {
+  if (!navigator.geolocation) { toast('GPS no disponible en este dispositivo', 'error'); return; }
+  toast('Obteniendo ubicación…', 'info', 5000);
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = pos.coords.latitude.toFixed(7);
+      const lng = pos.coords.longitude.toFixed(7);
+      const latInput = document.getElementById('coord-lat');
+      const lngInput = document.getElementById('coord-lng');
+      if (latInput) latInput.value = lat;
+      if (lngInput) lngInput.value = lng;
+      toast(`📍 Ubicación capturada: ${lat}, ${lng}`, 'success', 4000);
+    },
+    err => {
+      const msgs = { 1: 'Permiso de ubicación denegado', 2: 'Ubicación no disponible', 3: 'Tiempo de espera agotado' };
+      toast(msgs[err.code] || 'Error al obtener ubicación', 'error');
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+};
+
+// ── Capturar foto del cliente ──────────────────────────────────────────────────
+window._capClienteFoto = function() {
+  capturePhoto(b64 => {
+    _clienteFotoB64 = b64;
+    _clienteFotoUrl = null;
+    const preview = document.getElementById('foto-cliente-preview');
+    if (preview) {
+      preview.innerHTML = `
+        <img src="${b64}" class="foto-cliente-thumb" />
+        <button type="button" class="btn-outline btn-sm" onclick="window._capClienteFoto()">Cambiar</button>`;
+    }
+  });
 };
 
 window._submitProject = async function(e, editId) {
@@ -655,6 +787,11 @@ window._submitProject = async function(e, editId) {
   const tipoSistema = fd.get('tipoSistema') || null;
   const esPequeno   = tipoSistema === 'sistema_pequeno';
 
+  // Coordenadas GPS
+  const lat = parseFloat(fd.get('coordLat'));
+  const lng = parseFloat(fd.get('coordLng'));
+  const coordenadas = (!isNaN(lat) && !isNaN(lng)) ? { lat, lng } : null;
+
   const data = {
     clientName:      fd.get('clientName').trim(),
     tipoSistema,
@@ -664,13 +801,29 @@ window._submitProject = async function(e, editId) {
     direccion:       fd.get('direccion').trim(),
     fechaInicio:     fd.get('fechaInicio')    ? new Date(fd.get('fechaInicio')).toISOString()    : null,
     fechaEstimada:   fd.get('fechaEstimada') ? new Date(fd.get('fechaEstimada')).toISOString() : null,
+    coordenadas,
     // Campos sistema pequeño (null si no aplica)
-    bateria:      esPequeno ? (fd.get('bateria')?.trim() || null)       : null,
-    mppt:         esPequeno ? (fd.get('mppt')?.trim() || null)          : null,
-    inversor:     esPequeno ? (fd.get('inversor')?.trim() || null)      : null,
-    breakerPanel: esPequeno ? (fd.get('breakerPanel')?.trim() || null)  : null,
-    breakerPolo:  esPequeno ? (fd.get('breakerPolo')?.trim() || null)   : null,
+    bateria:          esPequeno ? (fd.get('bateria')?.trim() || null)          : null,
+    mppt:             esPequeno ? (fd.get('mppt')?.trim() || null)             : null,
+    inversor:         esPequeno ? (fd.get('inversor')?.trim() || null)         : null,
+    breakerPanel:     esPequeno ? (fd.get('breakerPanel')?.trim() || null)     : null,
+    breakerPolo:      esPequeno ? (fd.get('breakerPolo')?.trim() || null)      : null,
+    clienteTelefono:  esPequeno ? (fd.get('clienteTelefono')?.trim() || null)  : null,
   };
+
+  // Foto del cliente: subir si hay nueva foto capturada
+  if (esPequeno && _clienteFotoB64) {
+    const pid = editId || 'temp_' + uuid();
+    const result = await uploadPhotoQueued(_clienteFotoB64,
+      `projects/${editId || pid}/cliente.jpg`, editId || pid, 'clienteFoto');
+    data.clienteFoto = result.url || null;
+    _clienteFotoB64 = null;
+    _clienteFotoUrl = null;
+  } else if (editId) {
+    // Mantener foto existente si no se tomó nueva
+    const existing = await projects.getById(editId);
+    if (existing?.clienteFoto) data.clienteFoto = existing.clienteFoto;
+  }
 
   try {
     if (editId) {

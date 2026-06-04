@@ -1,8 +1,9 @@
 // dashboard.js — Lista de proyectos y estadísticas
 
 import { projects, users } from './db.js';
-import { esc, fmtFecha, fmtRelativa, fmtProjectId, ESTADOS, PRIORIDADES, TIPOS_SISTEMA, syncBadge } from './utils.js';
+import { esc, fmtFecha, fmtRelativa, fmtProjectId, ESTADOS, PRIORIDADES, TIPOS_SISTEMA, syncBadge, getPendingSrc } from './utils.js';
 import { isAdmin, isLider } from './auth.js';
+import { icon } from './icons.js';
 
 // ── Badge del nav ─────────────────────────────────────────────────────────────
 export function updateNavBadge(count) {
@@ -40,6 +41,11 @@ export async function renderDashboard(session) {
           <path d="M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z"/>
         </svg>
       </button>` : ''}
+      <button class="btn-icon-hdr" onclick="navigate('#mapa')" title="Mapa de instalaciones">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
+          <path d="M228.92,49.69a8,8,0,0,0-6.86-1.45L160.93,63.52,99.58,32.84a8,8,0,0,0-6.37-.4L29.21,55.07A8,8,0,0,0,24,62.46V200a8,8,0,0,0,9.94,7.76l61.13-15.28,61.35,30.68A8.15,8.15,0,0,0,160,224a8,8,0,0,0,2.06-.27l64-16A8,8,0,0,0,232,200V56A8,8,0,0,0,228.92,49.69ZM104,52.94l48,24V203.06l-48-24ZM40,74.08l48-17.11V188.17L40,200.33ZM216,181.92l-48,12V62.94l48-12Z"/>
+        </svg>
+      </button>
       <button class="btn-icon-hdr" onclick="navigate('#settings')" title="Ajustes">
         <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
           <path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,72a24,24,0,1,1,24-24A24,24,0,0,1,128,152Zm109.94-52.79a12,12,0,0,0-7.27-9.6l-15.53-6.07L225,70.79a12,12,0,0,0-2.63-13c-4.68-4.69-11.81-5.85-17.79-3.88l-15.3,5.2-9.47-12.83a12,12,0,0,0-12.65-4.41l-17.06,4.5-4.93-15.51A12,12,0,0,0,133.5,23h-11a12,12,0,0,0-11.67,8.87L106,47.38,88.94,42.88a12,12,0,0,0-12.65,4.41L66.82,60.12,51.52,54.92c-6-1.97-13.11-.81-17.79,3.88A12,12,0,0,0,31.1,71.93l9.86,12.61L25.43,90.61a12,12,0,0,0-7.27,9.6A102.4,102.4,0,0,0,17,112a102.4,102.4,0,0,0,1.16,11.79,12,12,0,0,0,7.27,9.6l15.53,6.07L31,152.79a12,12,0,0,0,2.63,13c4.68,4.68,11.81,5.85,17.79,3.87l15.3-5.19,9.47,12.83a12,12,0,0,0,12.65,4.41l17.06-4.5,4.93,15.51A12,12,0,0,0,122.5,201h11a12,12,0,0,0,11.67-8.87l4.88-15.51,17.06,4.5a12,12,0,0,0,12.65-4.41l9.47-12.83,15.3,5.19c6,2,13.11.81,17.79-3.87a12,12,0,0,0,2.63-13l-9.86-12.62,15.53-6.07a12,12,0,0,0,7.27-9.6A102.4,102.4,0,0,0,239,112,102.4,102.4,0,0,0,237.84,100.21Z"/>
@@ -220,7 +226,11 @@ function projectCard(p) {
       </span>
     </div>
 
-    <h3 class="pc-cliente">${esc(p.clientName || '—')}</h3>
+    <div class="pc-cliente-row">
+      ${p.clienteFoto ? `<img class="pc-cliente-foto" src="${esc(getPendingSrc({url: p.clienteFoto}) || p.clienteFoto)}" alt="Foto cliente" />` : ''}
+      <h3 class="pc-cliente">${esc(p.clientName || '—')}</h3>
+      ${p.clienteTelefono ? `<span class="pc-tel" title="${esc(p.clienteTelefono)}">${icon('phone',12)}</span>` : ''}
+    </div>
 
     <div class="pc-meta">
       ${tipo ? `<span class="pc-tag"><ph-icon name="${tipo.icon}" size="12"></ph-icon> ${tipo.label}</span>` : ''}

@@ -4,7 +4,7 @@ import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
          uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
-import { uploadPhoto } from './firebase.js';
+import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 import { scanOnce, startContinuousScan, stopScanner } from './scanner.js';
 
@@ -109,14 +109,17 @@ export async function renderGarantia(projectId, session) {
 // ── 1A Foto del sistema ────────────────────────────────────────────────────────
 window.capturarFotoSistema = function(projectId) {
   capturePhoto(async (b64) => {
-    toast('Subiendo foto…');
-    const url = await uploadPhoto(b64, `projects/${projectId}/sistema.jpg`);
+    toast(navigator.onLine ? 'Subiendo foto…' : 'Sin conexión — foto guardada localmente');
+    const result = await uploadPhotoQueued(b64, `projects/${projectId}/sistema.jpg`, projectId, 'fotoSistema');
     const slot = document.getElementById('slot-foto-sistema');
-    slot.innerHTML = `${fotoMini(url,'Foto general')}<button class="btn-del-foto" onclick="delFotoGeneral('${projectId}')">✕</button>`;
+    const displaySrc = result.url || (result.pending ? b64 : '');
+    slot.innerHTML = `${fotoMini(displaySrc,'Foto general')}<button class="btn-del-foto" onclick="delFotoGeneral('${projectId}')">✕</button>`;
     const p = await projects.getById(projectId);
-    p.garantia.fotoSistema = url;
+    p.garantia = p.garantia || {};
+    p.garantia.fotoSistema = result.url || null;
+    if (result.pending) p.garantia._fotoSistemaPending = result.pendingId;
     await projects.update(projectId, { garantia: p.garantia });
-    toast('✅ Foto guardada');
+    if (!result.pending) toast('✅ Foto guardada');
   });
 };
 
@@ -166,8 +169,13 @@ window.capFotoAdicional = function(projectId) {
     for (let i = 0; i < total; i++) {
       prog.update(i + 1);
       const fid = uuid();
-      const url = await uploadPhoto(fotos[i], `projects/${projectId}/adicional_${fid}.jpg`);
-      nuevas.push({ data: url, nota: '', id: fid, createdAt: isoNow() });
+      const result = await uploadPhotoQueued(fotos[i], `projects/${projectId}/adicional_${fid}.jpg`,
+        projectId, 'fotoAdicional', { itemId: fid });
+      nuevas.push({
+        data: result.url || (result.pending ? fotos[i] : null),
+        nota: '', id: fid, createdAt: isoNow(),
+        ...(result.pending && { pending: true, pendingId: result.pendingId }),
+      });
     }
     prog.done();
 
@@ -260,8 +268,13 @@ window.capFotoTecnica = function(projectId, key) {
     for (let i = 0; i < total; i++) {
       prog.update(i + 1);
       const fid = uuid();
-      const url = await uploadPhoto(fotos[i], `projects/${projectId}/tecnica_${key}_${fid}.jpg`);
-      existentes.push({ url, id: fid, createdAt: isoNow() });
+      const result = await uploadPhotoQueued(fotos[i], `projects/${projectId}/tecnica_${key}_${fid}.jpg`,
+        projectId, 'fotoTecnica', { key, itemId: fid });
+      existentes.push({
+        url: result.url || null,
+        id: fid, createdAt: isoNow(),
+        ...(result.pending && { pending: true, pendingId: result.pendingId }),
+      });
     }
     prog.done();
 

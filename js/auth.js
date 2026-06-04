@@ -21,13 +21,34 @@ export const TRANSITIONS = {
   cancelado:          { admin: ['borrador'],                          lider: [],                     apoyo: [] },
 };
 
-// ── Sesión en memoria ──────────────────────────────────────────────────────
+// ── Sesión en memoria + localStorage (offline-safe) ───────────────────────
+const _LS_KEY = 'ecofit_session_v2';
+const _LS_TTL = 7 * 24 * 3600 * 1000; // 7 días
+
 let _session = null;
 
 export async function getSession() {
   if (_session) return _session;
-  const stored = sessionStorage.getItem('ecofit_session');
-  if (stored) { _session = JSON.parse(stored); return _session; }
+
+  // 1. sessionStorage (misma pestaña / misma sesión del navegador)
+  const ss = sessionStorage.getItem('ecofit_session');
+  if (ss) { _session = JSON.parse(ss); return _session; }
+
+  // 2. localStorage (persiste entre reinicios — funciona OFFLINE)
+  try {
+    const ls = localStorage.getItem(_LS_KEY);
+    if (ls) {
+      const stored = JSON.parse(ls);
+      if (Date.now() - stored._savedAt < _LS_TTL) {
+        const { _savedAt, ...s } = stored;
+        _session = s;
+        // Restaurar sessionStorage para que el resto de la app funcione igual
+        sessionStorage.setItem('ecofit_session', JSON.stringify(s));
+        return _session;
+      }
+    }
+  } catch { /* silencioso */ }
+
   return null;
 }
 
@@ -35,11 +56,14 @@ function setSession(profile) {
   const s = { id: profile.id, username: profile.username, nombre: profile.nombre, rol: profile.rol };
   _session = s;
   sessionStorage.setItem('ecofit_session', JSON.stringify(s));
+  // Persistir en localStorage para acceso offline (7 días)
+  localStorage.setItem(_LS_KEY, JSON.stringify({ ...s, _savedAt: Date.now() }));
 }
 
 export async function logout() {
   _session = null;
   sessionStorage.removeItem('ecofit_session');
+  localStorage.removeItem(_LS_KEY);
   try { await signOut(fbAuth); } catch (_) {}
 }
 

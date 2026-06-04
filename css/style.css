@@ -962,6 +962,36 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 }
 @keyframes scanFlashAnim { 0% { opacity:1 } 100% { opacity:0 } }
 
+/* ── Scanner nativo Android (ML Kit) ──────────────────────────────────────── */
+/* Al activar el scanner nativo, el body se hace transparente para ver la cámara */
+body.scanner-native-active { background: transparent !important; }
+body.scanner-native-active > *:not(.scanner-native-ui) { visibility: hidden; }
+.scanner-native-ui {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 32px);
+  visibility: visible;
+}
+.scanner-native-frame {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -60%);
+  width: 240px; height: 240px;
+  border: 3px solid var(--accent);
+  border-radius: 16px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.45);
+  visibility: visible;
+}
+.scanner-native-hint {
+  color: #fff; font-size: 15px; text-align: center;
+  padding: 10px 24px; background: rgba(0,0,0,.6); border-radius: 20px;
+  visibility: visible;
+}
+.scanner-native-cancel {
+  margin-top: 16px; background: rgba(0,0,0,.7); color: #fff;
+  border: 1.5px solid rgba(255,255,255,.3); border-radius: 24px;
+  padding: 10px 32px; font-size: 15px; cursor: pointer;
+  visibility: visible;
+}
+
 /* ── Auditoría progreso ───────────────────────────────────────────────────── */
 .aud-prog-lbl { font-size: .78rem; font-weight: 700; color: var(--g300); }
 .aud-prog-bar-wrap {
@@ -1657,3 +1687,130 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 .diag-btn:hover { background: var(--g700); color: var(--g100); }
 #diagram-card:fullscreen { background: #0e1e11; padding: 20px; }
 #diagram-card:fullscreen #diag-wrap { max-height: calc(100vh - 80px); }
+
+/* ── Fotos pendientes (offline queue) ─────────────────────────────────────── */
+.foto-mini-wrap { position: relative; display: inline-block; }
+.foto-pending-badge {
+  position: absolute; top: 3px; right: 3px;
+  background: rgba(0,0,0,.7); color: #fff; font-size: 10px;
+  border-radius: 4px; padding: 1px 4px; line-height: 1.4;
+  pointer-events: none;
+}
+.foto-mini-placeholder {
+  width: 72px; height: 72px; background: var(--g800); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: var(--g400); cursor: default;
+}
+/* Badge fijo en pantalla para fotos pendientes de subir */
+.pending-photos-badge {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom) + 68px); right: 14px;
+  background: var(--solar); color: #000;
+  font-size: 12px; font-weight: 700; padding: 5px 10px;
+  border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  z-index: 150; cursor: default;
+}
+
+/* ── Datos del cliente (detalle proyecto) ─────────────────────────────────── */
+.card-cliente {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+}
+.cliente-foto-wrap img {
+  width: 64px; height: 64px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--border2); flex-shrink: 0;
+}
+.cliente-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.cliente-nombre { font-weight: 600; font-size: .95rem; color: var(--text-main); }
+.cliente-tel-num { font-size: .82rem; color: var(--text-muted); }
+.cliente-tel-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
+.btn-action-tel, .btn-action-wa {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 20px; font-size: .8rem; font-weight: 600;
+  text-decoration: none; cursor: pointer; border: none;
+}
+.btn-action-tel  { background: var(--g800); color: var(--text-main); }
+.btn-action-wa   { background: #25d366; color: #000; }
+.btn-action-tel:hover { background: var(--g700); }
+.btn-action-wa:hover  { background: #1da856; }
+
+/* ── Dashboard: foto cliente en tarjeta ───────────────────────────────────── */
+.pc-cliente-row { display: flex; align-items: center; gap: 8px; }
+.pc-cliente-foto {
+  width: 32px; height: 32px; border-radius: 50%; object-fit: cover;
+  border: 1.5px solid var(--border2); flex-shrink: 0;
+}
+.pc-tel { display: flex; align-items: center; color: var(--g400); margin-left: 4px; }
+
+/* ── Coordenadas GPS ──────────────────────────────────────────────────────── */
+.coords-row .meta-val { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn-maps {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .78rem; font-weight: 600; color: var(--accent);
+  text-decoration: none; padding: 3px 8px; border-radius: 12px;
+  background: rgba(82,183,136,.12);
+}
+.btn-maps:hover { background: rgba(82,183,136,.25); }
+.coords-inputs { display: flex; gap: 8px; margin-bottom: 8px; }
+.coords-inputs input { flex: 1; min-width: 0; }
+.btn-gps {
+  display: inline-flex; align-items: center; gap: 6px;
+  width: 100%; justify-content: center; margin-top: 4px;
+}
+
+/* ── Formulario: sección datos cliente ────────────────────────────────────── */
+.form-section-title {
+  font-size: .75rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em;
+  display: flex; align-items: center; gap: 6px;
+  padding: 12px 0 6px; margin-top: 4px;
+  border-top: 1px solid var(--border2);
+}
+.hint-badge {
+  background: var(--solar); color: #000;
+  font-size: .65rem; padding: 2px 6px; border-radius: 10px;
+  font-weight: 700; text-transform: none; letter-spacing: 0;
+}
+.foto-cliente-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.foto-cliente-thumb {
+  width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
+  border: 2px solid var(--accent);
+}
+
+/* ── Mapa de instalaciones ────────────────────────────────────────────────── */
+.map-container {
+  width: 100%; height: 55vh; min-height: 300px;
+  border-radius: var(--radius); overflow: hidden;
+  background: var(--g900); margin-bottom: 12px;
+}
+.map-offline-banner {
+  background: rgba(251,191,36,.12); border: 1px solid rgba(251,191,36,.3);
+  color: var(--solar); border-radius: var(--radius-sm);
+  padding: 8px 12px; font-size: .82rem; display: flex; align-items: center; gap: 6px;
+  margin-bottom: 10px;
+}
+.map-project-list { display: flex; flex-direction: column; gap: 1px; }
+.map-list-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--surface); border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.map-list-row:hover { background: var(--g800); }
+.map-list-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.map-list-info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.map-list-id { font-size: .78rem; color: var(--text-muted); }
+.map-list-cliente { font-size: .9rem; font-weight: 600; color: var(--text-main); }
+.map-list-est { font-size: .75rem; font-weight: 600; }
+/* Popup en el mapa */
+.btn-map-popup {
+  margin-top: 6px; background: var(--accent, #40916c); color: #fff;
+  border: none; border-radius: 6px; padding: 4px 10px;
+  font-size: .8rem; cursor: pointer; width: 100%;
+}
+
+/* ── Advertencia offline en estado ───────────────────────────────────────── */
+.modal-confirm-msg { white-space: pre-line; }
+
+/* ── Sync badge ───────────────────────────────────────────────────────────── */
+.sync-badge { font-size: .65rem; vertical-align: middle; margin-left: 3px; }
+.sync-ok      { color: var(--accent); }
+.sync-pending { color: var(--solar); }
+.sync-local   { color: var(--g400); }

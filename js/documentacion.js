@@ -3,7 +3,7 @@
 import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
-import { uploadPhoto } from './firebase.js';
+import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 
 // ── Vista principal ────────────────────────────────────────────────────────────
@@ -668,8 +668,13 @@ window.agregarFoto = function(projectId, fase) {
     for (let i = 0; i < total; i++) {
       prog.update(i + 1);
       const fid = uuid();
-      const url = await uploadPhoto(fotos[i], `projects/${projectId}/${fase}_${fid}.jpg`);
-      nuevas.push({ data: url, nota: '', id: fid, createdAt: isoNow() });
+      const result = await uploadPhotoQueued(fotos[i], `projects/${projectId}/${fase}_${fid}.jpg`,
+        projectId, 'fotoFase', { fase, itemId: fid });
+      nuevas.push({
+        data: result.url || (result.pending ? fotos[i] : null),
+        nota: '', id: fid, createdAt: isoNow(),
+        ...(result.pending && { pending: true, pendingId: result.pendingId }),
+      });
     }
     prog.done();
 

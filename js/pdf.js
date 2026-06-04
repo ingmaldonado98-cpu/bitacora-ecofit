@@ -4,6 +4,7 @@ import { projects, config } from './db.js';
 import { esc, fmtFecha, fmtRelativa, TIPOS_SISTEMA, ESTADOS, toast } from './utils.js';
 import { isAdmin } from './auth.js';
 import { icon } from './icons.js';
+import { isNative, getPlugin } from './platform.js';
 
 const ESTADOS_LABEL = Object.fromEntries(Object.entries(ESTADOS).map(([k,v]) => [k, v.label]));
 
@@ -170,6 +171,35 @@ async function addImage(doc, b64, x, y, maxW, maxH) {
   } catch { return y; }
 }
 
+// ── Android: guardar PDF en Documentos/Ecofit ────────────────────────────────
+async function _saveNative(doc, filename) {
+  const Filesystem = getPlugin('Filesystem');
+  if (!Filesystem) { doc.save(filename); return; }
+  try {
+    const base64 = doc.output('datauristring').split(',')[1];
+    await Filesystem.writeFile({
+      path: `Ecofit/${filename}`,
+      data: base64,
+      directory: 'DOCUMENTS',
+      recursive: true,
+    });
+    toast(`PDF guardado en Documentos/Ecofit/${filename}`, 'success', 5000);
+  } catch (err) {
+    doc.save(filename);
+    toast('No se pudo guardar en Documentos — descargado como archivo', 'warning');
+  }
+}
+
+// ── Guardar PDF: nativo (Android) o descarga (web) ───────────────────────────
+async function _savePDF(doc, filename) {
+  if (isNative()) {
+    await _saveNative(doc, filename);
+  } else {
+    doc.save(filename);
+    await _tryOneDriveSave(doc, filename);
+  }
+}
+
 // ── OneDrive: guardar PDF si hay carpeta configurada ─────────────────────────
 async function _tryOneDriveSave(doc, filename) {
   try {
@@ -257,8 +287,7 @@ window.exportarPDFCliente = async function(projectId) {
   for (let i=1;i<=totalPages;i++) { doc.setPage(i); addFooter(doc,i,totalPages); }
 
   const filenameC = `EFS-Cliente-${project.displayId}-${project.clientName?.replace(/\s+/g,'_')}.pdf`;
-  doc.save(filenameC);
-  await _tryOneDriveSave(doc, filenameC);
+  await _savePDF(doc, filenameC);
 };
 
 // ── PDF Técnico ───────────────────────────────────────────────────────────────
@@ -280,6 +309,14 @@ window.exportarPDFTecnico = async function(projectId) {
   doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...GRIS);
   doc.text(project.clientName || '—', 14, y); y += 6;
   if (project.direccion) { doc.text(project.direccion, 14, y); y += 6; }
+  if (project.coordenadas?.lat) {
+    const lat = Number(project.coordenadas.lat).toFixed(6);
+    const lng = Number(project.coordenadas.lng).toFixed(6);
+    y = campo(doc, 'Coordenadas GPS', `${lat}, ${lng}`, 14, y);
+  }
+  if (project.clienteTelefono) {
+    y = campo(doc, 'Tel. cliente', project.clienteTelefono, 14, y);
+  }
   y = campo(doc,'Tipo de sistema',tipo?.label||'—',14,y);
   y = campo(doc,'Estado', ESTADOS_LABEL[project.estado] || project.estado, 14,y);
   y = campo(doc,'Capacidad',`${totalKwp.toFixed(2)} kWp · ${totalPaneles} paneles`,14,y);
@@ -487,6 +524,5 @@ window.exportarPDFTecnico = async function(projectId) {
   for (let i=1;i<=totalPages;i++) { doc.setPage(i); addFooter(doc,i,totalPages); }
 
   const filenameT = `EFS-Tecnico-${project.displayId}.pdf`;
-  doc.save(filenameT);
-  await _tryOneDriveSave(doc, filenameT);
+  await _savePDF(doc, filenameT);
 };
