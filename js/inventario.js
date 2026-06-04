@@ -1,7 +1,7 @@
 // inventario.js — Control de Almacén · Bitácora Ecofit V6
 
 import { toast, confirmDialog, inputDialog } from './utils.js';
-import { inventario as invStore } from './db.js';
+import { inventario as invStore, projects } from './db.js';
 
 // ── Materiales base (136 items) ────────────────────────────────────────────
 const RAW=[
@@ -202,6 +202,7 @@ function renderApp(){
     ...(isAdmin()?[
       {k:'catalogo',i:'wrench',          l:'Catálogo'},
       {k:'areas',  i:'map-pin',          l:'Áreas'},
+      {k:'consumo',i:'chart-bar',        l:'Consumo'},
     ]:[])
   ];
 
@@ -216,6 +217,7 @@ function renderApp(){
   else if(S.tab==='historial')content=renderHistorial();
   else if(S.tab==='catalogo') content=renderCatalogo();
   else if(S.tab==='areas')    content=renderAreas();
+  else if(S.tab==='consumo')  content=renderConsumo();
 
   return`
   <div class="view-header">
@@ -611,6 +613,170 @@ function renderAreas(){
     </p>
   </div>`;
 }
+
+// ── Tab Consumo ────────────────────────────────────────────────────────────
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function renderConsumo() {
+  const now = new Date();
+  const selMes  = S.consumoMes  ?? now.getMonth();
+  const selAnio = S.consumoAnio ?? now.getFullYear();
+
+  return `
+  <div class="card" style="margin-top:12px">
+    <div class="card-title-row">
+      <h3 class="card-title">Reporte de consumo mensual</h3>
+    </div>
+    <p style="font-size:.82rem;color:var(--text-muted);margin:0 0 12px">
+      Consolida los materiales (BOM) de todos los proyectos cerrados en el mes seleccionado.
+    </p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="cons-mes" class="select-field" style="flex:1;min-width:120px">
+        ${MESES_ES.map((m,i)=>`<option value="${i}" ${i===selMes?'selected':''}>${m}</option>`).join('')}
+      </select>
+      <input id="cons-anio" type="number" class="inv-mes-inp" style="width:90px"
+             value="${selAnio}" min="2020" max="2099" />
+      <button class="btn-primary btn-sm" onclick="window._invGenConsumo()">
+        Generar reporte
+      </button>
+    </div>
+  </div>
+  <div id="cons-resultado"></div>`;
+}
+
+window._invGenConsumo = async function() {
+  const mes  = parseInt(document.getElementById('cons-mes').value);
+  const anio = parseInt(document.getElementById('cons-anio').value);
+  S.consumoMes  = mes;
+  S.consumoAnio = anio;
+
+  const todos = await projects.getAll();
+
+  // Proyectos cerrados en el mes/año seleccionado
+  const cerrados = todos.filter(p => {
+    if (p.estado !== 'cerrado') return false;
+    const entrada = (p.statusLog || []).find(e => e.to === 'cerrado');
+    if (!entrada) return false;
+    const d = new Date(entrada.at);
+    return d.getMonth() === mes && d.getFullYear() === anio;
+  });
+
+  const el = document.getElementById('cons-resultado');
+  if (!cerrados.length) {
+    el.innerHTML = `<div class="card" style="margin-top:8px">
+      <p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:16px 0">
+        Sin proyectos cerrados en ${MESES_ES[mes]} ${anio}.
+      </p>
+    </div>`;
+    return;
+  }
+
+  // Consolidar BOM de todos los proyectos
+  const totales = {};
+  const proyectosConBOM = [];
+  const proyectosSinBOM = [];
+
+  cerrados.forEach(p => {
+    const bom = p.projectConfig?.computed?.bom || [];
+    if (bom.length) {
+      proyectosConBOM.push(p);
+      bom.forEach(item => {
+        const key = item.partNum || item.name;
+        if (!totales[key]) totales[key] = { name: item.name, partNum: item.partNum||'—', qty: 0, unit: item.unit, grp: item.grp||'General' };
+        totales[key].qty += item.qty;
+      });
+    } else {
+      proyectosSinBOM.push(p);
+    }
+  });
+
+  // Agrupar por categoría
+  const grupos = {};
+  Object.values(totales).forEach(item => {
+    if (!grupos[item.grp]) grupos[item.grp] = [];
+    grupos[item.grp].push(item);
+  });
+
+  const tablaHtml = Object.entries(grupos).map(([grp, items]) => `
+    <tr style="background:var(--surface2)">
+      <td colspan="4" style="padding:6px 10px;font-weight:700;font-size:.8rem;color:var(--accent)">
+        ${grp}
+      </td>
+    </tr>
+    ${items.map(it=>`
+    <tr>
+      <td style="padding:5px 10px;font-size:.82rem">${it.name}</td>
+      <td style="padding:5px 10px;font-size:.78rem;color:var(--text-muted)">${it.partNum}</td>
+      <td style="padding:5px 10px;font-weight:700;text-align:right">${it.qty}</td>
+      <td style="padding:5px 10px;font-size:.78rem;color:var(--text-muted)">${it.unit}</td>
+    </tr>`).join('')}
+  `).join('');
+
+  const sinBOMMsg = proyectosSinBOM.length
+    ? `<p style="font-size:.78rem;color:var(--yellow);margin:8px 0 0">
+        ⚠ ${proyectosSinBOM.length} proyecto(s) sin BOM calculado:
+        ${proyectosSinBOM.map(p=>`<strong>${p.displayId}</strong>`).join(', ')}
+       </p>` : '';
+
+  el.innerHTML = `
+  <div class="card" style="margin-top:8px">
+    <div class="card-title-row">
+      <h3 class="card-title">${MESES_ES[mes]} ${anio} — ${cerrados.length} proyecto(s) cerrado(s)</h3>
+      <button class="btn-outline btn-sm" onclick="window._invExportConsumo()" style="flex-shrink:0">
+        Exportar Excel
+      </button>
+    </div>
+    ${sinBOMMsg}
+    <div style="margin-top:10px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.83rem">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border2)">
+            <th style="text-align:left;padding:6px 10px">Material</th>
+            <th style="text-align:left;padding:6px 10px">Parte #</th>
+            <th style="text-align:right;padding:6px 10px">Cantidad</th>
+            <th style="text-align:left;padding:6px 10px">Unidad</th>
+          </tr>
+        </thead>
+        <tbody>${tablaHtml}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border2)">
+      <p style="font-size:.78rem;color:var(--text-muted);margin:0">
+        Proyectos incluidos: ${proyectosConBOM.map(p=>`<strong>${p.displayId}</strong> (${p.clientName})`).join(' · ')}
+      </p>
+    </div>
+  </div>`;
+
+  // Guardar datos para exportar
+  window._consumoExportData = { mes, anio, grupos, cerrados, proyectosSinBOM };
+};
+
+window._invExportConsumo = async function() {
+  const d = window._consumoExportData;
+  if (!d) { toast('Genera el reporte primero', 'error'); return; }
+
+  toast('Preparando Excel…', 'info', 3000);
+  let XLSX;
+  try {
+    const mod = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+    XLSX = mod;
+  } catch {
+    toast('Sin conexión para cargar exportador', 'error'); return;
+  }
+
+  const rows = [['Material','Parte #','Cantidad','Unidad','Categoría']];
+  Object.entries(d.grupos).forEach(([grp, items]) => {
+    items.forEach(it => rows.push([it.name, it.partNum, it.qty, it.unit, grp]));
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:40},{wch:16},{wch:10},{wch:8},{wch:18}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `${MESES_ES[d.mes]} ${d.anio}`);
+  XLSX.writeFile(wb, `Consumo_${MESES_ES[d.mes]}_${d.anio}.xlsx`);
+  toast('✅ Excel exportado');
+};
 
 // ── Bind principal ─────────────────────────────────────────────────────────
 function invBind(){
