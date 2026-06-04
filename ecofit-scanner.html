@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Escáner Serie — Ecofit Solar</title>
+<style>
+  :root {
+    --eco-orange: #E8640A;
+    --eco-orange-dark: #C04F00;
+    --eco-orange-light: #FF8533;
+    --eco-bg: #111318;
+    --eco-surface: #1C1F27;
+    --eco-surface2: #252830;
+    --eco-border: rgba(232,100,10,0.25);
+    --eco-text: #F0EDE8;
+    --eco-muted: #8A8880;
+    --eco-success: #2ECC71;
+    --eco-error: #E74C3C;
+    --scan-line: rgba(232,100,10,0.85);
+    --radius: 12px;
+    --radius-lg: 18px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--eco-bg);
+    color: var(--eco-text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--eco-surface);
+    border-bottom: 1px solid var(--eco-border);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .logo {
+    width: 32px; height: 32px;
+    background: var(--eco-orange);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo svg { width: 20px; height: 20px; fill: white; }
+  .header-title { flex: 1; }
+  .header-title h1 { font-size: 15px; font-weight: 600; color: var(--eco-text); }
+  .header-title p  { font-size: 11px; color: var(--eco-muted); margin-top: 1px; }
+  .cam-btn {
+    width: 36px; height: 36px;
+    background: var(--eco-surface2);
+    border: 1px solid var(--eco-border);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .cam-btn:active { background: var(--eco-orange-dark); }
+  .cam-btn svg { width: 18px; height: 18px; stroke: var(--eco-orange); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .scanner-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 18px;
+    gap: 18px;
+    position: relative;
+    overflow-y: auto;
+  }
+  .viewfinder {
+    width: 100%;
+    max-width: 340px;
+    aspect-ratio: 1 / 1;
+    position: relative;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: #000;
+  }
+  #video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .corner {
+    position: absolute;
+    width: 26px; height: 26px;
+    border-color: var(--eco-orange);
+    border-style: solid;
+    border-width: 0;
+    z-index: 3;
+  }
+  .corner.tl { top: 12px; left: 12px; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
+  .corner.tr { top: 12px; right: 12px; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
+  .corner.bl { bottom: 12px; left: 12px; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 4px; }
+  .corner.br { bottom: 12px; right: 12px; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
+  .scan-line {
+    position: absolute;
+    left: 12px; right: 12px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--scan-line) 20%, var(--scan-line) 80%, transparent);
+    top: 50%;
+    z-index: 2;
+    border-radius: 2px;
+    animation: scanMove 2s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--scan-line);
+  }
+  @keyframes scanMove {
+    0%   { transform: translateY(-80px); opacity: 0.4; }
+    20%  { opacity: 1; }
+    80%  { opacity: 1; }
+    100% { transform: translateY(80px); opacity: 0.4; }
+  }
+  .overlay-idle {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 4;
+    transition: opacity 0.3s;
+  }
+  .overlay-idle svg { width: 48px; height: 48px; stroke: var(--eco-orange); fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+  .overlay-idle span { font-size: 13px; color: var(--eco-muted); }
+  .overlay-idle.hidden { opacity: 0; pointer-events: none; }
+  .flash {
+    position: absolute;
+    inset: 0;
+    background: rgba(46,204,113,0.35);
+    z-index: 5;
+    border-radius: var(--radius-lg);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s;
+  }
+  .flash.show { opacity: 1; }
+  .hint {
+    font-size: 12px;
+    color: var(--eco-muted);
+    text-align: center;
+    max-width: 280px;
+    line-height: 1.5;
+  }
+  .hint strong { color: var(--eco-orange-light); font-weight: 500; }
+  .result-card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--eco-surface);
+    border: 1px solid var(--eco-border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .result-card.visible { display: flex; }
+  .result-header { display: flex; align-items: center; gap: 8px; }
+  .result-badge {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(46,204,113,0.15);
+    border: 1px solid rgba(46,204,113,0.3);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .result-badge svg { width: 16px; height: 16px; stroke: var(--eco-success); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .result-header-text h3 { font-size: 12px; color: var(--eco-muted); font-weight: 400; }
+  .result-header-text p { font-size: 13px; color: var(--eco-success); font-weight: 500; margin-top: 1px; }
+  .result-value {
+    background: var(--eco-surface2);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .result-value span {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--eco-text);
+    word-break: break-all;
+    font-family: 'Courier New', monospace;
+  }
+  .copy-btn {
+    background: none; border: none; cursor: pointer;
+    padding: 4px; border-radius: 6px; transition: background 0.15s; flex-shrink: 0;
+  }
+  .copy-btn:active { background: rgba(255,255,255,0.1); }
+  .copy-btn svg { width: 18px; height: 18px; stroke: var(--eco-muted); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  .result-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+  .meta-pill {
+    font-size: 11px; padding: 3px 10px; border-radius: 20px;
+    background: var(--eco-surface2); border: 1px solid rgba(255,255,255,0.07); color: var(--eco-muted);
+  }
+  .meta-pill strong { color: var(--eco-orange-light); font-weight: 500; }
+  .result-actions { display: flex; gap: 8px; }
+  .btn {
+    flex: 1; height: 40px; border-radius: var(--radius); border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn:active { opacity: 0.8; transform: scale(0.98); }
+  .btn-primary { background: var(--eco-orange); color: white; }
+  .btn-secondary { background: var(--eco-surface2); color: var(--eco-text); border: 1px solid rgba(255,255,255,0.1); }
+  .btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .history-wrap {
+    flex-shrink: 0;
+    background: var(--eco-surface);
+    border-top: 1px solid var(--eco-border);
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .history-header {
+    padding: 10px 18px 6px;
+    font-size: 11px; font-weight: 600; color: var(--eco-muted);
+    text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .history-empty { padding: 8px 18px 14px; font-size: 12px; color: var(--eco-muted); font-style: italic; }
+  .history-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+  .history-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--eco-orange); flex-shrink: 0; }
+  .history-code { flex: 1; font-size: 13px; color: var(--eco-text); font-family: 'Courier New', monospace; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-format { font-size: 10px; color: var(--eco-muted); background: var(--eco-surface2); padding: 2px 7px; border-radius: 10px; flex-shrink: 0; }
+  .history-time { font-size: 10px; color: var(--eco-muted); flex-shrink: 0; }
+  .start-btn {
+    width: 100%; max-width: 340px; height: 50px;
+    background: var(--eco-orange); border: none; border-radius: var(--radius-lg);
+    color: white; font-size: 15px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    letter-spacing: 0.3px;
+    transition: background 0.15s, transform 0.1s;
+    box-shadow: 0 4px 20px rgba(232,100,10,0.3);
+  }
+  .start-btn:active { background: var(--eco-orange-dark); transform: scale(0.98); }
+  .start-btn.stop { background: #2A2D35; box-shadow: none; border: 1px solid rgba(255,255,255,0.1); }
+  .start-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .status-bar {
+    width: 100%; max-width: 340px;
+    padding: 8px 14px;
+    background: var(--eco-surface2);
+    border: 1px solid var(--eco-border);
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--eco-muted);
+    text-align: center;
+    display: none;
+  }
+  .status-bar.visible { display: block; }
+  .toast {
+    position: fixed;
+    bottom: 20px; left: 50%; transform: translateX(-50%) translateY(10px);
+    background: var(--eco-surface);
+    border: 1px solid rgba(46,204,113,0.3);
+    color: var(--eco-success);
+    font-size: 13px; font-weight: 500;
+    padding: 9px 18px; border-radius: 30px;
+    opacity: 0; transition: opacity 0.2s, transform 0.2s;
+    z-index: 100; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .history-wrap::-webkit-scrollbar { width: 3px; }
+  .history-wrap::-webkit-scrollbar-track { background: transparent; }
+  .history-wrap::-webkit-scrollbar-thumb { background: var(--eco-border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+  </div>
+  <div class="header-title">
+    <h1>Escáner de Series</h1>
+    <p>Ecofit Solar Solutions</p>
+  </div>
+  <button class="cam-btn" id="flipCam" title="Cambiar cámara">
+    <svg viewBox="0 0 24 24"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+  </button>
+</header>
+
+<main class="scanner-wrap">
+  <div class="viewfinder" id="viewfinder">
+    <video id="video" playsinline muted></video>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="scan-line" id="scanLine" style="display:none;"></div>
+    <div class="flash" id="flash"></div>
+    <div class="overlay-idle" id="overlayIdle">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="3" y="16" width="5" height="5" rx="1"/><rect x="16" y="3" width="5" height="5" rx="1"/><path d="M21 16h-3m0 0v3m0-3h-3m3 0v-3m0 3h3"/><path d="M3 9h3m3 0V3m3 6V6m0 3h3"/></svg>
+      <span>Cámara no activa</span>
+    </div>
+  </div>
+
+  <p class="hint">Apunta al <strong>código de barras o QR</strong> del panel.<br>Soporta Code128, Code39, QR, EAN, Data Matrix.</p>
+
+  <div class="status-bar" id="statusBar">Cargando librería de escaneo...</div>
+
+  <button class="start-btn" id="startBtn" disabled>
+    <svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+    Cargando...
+  </button>
+
+  <div class="result-card" id="resultCard">
+    <div class="result-header">
+      <div class="result-badge">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="result-header-text">
+        <h3>Código detectado</h3>
+        <p id="resultFormat">—</p>
+      </div>
+    </div>
+    <div class="result-value">
+      <span id="resultText">—</span>
+      <button class="copy-btn" id="copyBtn" title="Copiar">
+        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </div>
+    <div class="result-meta">
+      <div class="meta-pill">Formato: <strong id="metaFormat">—</strong></div>
+      <div class="meta-pill">Hora: <strong id="metaTime">—</strong></div>
+    </div>
+    <div class="result-actions">
+      <button class="btn btn-secondary" id="reScanBtn">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Re-escanear
+      </button>
+      <button class="btn btn-primary" id="useBtn">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Usar número
+      </button>
+    </div>
+  </div>
+</main>
+
+<div class="history-wrap">
+  <div class="history-header">Historial de sesión</div>
+  <div class="history-empty" id="historyEmpty">Sin escaneos aún.</div>
+  <div id="historyList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Cargar ZXing desde jsDelivr con el nombre de global correcto -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script>
+(function() {
+  // El UMD de ZXing expone el global como ZXing (no ZXingLibrary)
+  // Esperamos a que el DOM esté listo y el script cargado
+  var ZXing = window.ZXing;
+
+  var codeReader = null;
+  var scanning   = false;
+  var currentDevice = 0;
+  var devices    = [];
+  var lastResult = null;
+
+  var video        = document.getElementById('video');
+  var startBtn     = document.getElementById('startBtn');
+  var overlayIdle  = document.getElementById('overlayIdle');
+  var scanLine     = document.getElementById('scanLine');
+  var flash        = document.getElementById('flash');
+  var resultCard   = document.getElementById('resultCard');
+  var resultText   = document.getElementById('resultText');
+  var resultFormat = document.getElementById('resultFormat');
+  var metaFormat   = document.getElementById('metaFormat');
+  var metaTime     = document.getElementById('metaTime');
+  var copyBtn      = document.getElementById('copyBtn');
+  var reScanBtn    = document.getElementById('reScanBtn');
+  var useBtn       = document.getElementById('useBtn');
+  var historyList  = document.getElementById('historyList');
+  var historyEmpty = document.getElementById('historyEmpty');
+  var flipCam      = document.getElementById('flipCam');
+  var toast        = document.getElementById('toast');
+  var statusBar    = document.getElementById('statusBar');
+
+  function setStatus(msg, visible) {
+    statusBar.textContent = msg;
+    statusBar.classList.toggle('visible', !!visible);
+  }
+
+  function formatName(fmt) {
+    var map = {
+      'CODE_128': 'Code 128', 'CODE_39': 'Code 39', 'QR_CODE': 'QR Code',
+      'EAN_13': 'EAN-13', 'EAN_8': 'EAN-8', 'DATA_MATRIX': 'Data Matrix',
+      'PDF_417': 'PDF 417', 'AZTEC': 'Aztec', 'UPC_A': 'UPC-A', 'UPC_E': 'UPC-E',
+      'ITF': 'ITF', 'CODABAR': 'Codabar', '8': 'EAN-8', '4': 'Code 128',
+      '12': 'QR Code', '5': 'Code 39'
+    };
+    return map[String(fmt)] || String(fmt);
+  }
+
+  function showToast(msg, duration) {
+    duration = duration || 1800;
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(function() { toast.classList.remove('show'); }, duration);
+  }
+
+  function flashEffect() {
+    flash.classList.add('show');
+    setTimeout(function() { flash.classList.remove('show'); }, 300);
+  }
+
+  function vibrate() {
+    if (navigator.vibrate) navigator.vibrate([60, 30, 60]);
+  }
+
+  function addToHistory(code, fmt) {
+    var now = new Date();
+    var time = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    historyEmpty.style.display = 'none';
+    var item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML =
+      '<div class="history-dot"></div>' +
+      '<div class="history-code">' + code + '</div>' +
+      '<div class="history-format">' + formatName(fmt) + '</div>' +
+      '<div class="history-time">' + time + '</div>';
+    historyList.prepend(item);
+  }
+
+  function initZXing() {
+    // Verificar que ZXing cargó correctamente
+    if (!window.ZXing) {
+      setStatus('Error: no se pudo cargar la librería de escaneo.', true);
+      return false;
+    }
+    ZXing = window.ZXing;
+    return true;
+  }
+
+  function createReader() {
+    if (codeReader) return;
+    if (!initZXing()) return;
+    try {
+      var hints = new Map();
+      // Usar los valores numéricos como fallback si BarcodeFormat no está disponible
+      var formats;
+      if (ZXing.BarcodeFormat) {
+        formats = [
+          ZXing.BarcodeFormat.CODE_128,
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.QR_CODE,
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.DATA_MATRIX,
+          ZXing.BarcodeFormat.PDF_417,
+          ZXing.BarcodeFormat.AZTEC,
+          ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.ITF
+        ];
+        if (ZXing.DecodeHintType) {
+          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+          hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+          codeReader = new ZXing.BrowserMultiFormatReader(hints, 300);
+        } else {
+          codeReader = new ZXing.BrowserMultiFormatReader(null, 300);
+        }
+      } else {
+        codeReader = new ZXing.BrowserMultiFormatReader(null, 300);
+      }
+    } catch(e) {
+      console.error('Error creando lector ZXing:', e);
+      codeReader = new ZXing.BrowserMultiFormatReader();
+    }
+  }
+
+  function enableBtn() {
+    startBtn.disabled = false;
+    startBtn.innerHTML =
+      '<svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>' +
+      'Iniciar escáner';
+    setStatus('', false);
+  }
+
+  // Esperar a que ZXing cargue
+  function waitForZXing(attempts) {
+    attempts = attempts || 0;
+    if (window.ZXing && window.ZXing.BrowserMultiFormatReader) {
+      enableBtn();
+    } else if (attempts < 20) {
+      setTimeout(function() { waitForZXing(attempts + 1); }, 200);
+    } else {
+      setStatus('No se pudo cargar el motor de escaneo. Verifica tu conexión.', true);
+      startBtn.disabled = false;
+      startBtn.textContent = 'Reintentar';
+    }
+  }
+
+  async function startScan() {
+    if (!initZXing()) { showToast('⚠️ Librería no disponible', 2500); return; }
+    createReader();
+    if (!codeReader) { showToast('⚠️ Error inicializando escáner', 2500); return; }
+
+    try {
+      if (devices.length === 0) {
+        devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+        var backIdx = devices.findIndex(function(d) { return /back|rear|environment/i.test(d.label); });
+        if (backIdx >= 0) currentDevice = backIdx;
+      }
+
+      var deviceId = devices.length > 0 ? devices[currentDevice].deviceId : undefined;
+
+      scanning = true;
+      startBtn.innerHTML =
+        '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>' +
+        'Detener escáner';
+      startBtn.classList.add('stop');
+      overlayIdle.classList.add('hidden');
+      scanLine.style.display = 'block';
+      resultCard.classList.remove('visible');
+      setStatus('', false);
+
+      var constraints = {
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          facingMode: deviceId ? undefined : { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+
+      await codeReader.decodeFromConstraints(constraints, video, function(result, err) {
+        if (result) {
+          var code = result.getText();
+          var fmt  = result.getBarcodeFormat();
+          onDetected(code, fmt);
+        }
+      });
+    } catch(e) {
+      stopScan();
+      var msg = e && e.name === 'NotAllowedError'
+        ? '⚠️ Permiso de cámara denegado'
+        : '⚠️ No se pudo acceder a la cámara';
+      showToast(msg, 2500);
+      setStatus(msg, true);
+      console.error(e);
+    }
+  }
+
+  function stopScan() {
+    if (codeReader) { try { codeReader.reset(); } catch(e) {} }
+    scanning = false;
+    startBtn.innerHTML =
+      '<svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>' +
+      'Iniciar escáner';
+    startBtn.classList.remove('stop');
+    overlayIdle.classList.remove('hidden');
+    scanLine.style.display = 'none';
+  }
+
+  function onDetected(code, fmt) {
+    if (lastResult === code) return;
+    lastResult = code;
+    vibrate();
+    flashEffect();
+    var fmtName = formatName(fmt);
+    var now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    resultText.textContent   = code;
+    resultFormat.textContent = 'Detectado · ' + fmtName;
+    metaFormat.textContent   = fmtName;
+    metaTime.textContent     = now;
+    resultCard.classList.add('visible');
+    addToHistory(code, fmt);
+    stopScan();
+  }
+
+  startBtn.addEventListener('click', function() {
+    if (scanning) { stopScan(); }
+    else { lastResult = null; startScan(); }
+  });
+
+  reScanBtn.addEventListener('click', function() {
+    lastResult = null;
+    resultCard.classList.remove('visible');
+    startScan();
+  });
+
+  useBtn.addEventListener('click', function() {
+    var code = resultText.textContent;
+    var evt = new CustomEvent('ecofitScanResult', { detail: { code: code, format: metaFormat.textContent } });
+    window.dispatchEvent(evt);
+    document.dispatchEvent(evt);
+    showToast('✓ "' + code + '" listo para usar');
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'ECOFIT_SCAN', code: code, format: metaFormat.textContent }, '*');
+    }
+  });
+
+  copyBtn.addEventListener('click', function() {
+    var code = resultText.textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code)
+        .then(function() { showToast('✓ Copiado al portapapeles'); })
+        .catch(function() { showToast('No se pudo copiar'); });
+    } else {
+      showToast('No se pudo copiar');
+    }
+  });
+
+  flipCam.addEventListener('click', function() {
+    if (devices.length < 2) { showToast('Solo hay una cámara disponible'); return; }
+    currentDevice = (currentDevice + 1) % devices.length;
+    if (scanning) { stopScan(); setTimeout(startScan, 300); }
+    else { showToast('Cámara: ' + (devices[currentDevice].label || 'Cámara ' + (currentDevice + 1))); }
+  });
+
+  // Iniciar espera de librería
+  setStatus('Cargando librería de escaneo...', true);
+  waitForZXing(0);
+
+})();
+</script>
+</body>
+</html>

@@ -337,6 +337,75 @@ window._viewPhoto = function(imgId) {
   document.addEventListener('keydown', onKey);
 };
 
+// ── Overlay iframe del escáner Ecofit ─────────────────────────────────────────
+// options:
+//   continuous  — false (cierra tras el 1er scan) | true (queda abierto para multi-scan)
+//   title       — texto en la cabecera del overlay
+//   onClose     — callback al cerrar sin resultado
+//
+// Retorna la función closeScanner() por si el llamador quiere cerrar programáticamente.
+export function openScannerOverlay(onResult, { continuous = false, title = 'Escanear código', onClose = null } = {}) {
+  // Evitar duplicados
+  document.getElementById('scanner-overlay-wrap')?.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id = 'scanner-overlay-wrap';
+  wrap.className = 'scanner-overlay-wrap';
+  wrap.innerHTML = `
+    <div class="scanner-overlay-hdr">
+      <span class="scanner-overlay-title">${esc(title)}</span>
+      <button class="scanner-overlay-close" id="scanner-overlay-close-btn" aria-label="Cerrar escáner">✕</button>
+    </div>
+    ${continuous ? `<div class="scanner-overlay-counter" id="scanner-overlay-counter">
+      <span id="scanner-count-num">0</span> escaneados en esta sesión</div>` : ''}
+    <iframe
+      id="scanner-overlay-iframe"
+      src="./ecofit-scanner.html"
+      class="scanner-overlay-iframe"
+      allow="camera;microphone"
+      loading="lazy">
+    </iframe>`;
+
+  document.body.appendChild(wrap);
+  // Animar entrada
+  requestAnimationFrame(() => wrap.classList.add('scanner-overlay-visible'));
+
+  let scanCount = 0;
+
+  function close() {
+    wrap.classList.remove('scanner-overlay-visible');
+    setTimeout(() => wrap.remove(), 250);
+    window.removeEventListener('message', onMsg);
+    if (onClose) onClose();
+  }
+
+  function onMsg(e) {
+    if (!e.data || e.data.type !== 'ECOFIT_SCAN') return;
+    const code = e.data.code?.trim();
+    if (!code) return;
+
+    if (continuous) {
+      scanCount++;
+      const counter = document.getElementById('scanner-count-num');
+      if (counter) counter.textContent = scanCount;
+      onResult(code, e.data.format);
+      // NO cerramos — el técnico sigue escaneando y pulsa ✕ cuando termina
+    } else {
+      close();
+      onResult(code, e.data.format);
+    }
+  }
+
+  window.addEventListener('message', onMsg);
+  document.getElementById('scanner-overlay-close-btn').addEventListener('click', close);
+
+  // Cerrar con Escape
+  const onKey = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+
+  return close;
+}
+
 // ── Indicador de sync ──────────────────────────────────────────────────────────
 export function syncBadge(synced) {
   if (synced === true)  return '<span class="sync-badge sync-ok" title="Sincronizado">✔</span>';

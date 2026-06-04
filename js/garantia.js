@@ -2,7 +2,8 @@
 
 import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
-         uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION } from './utils.js';
+         uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION,
+         openScannerOverlay } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
@@ -385,9 +386,13 @@ window.capEqFoto = function(tipo, slotId) {
 };
 
 window.scanSerial = function() {
-  scanOnce(
-    (code) => { document.getElementById('eq-serial').value = code; toast('Serial escaneado'); },
-    () => {}
+  openScannerOverlay(
+    (code) => {
+      const inp = document.getElementById('eq-serial');
+      if (inp) { inp.value = code; inp.focus(); }
+      toast(`✅ Serial escaneado: ${code}`);
+    },
+    { continuous: false, title: 'Escanear serial del equipo' }
   );
 };
 
@@ -705,57 +710,67 @@ window.delString = async function(projectId, idx) {
 let _activeScanStringIdx = -1;
 
 window.startScanString = async function(projectId, stringIdx) {
-  const containerId = `scanner-${stringIdx}`;
-  const container = document.getElementById(containerId);
-
-  if (_activeScanStringIdx === stringIdx) {
-    // Detener
-    stopScanner();
-    container.style.display = 'none';
-    _activeScanStringIdx = -1;
-    return;
-  }
-
-  // Cerrar cualquier scanner activo
-  if (_activeScanStringIdx >= 0) {
-    stopScanner();
-    document.getElementById(`scanner-${_activeScanStringIdx}`).style.display = 'none';
-  }
-
-  _activeScanStringIdx = stringIdx;
-  container.style.display = 'block';
-
   const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  startContinuousScan(containerId, async (serial) => {
-    const p = await projects.getById(projectId);
-    const str = p.garantia.paneles.strings[stringIdx];
-    const nextLetra = letras[str.paneles.length] || `P${str.paneles.length+1}`;
+  // Cerrar viejo scanner ZXing inline si estaba activo
+  if (_activeScanStringIdx >= 0) {
+    stopScanner();
+    const old = document.getElementById(`scanner-${_activeScanStringIdx}`);
+    if (old) old.style.display = 'none';
+    _activeScanStringIdx = -1;
+  }
 
-    str.paneles.push({ letra: nextLetra, serial, fotoRespaldo: null, createdAt: isoNow() });
-    await projects.update(projectId, { garantia: p.garantia });
+  const strHeader = document.querySelector(`#scanner-${stringIdx}`)
+    ?.closest('.string-card')
+    ?.querySelector('.string-nombre')
+    ?.textContent || `String ${stringIdx + 1}`;
 
-    // Actualizar lista en UI sin re-render completo
-    const listEl = document.getElementById(`panels-${stringIdx}`);
-    if (listEl) {
-      const pi = str.paneles.length - 1;
-      const pan = str.paneles[pi];
-      const row = document.createElement('div');
-      row.className = 'panel-row';
-      row.innerHTML = `
-        <span class="panel-letra">${pan.letra}</span>
-        <span class="panel-serial">${esc(pan.serial)}</span>
-        <button class="btn-del-sm" onclick="delPanel('${projectId}',${stringIdx},${pi})">✕</button>
-      `;
-      listEl.appendChild(row);
+  openScannerOverlay(
+    async (serial) => {
+      // Deduplicar: no agregar si el serial ya existe en este string
+      const pCheck = await projects.getById(projectId);
+      const strCheck = pCheck?.garantia?.paneles?.strings?.[stringIdx];
+      if (strCheck?.paneles?.some(pan => pan.serial === serial)) {
+        toast(`⚠ Serial ya registrado: ${serial}`, 'warning', 3000);
+        return;
+      }
+
+      const p = await projects.getById(projectId);
+      const str = p.garantia.paneles.strings[stringIdx];
+      const nextLetra = letras[str.paneles.length] || `P${str.paneles.length + 1}`;
+
+      str.paneles.push({ letra: nextLetra, serial, fotoRespaldo: null, createdAt: isoNow() });
+      await projects.update(projectId, { garantia: p.garantia });
+
+      // Actualizar lista en UI sin re-render completo
+      const listEl = document.getElementById(`panels-${stringIdx}`);
+      if (listEl) {
+        const pi = str.paneles.length - 1;
+        const row = document.createElement('div');
+        row.className = 'panel-row';
+        row.innerHTML = `
+          <span class="panel-letra">${nextLetra}</span>
+          <span class="panel-serial">${esc(serial)}</span>
+          <button class="btn-del-sm" onclick="delPanel('${projectId}',${stringIdx},${pi})">✕</button>`;
+        listEl.appendChild(row);
+      }
+      // Actualizar contador en el header del string
+      const headerEl = document.querySelector(`#scanner-${stringIdx}`)
+        ?.closest('.string-card')?.querySelector('.string-nombre');
+      if (headerEl) {
+        const p2 = await projects.getById(projectId);
+        const count = p2?.garantia?.paneles?.strings?.[stringIdx]?.paneles?.length || 0;
+        headerEl.textContent = `${strHeader.replace(/\(\d+.*\)/, '').trim()} (${count} paneles)`;
+      }
+      toast(`✅ Panel ${nextLetra}: ${serial}`);
+    },
+    {
+      continuous: true,
+      title: `Escanear paneles — ${strHeader}`,
+      onClose: () => { _activeScanStringIdx = -1; }
     }
-    // Actualizar contador del string
-    const header = document.querySelector(`#panels-${stringIdx}`)?.previousElementSibling?.previousElementSibling;
-    if (header) {
-      header.querySelector('.string-nombre').textContent =
-        `String ${stringIdx+1} (${str.paneles.length} paneles)`;
-    }
-  }, () => {});
+  );
+  _activeScanStringIdx = stringIdx;
 };
 
 window.addPanelManual = async function(projectId, stringIdx) {
