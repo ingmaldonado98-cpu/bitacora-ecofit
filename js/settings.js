@@ -258,10 +258,29 @@ export async function renderSettings(session) {
     </div>
   </div>
 
+  <div class="card">
+    <h3 class="card-title">Actualización de la app</h3>
+    <p class="hint-text">
+      Si trabajaste sin internet y la app muestra información desactualizada,
+      usa este botón al reconectarte para cargar la versión más reciente.
+    </p>
+    <div id="update-status" style="margin-bottom:10px"></div>
+    <div class="form-actions-row">
+      <button class="btn-primary btn-sm" onclick="window._forceAppUpdate()">
+        🔄 Forzar actualización
+      </button>
+      <button class="btn-outline btn-sm" onclick="window._checkForUpdate()">
+        Buscar actualización
+      </button>
+    </div>
+    <p class="hint-text" style="margin-top:8px">
+      Service Worker: <span id="sw-ver">—</span>
+    </p>
+  </div>
+
   <div class="settings-footer">
     <p>Bitácora Ecofit Solar Solutions · V6</p>
     <p>La Paz, Baja California Sur · México</p>
-    <p>Service Worker: <span id="sw-ver">—</span></p>
   </div>
   `;
 }
@@ -635,4 +654,43 @@ window.limpiarDatos = async function() {
   sessionStorage.clear();
   toast('Datos eliminados. Recargando…');
   setTimeout(() => location.reload(), 1500);
+};
+
+// ── Forzar actualización del Service Worker ───────────────────────────────────
+window._forceAppUpdate = async function() {
+  const statusEl = document.getElementById('update-status');
+  if (!navigator.onLine) {
+    toast('Necesitas internet para actualizar la app', 'error');
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--solar)">⚠ Sin conexión — conéctate primero</span>';
+    return;
+  }
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--text-muted)">Buscando actualización…</span>';
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const reg of regs) { await reg.update(); }
+    // Limpiar caché viejo
+    const keys = await caches.keys();
+    for (const key of keys) { await caches.delete(key); }
+    toast('✅ Caché limpiado — recargando la app…', 'success', 3000);
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--accent)">✅ Actualización aplicada</span>';
+    setTimeout(() => location.reload(true), 2000);
+  } catch(err) {
+    toast('Error al actualizar: ' + err.message, 'error');
+  }
+};
+
+window._checkForUpdate = async function() {
+  const statusEl = document.getElementById('update-status');
+  if (!navigator.serviceWorker?.controller) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--text-muted)">Service Worker no activo</span>';
+    return;
+  }
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const reg of regs) { await reg.update(); }
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--accent)">✅ Sin actualizaciones pendientes</span>';
+    toast('App al día', 'success');
+  } catch(err) {
+    toast('Error al verificar: ' + err.message, 'error');
+  }
 };
