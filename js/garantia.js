@@ -396,6 +396,17 @@ window.scanSerial = function() {
   );
 };
 
+window.scanLoteEstructura = function() {
+  openScannerOverlay(
+    (code) => {
+      const inp = document.getElementById('est-lote');
+      if (inp) { inp.value = code; inp.focus(); }
+      toast(`✅ Lote escaneado: ${code}`);
+    },
+    { continuous: false, title: 'Escanear número de lote — Estructura' }
+  );
+};
+
 window.showFormEquipo = function(projectId) {
   const form = document.getElementById('form-equipo');
   form.style.display = 'block';
@@ -536,8 +547,11 @@ export async function renderEstructuraForm(projectId, session) {
       <input type="text" name="modelo" value="${esc(est.modelo||'')}" /></div>
     <div class="form-group"><label>Número de lote</label>
       <div class="serial-row">
-        <input type="text" name="numLote" id="est-lote" value="${esc(est.numLote||'')}" />
-        <button type="button" class="btn-icon" onclick="capEqFoto('etiqueta','slot-est-etiq')">${icon('camera')}</button>
+        <input type="text" name="numLote" id="est-lote" value="${esc(est.numLote||'')}" placeholder="Leer etiqueta o escribir" />
+        <button type="button" class="btn-icon" onclick="scanLoteEstructura()" title="Escanear código de lote">
+          ${icon('barcode')}
+        </button>
+        <button type="button" class="btn-icon" onclick="capEqFoto('etiqueta','slot-est-etiq')" title="Foto de etiqueta">${icon('camera')}</button>
       </div>
       <div id="slot-est-etiq">${fotoMini(est.fotoEtiqueta,'Etiqueta lote')}</div>
     </div>
@@ -774,15 +788,65 @@ window.startScanString = async function(projectId, stringIdx) {
 };
 
 window.addPanelManual = async function(projectId, stringIdx) {
-  const serial = await inputDialog('Número de serie del panel:');
-  if (serial === null) return;
+  // Mostrar modal de elección: escáner o texto manual
+  const choice = await new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="modal-confirm" role="dialog" aria-modal="true">
+        <p class="modal-confirm-msg">¿Cómo quieres agregar el panel?</p>
+        <div class="modal-confirm-actions" style="flex-direction:column;gap:8px">
+          <button class="btn-primary modal-btn-scan" style="width:100%">
+            🔲 Escanear código de barras
+          </button>
+          <button class="btn-outline modal-btn-text" style="width:100%">
+            ✏️ Escribir serial manualmente
+          </button>
+          <button class="btn-outline modal-btn-cancel" style="width:100%;color:var(--text-muted)">
+            Cancelar
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.modal-btn-scan').onclick   = () => { overlay.remove(); resolve('scan'); };
+    overlay.querySelector('.modal-btn-text').onclick   = () => { overlay.remove(); resolve('text'); };
+    overlay.querySelector('.modal-btn-cancel').onclick = () => { overlay.remove(); resolve(null); };
+  });
+
+  if (!choice) return;
+
   const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const p = await projects.getById(projectId);
-  const str = p.garantia.paneles.strings[stringIdx];
-  const nextLetra = letras[str.paneles.length] || `P${str.paneles.length+1}`;
-  str.paneles.push({ letra: nextLetra, serial: serial.trim(), fotoRespaldo: null, createdAt: isoNow() });
-  await projects.update(projectId, { garantia: p.garantia });
-  navigate(`#proyecto/${projectId}/garantia`);
+
+  if (choice === 'scan') {
+    const strNombre = (await projects.getById(projectId))
+      ?.garantia?.paneles?.strings?.[stringIdx]?.nombre || `String ${stringIdx + 1}`;
+    openScannerOverlay(
+      async (serial) => {
+        // Deduplicar
+        const pCheck = await projects.getById(projectId);
+        if (pCheck?.garantia?.paneles?.strings?.[stringIdx]?.paneles?.some(p => p.serial === serial)) {
+          toast(`⚠ Serial ya registrado: ${serial}`, 'warning', 3000);
+          return;
+        }
+        const p = await projects.getById(projectId);
+        const str = p.garantia.paneles.strings[stringIdx];
+        const nextLetra = letras[str.paneles.length] || `P${str.paneles.length+1}`;
+        str.paneles.push({ letra: nextLetra, serial: serial.trim(), fotoRespaldo: null, createdAt: isoNow() });
+        await projects.update(projectId, { garantia: p.garantia });
+        navigate(`#proyecto/${projectId}/garantia`);
+      },
+      { continuous: false, title: `Escanear panel — ${strNombre}` }
+    );
+  } else {
+    const serial = await inputDialog('Número de serie del panel:');
+    if (!serial?.trim()) return;
+    const p = await projects.getById(projectId);
+    const str = p.garantia.paneles.strings[stringIdx];
+    const nextLetra = letras[str.paneles.length] || `P${str.paneles.length+1}`;
+    str.paneles.push({ letra: nextLetra, serial: serial.trim(), fotoRespaldo: null, createdAt: isoNow() });
+    await projects.update(projectId, { garantia: p.garantia });
+    navigate(`#proyecto/${projectId}/garantia`);
+  }
 };
 
 window.delPanel = async function(projectId, stringIdx, panelIdx) {
