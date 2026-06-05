@@ -15,6 +15,7 @@ export async function renderGarantia(projectId, session) {
   if (!project) return '<p class="empty-msg">Proyecto no encontrado.</p>';
   const edit = canEdit(session, project);
   const g = project.garantia || {};
+  _clearEqFotos(); // limpiar fotos temporales de sesiones anteriores
 
   return `
   <div class="view-header">
@@ -104,6 +105,17 @@ export async function renderGarantia(projectId, session) {
       </div>
     </div>
   </div>
+  <script>
+    (function() {
+      const target = sessionStorage.getItem('garantia-tab-target');
+      if (target) {
+        sessionStorage.removeItem('garantia-tab-target');
+        const bar = document.getElementById('garantia-tabs');
+        const btn = bar?.querySelector('[data-tab="' + target + '"]');
+        if (btn) btn.click();
+      }
+    })();
+  </script>
   `;
 }
 
@@ -375,13 +387,22 @@ function formEquipo(projectId) {
 }
 
 const _eqFotos = {};
+
+// Limpiar fotos temporales al navegar a la vista de garantía
+function _clearEqFotos() {
+  Object.keys(_eqFotos).forEach(k => delete _eqFotos[k]);
+}
 window.capEqFoto = function(tipo, slotId) {
   capturePhoto(async (b64) => {
     toast('Subiendo foto…');
-    const url = await uploadPhoto(b64, `projects/equipo_${tipo}_${Date.now()}.jpg`);
-    _eqFotos[tipo] = url;
+    // Usar un projectId genérico para fotos de equipo no vinculadas aún
+    const fid = uuid();
+    const result = await uploadPhotoQueued(b64, `projects/equipo_${tipo}_${fid}.jpg`,
+      'equipo_temp', 'eqFoto', { tipo });
+    _eqFotos[tipo] = result.url || b64; // fallback a b64 si está offline
     const slot = document.getElementById(slotId);
-    slot.innerHTML = fotoMini(url, tipo);
+    if (slot) slot.innerHTML = fotoMini(_eqFotos[tipo], tipo);
+    if (result.url) toast('✅ Foto guardada');
   });
 };
 
@@ -531,6 +552,7 @@ function renderEstructura(est, projectId, edit, cfg) {
 export async function renderEstructuraForm(projectId, session) {
   const project = await projects.getById(projectId);
   const est = project?.garantia?.estructura || {};
+  _clearEqFotos(); // limpiar fotos temporales de sesiones anteriores
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}/garantia')">${icon('caret-left')}</button>
@@ -701,15 +723,9 @@ window.agregarString = async function(projectId) {
   const n = (p.garantia.paneles.strings||[]).length + 1;
   p.garantia.paneles.strings = [...(p.garantia.paneles.strings||[]), { nombre:`String ${n}`, paneles:[] }];
   await projects.update(projectId, { garantia: p.garantia });
+  // Guardar target tab en sessionStorage para activarlo después del render
+  sessionStorage.setItem('garantia-tab-target', 'g-paneles');
   navigate(`#proyecto/${projectId}/garantia`);
-  // Switch to paneles tab after re-render
-  setTimeout(() => {
-    const tabs = document.getElementById('garantia-tabs');
-    if (tabs) {
-      const panelesTab = tabs.querySelector('[data-tab="g-paneles"]');
-      if (panelesTab) panelesTab.click();
-    }
-  }, 200);
 };
 
 window.delString = async function(projectId, idx) {
@@ -913,9 +929,12 @@ window._delNota = async function(projectId, scope, idx) {
 // ── Tab switcher ───────────────────────────────────────────────────────────────
 window.switchTab = function(tabBarId, targetId, btn) {
   const bar = document.getElementById(tabBarId);
+  if (!bar) return;
   bar.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
   btn.classList.add('tab-active');
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('tab-panel-active'));
+  // Solo ocultar panels que son hermanos de la tab-bar (evita chocar con otros grupos)
+  const container = bar.parentElement;
+  container.querySelectorAll(':scope > .tab-panel').forEach(p => p.classList.remove('tab-panel-active'));
   const target = document.getElementById(targetId);
   if (target) target.classList.add('tab-panel-active');
   // Detener scanner si cambia de tab

@@ -211,12 +211,16 @@ function updateHeader(session) {
     session.rol === 'admin' ? 'Admin' : session.rol === 'lider' ? 'Líder' : 'Apoyo';
   hdr.style.display = '';
   // Si el logo img no carga, mostrar fallback tipográfico
-  const logoImg = hdr.querySelector('.hdr-logo');
+  const logoImg  = hdr.querySelector('.hdr-logo');
   const logoText = document.getElementById('hdr-logo-text');
   if (logoImg && logoText) {
+    const showFallback = () => { logoImg.style.display = 'none'; logoText.style.display = 'flex'; };
+    // Ya terminó de cargar y no tiene píxeles → está roto
     if (logoImg.complete && logoImg.naturalWidth === 0) {
-      logoImg.style.display = 'none';
-      logoText.style.display = 'flex';
+      showFallback();
+    } else if (!logoImg.complete) {
+      // Todavía cargando — esperar evento error
+      logoImg.addEventListener('error', showFallback, { once: true });
     }
   }
 }

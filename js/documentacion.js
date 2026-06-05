@@ -3,7 +3,7 @@
 import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
-import { uploadPhotoQueued } from './firebase.js';
+import { uploadPhotoQueued, uploadPhoto } from './firebase.js';
 import { icon } from './icons.js';
 
 // ── Vista principal ────────────────────────────────────────────────────────────
@@ -166,6 +166,9 @@ function renderLevantamiento(project, tipo, edit) {
       </div>
     </div>
   `;
+
+  // Reinicializar campos libres con los datos del proyecto (evita estado stale entre navegaciones)
+  _camposLibres = [...(lev.camposLibres || [])];
 
   // Campos dinámicos según tipo de sistema
   const dinamico = renderCamposDinamicos(tipo, lev, edit, pid);
@@ -428,7 +431,16 @@ window.addRecibo = function() {
 };
 window.delRecibo = function(i) { _recibos.splice(i,1); refreshRecibos(); };
 window.capReciboFoto = function(i) {
-  capturePhoto(b64 => { _recibos[i].foto = b64; refreshRecibos(); });
+  capturePhoto(async b64 => {
+    toast('Subiendo foto del recibo…');
+    // Usamos un ID temporal sin projectId ya que los recibos son parte del levantamiento
+    const fid = uuid();
+    const result = await uploadPhotoQueued(b64, `levantamiento/recibo_${fid}.jpg`,
+      'levantamiento_temp', 'reciboFoto');
+    _recibos[i].foto = result.url || (result.pending ? b64 : null);
+    refreshRecibos();
+    if (result.url) toast('✅ Foto del recibo guardada');
+  });
 };
 function refreshRecibos() {
   const panel = document.getElementById('panel-recibos');
@@ -473,7 +485,24 @@ function renderAparatos(aparatos, edit) {
 window.addAparatoRapido = function(a) { _aparatos.push({...a,cantidad:1}); refreshAparatos(); };
 window.addAparato = function() { _aparatos.push({nombre:'',potencia:0,horas:0,cantidad:1}); refreshAparatos(); };
 window.delAparato = function(i) { _aparatos.splice(i,1); refreshAparatos(); };
-function refreshAparatos() { const el=document.getElementById('lista-aparatos'); if(el) el.outerHTML = renderAparatos(_aparatos,true); }
+function refreshAparatos() {
+  const el = document.getElementById('lista-aparatos');
+  if (el) {
+    // Reemplazar solo el contenido del contenedor padre para mantener referencias del DOM
+    el.innerHTML = _aparatos.map((a,i) => `
+      <div class="aparato-row">
+        <input type="text" value="${esc(a.nombre)}" placeholder="Nombre" oninput="_aparatos[${i}].nombre=this.value"/>
+        <input type="number" value="${a.potencia}" placeholder="W" min="0" oninput="_aparatos[${i}].potencia=parseFloat(this.value)||0"/>
+        <input type="number" value="${a.horas}" placeholder="h/día" min="0" step="0.5" oninput="_aparatos[${i}].horas=parseFloat(this.value)||0"/>
+        <input type="number" value="${a.cantidad||1}" placeholder="Cant." min="1" oninput="_aparatos[${i}].cantidad=parseInt(this.value)||1"/>
+        <button type="button" class="btn-del-sm" onclick="delAparato(${i})">✕</button>
+      </div>`).join('');
+    // Actualizar total
+    const totalKwh = _aparatos.reduce((s,a) => s + (a.potencia * a.horas * 30 / 1000), 0);
+    const totEl = el.closest('.card, [id^="panel-aparatos"]')?.querySelector('.kwh-total');
+    if (totEl) totEl.innerHTML = `Total estimado: <strong>${totalKwh.toFixed(0)} kWh/mes</strong>`;
+  }
+}
 
 window.setModoConsumo = function(modo) {
   document.querySelectorAll('#chip-consumo .chip').forEach(c => {
@@ -610,11 +639,14 @@ window._levAutoSave = function(projectId) {
 
 window.capSombraFoto = function(pid) {
   capturePhoto(async b64 => {
+    toast('Subiendo foto de sombra…');
+    const result = await uploadPhotoQueued(b64, `projects/${pid}/sombra.jpg`, pid, 'sombraFoto');
+    const fotoUrl = result.url || (result.pending ? b64 : null);
     const p = await projects.getById(pid);
     p.documentacion = p.documentacion || {};
     p.documentacion.levantamiento = p.documentacion.levantamiento || {};
     p.documentacion.levantamiento.sombras = p.documentacion.levantamiento.sombras || {};
-    p.documentacion.levantamiento.sombras.foto = b64;
+    p.documentacion.levantamiento.sombras.foto = fotoUrl;
     await projects.update(pid, { documentacion: p.documentacion });
     navigate(`#proyecto/${pid}/documentacion`);
   });

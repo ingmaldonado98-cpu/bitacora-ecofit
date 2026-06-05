@@ -144,6 +144,21 @@ body {
   overflow-x: hidden;
 }
 
+/* ── Splash screen ────────────────────────────────────────────────────────── */
+.splash-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 60dvh; gap: 16px;
+  color: var(--g300);
+  animation: splashPulse 1.4s ease-in-out infinite alternate;
+}
+.splash-icon { opacity: .8; }
+.splash-text { font-size: .9rem; color: var(--text-muted); letter-spacing: .04em; }
+
+@keyframes splashPulse {
+  from { opacity: .6; transform: scale(.97); }
+  to   { opacity: 1;  transform: scale(1); }
+}
+
 /* ── Top header (tras login) ──────────────────────────────────────────────── */
 #top-header {
   position: sticky; top: 0; z-index: 50;

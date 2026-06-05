@@ -21,6 +21,16 @@ export function fmtFechaHora(iso) {
 export function fmtRelativa(iso) {
   if (!iso) return '—';
   const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 0) {
+    // Fecha futura
+    const absDiff = Math.abs(diff);
+    const h = Math.floor(absDiff / 3600000);
+    const d = Math.floor(absDiff / 86400000);
+    if (h < 1) return 'ahora mismo';
+    if (h < 24) return `en ${h}h`;
+    if (d < 7) return `en ${d}d`;
+    return fmtFecha(iso);
+  }
   const h = Math.floor(diff / 3600000);
   const d = Math.floor(diff / 86400000);
   if (h < 1) return 'hace un momento';
@@ -407,10 +417,11 @@ export function openScannerOverlay(onResult, { continuous = false, title = 'Esca
 }
 
 // ── Indicador de sync ──────────────────────────────────────────────────────────
+// Solo muestra badge cuando está explícitamente sincronizado con Drive/OneDrive.
+// Si driveSynced es false/undefined (estado normal), no muestra nada — evita confusión.
 export function syncBadge(synced) {
-  if (synced === true)  return '<span class="sync-badge sync-ok" title="Sincronizado">✔</span>';
-  if (synced === false) return '<span class="sync-badge sync-pending" title="Pendiente sync">☁</span>';
-  return '<span class="sync-badge sync-local" title="Guardado local">✅</span>';
+  if (synced === true) return '<span class="sync-badge sync-ok" title="Sincronizado con OneDrive">✔</span>';
+  return '';
 }
 
 // ── Estado labels ──────────────────────────────────────────────────────────────

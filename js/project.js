@@ -2,7 +2,7 @@
 
 import { projects, users, kv } from './db.js';
 import { esc, fmtFecha, fmtFechaHora, fmtRelativa, fmtProjectId, uuid, isoNow, toast,
-         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog,
+         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog, inputDialog,
          capturePhoto, fotoMini, getPendingSrc } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } from './auth.js';
 import { icon } from './icons.js';
@@ -452,7 +452,7 @@ window._submitObs = async function(id) {
     timestamp: isoNow(),
   }];
   await projects.update(id, { observaciones: obs });
-  _refreshObsList(obs, session, id);
+  _refreshObsList(obs, session, id, project);
   document.getElementById('obs-form').style.display = 'none';
   document.getElementById('obs-texto').value = '';
   toast('Observación guardada');
@@ -464,7 +464,7 @@ window._delObs = async function(id, idx) {
   const obs = (project.observaciones || []).filter((_,i) => i !== idx);
   await projects.update(id, { observaciones: obs });
   const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
-  _refreshObsList(obs, session, id);
+  _refreshObsList(obs, session, id, project);
 };
 
 window._resolverObs = async function(id, idx, resolver) {
@@ -485,12 +485,13 @@ window._resolverObs = async function(id, idx, resolver) {
     obs[idx] = rest;
   }
   await projects.update(id, { observaciones: obs });
-  _refreshObsList(obs, session, id);
+  _refreshObsList(obs, session, id, project);
   toast(resolver ? '✓ Observación resuelta' : 'Observación reabierta');
 };
 
-function _refreshObsList(obs, session, projectId) {
-  const edit = isLider(session);
+function _refreshObsList(obs, session, projectId, _project) {
+  // canEdit requiere el proyecto; si no se pasa usamos isLider como fallback conservador
+  const edit = _project ? canEdit(session, _project) : isLider(session);
   const el = document.getElementById('obs-list');
   if (el) el.innerHTML = renderObservaciones(obs, session, projectId, edit);
   const activas   = obs.filter(o => !o.resuelta).length;
@@ -615,11 +616,13 @@ export async function renderProjectForm(id, session) {
     <div class="form-group">
       <label>Técnicos Apoyo</label>
       <div class="chip-group" id="chip-apoyo">
-        ${tecnicos.map(t => `
+        ${tecnicos.filter(t => t.rol === 'apoyo').map(t => `
           <button type="button"
             class="chip ${(project?.tecnicosApoyo||[]).includes(t.id)?'chip-active':''}"
             onclick="toggleApoyo('${t.id}',this)">${esc(t.nombre)}</button>
         `).join('')}
+        ${tecnicos.filter(t => t.rol === 'apoyo').length === 0
+          ? '<span class="hint-text">Sin técnicos de apoyo registrados aún.</span>' : ''}
       </div>
       <input type="hidden" name="tecnicosApoyo" id="apoyo-val"
              value='${JSON.stringify(project?.tecnicosApoyo||[])}'>
@@ -760,6 +763,14 @@ window._submitProject = async function(e, editId) {
   const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
 
   const tipoSistema = fd.get('tipoSistema') || null;
+  if (!tipoSistema) {
+    btn.disabled = false;
+    btn.classList.remove('btn-saving');
+    btn.textContent = btnLabel;
+    toast('Selecciona el tipo de sistema', 'error');
+    document.getElementById('chip-tipo')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   const esPequeno   = tipoSistema === 'sistema_pequeno';
 
   // Coordenadas GPS

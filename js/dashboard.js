@@ -128,7 +128,6 @@ function renderWorkload(all, allUsers) {
   <div class="workload-bar">
     <span class="wl-label">Carga</span>
     ${chips}
-    ${document.getElementById('wl-active') ? '' : ''}
   </div>`;
 }
 

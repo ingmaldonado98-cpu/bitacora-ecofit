@@ -21,8 +21,59 @@ export async function renderSettings(session) {
       <button class="btn-back" onclick="navigate('#dashboard')">${icon('caret-left')}</button>
       <h1 class="hdr-title">Ajustes</h1>
     </div>
-    <p class="empty-msg">Solo el administrador puede gestionar ajustes.</p>`;
+
+    <!-- Perfil del usuario -->
+    <div class="card">
+      <h3 class="card-title">Mi perfil</h3>
+      <div class="user-row" id="urow-self-np">
+        <div class="user-info">
+          <span class="user-nombre">${esc(session.nombre)}</span>
+          <span class="user-username">@${esc(session.username)}</span>
+          <span class="user-rol rol-${session.rol}">${ROLES[session.rol]?.label || session.rol}</span>
+        </div>
+        <div class="user-actions">
+          <button class="btn-icon-sm" onclick="editarMiPerfilNP()" title="Editar mi perfil">✎</button>
+        </div>
+      </div>
+      <div class="form-inline-card" id="uedit-self-np" style="display:none">
+        <p class="hint-text" style="margin-bottom:10px">Puedes editar tu nombre, usuario y contraseña.</p>
+        <div class="form-row">
+          <div class="form-group"><label>Nombre</label>
+            <input type="text" id="ue-np-nombre" value="${esc(session.nombre)}" /></div>
+          <div class="form-group"><label>Usuario</label>
+            <input type="text" id="ue-np-username" value="${esc(session.username)}" /></div>
+        </div>
+        <div class="form-group"><label>Nueva contraseña <span style="color:var(--text-muted);font-size:.75rem">(dejar vacío para no cambiar)</span></label>
+          <input type="password" id="ue-np-pass" placeholder="mín. 6 chars" /></div>
+        <div class="form-actions">
+          <button class="btn-outline btn-sm" onclick="document.getElementById('uedit-self-np').style.display='none';document.getElementById('urow-self-np').style.display=''">Cancelar</button>
+          <button class="btn-primary btn-sm" onclick="guardarMiPerfil('${session.id}')">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info de la app -->
+    <div class="card">
+      <h3 class="card-title">Actualización de la app</h3>
+      <p class="hint-text">Si la app muestra información desactualizada al reconectarte, usa este botón.</p>
+      <div class="form-actions-row" style="margin-top:10px">
+        <button class="btn-primary btn-sm" onclick="window._forceAppUpdate()">🔄 Forzar actualización</button>
+      </div>
+      <p class="hint-text" style="margin-top:8px">Service Worker: <span id="sw-ver">—</span></p>
+    </div>
+
+    <div class="settings-footer">
+      <p>Bitácora Ecofit Solar Solutions · V6</p>
+      <p>La Paz, Baja California Sur · México</p>
+    </div>`;
   }
+
+  // Funciones de perfil para no-admin
+  window.editarMiPerfilNP = function() {
+    document.getElementById('urow-self-np').style.display = 'none';
+    document.getElementById('uedit-self-np').style.display = 'block';
+    document.getElementById('ue-np-nombre')?.focus();
+  };
 
   const [allUsers, contacto, customPanels] = await Promise.all([
     users.getAll(),
@@ -375,9 +426,10 @@ window.cancelarMiPerfil = function() {
 };
 
 window.guardarMiPerfil = async function(id) {
-  const nombre   = document.getElementById('ue-self-nombre')?.value.trim();
-  const username = document.getElementById('ue-self-username')?.value.trim().toLowerCase();
-  const pass     = document.getElementById('ue-self-pass')?.value;
+  // Soporta tanto el form admin (ue-self-*) como el form no-admin (ue-np-*)
+  const nombre   = (document.getElementById('ue-self-nombre')   || document.getElementById('ue-np-nombre'))?.value.trim();
+  const username = (document.getElementById('ue-self-username') || document.getElementById('ue-np-username'))?.value.trim().toLowerCase();
+  const pass     = (document.getElementById('ue-self-pass')     || document.getElementById('ue-np-pass'))?.value;
 
   if (!nombre || !username) { toast('Nombre y usuario son obligatorios', 'error'); return; }
   if (pass && pass.length < 6) { toast('Contraseña mínimo 6 caracteres', 'error'); return; }
@@ -427,7 +479,10 @@ window.guardarEditUser = async function(id) {
   if (!nombre || !username) { toast('Nombre y usuario son obligatorios', 'error'); return; }
 
   try {
-    await users.update(id, { nombre, username, rol, ...(email ? { email } : {}) });
+    // Guardar tanto email (display) como authEmail (usado para reset de contraseña)
+    const update = { nombre, username, rol };
+    if (email) { update.email = email; update.authEmail = email; }
+    await users.update(id, update);
     toast('✅ Usuario actualizado');
     navigate('#settings');
   } catch(err) {
