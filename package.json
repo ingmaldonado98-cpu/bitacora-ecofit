@@ -1,0 +1,11 @@
+{
+  "name": "bitacora-ecofit-v6",
+  "version": "6.0.0",
+  "description": "PWA de gestión de instalaciones fotovoltaicas — Ecofit Solar Solutions",
+  "private": true,
+  "scripts": {
+    "bump-sw": "node scripts/bump-sw-version.js",
+    "bump-sw-dry": "node scripts/bump-sw-version.js --dry",
+    "predeploy": "node scripts/bump-sw-version.js"
+  }
+}

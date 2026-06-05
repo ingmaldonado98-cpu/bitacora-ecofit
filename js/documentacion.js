@@ -13,6 +13,14 @@ export async function renderDocumentacion(projectId, session) {
   const edit = canEdit(session, project);
   const tipo = project.tipoSistema || 'otro';
 
+  // Contar fotos por fase para badges
+  const fases = project.documentacion?.fases || {};
+  const cAntes   = (fases.antes   || []).length;
+  const cDurante = (fases.durante || []).length;
+  const cDespues = (fases.despues || []).length;
+  const cNotas   = (project.documentacion?.notas || []).length;
+  const totalFases = cAntes + cDurante + cDespues;
+
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
@@ -23,40 +31,62 @@ export async function renderDocumentacion(projectId, session) {
   </div>
 
   <div class="tab-bar" id="doc-tabs">
-    <button class="tab-btn tab-active" data-tab="d-lev"    onclick="switchTab('doc-tabs','d-lev',this)">Levantamiento</button>
-    <button class="tab-btn"            data-tab="d-antes"  onclick="switchTab('doc-tabs','d-antes',this)">Antes</button>
-    <button class="tab-btn"            data-tab="d-durante" onclick="switchTab('doc-tabs','d-durante',this)">Durante</button>
-    <button class="tab-btn"            data-tab="d-despues" onclick="switchTab('doc-tabs','d-despues',this)">
-      Cierre ${(project.documentacion?.fases?.despues?.length||0) > 0
-        ? '<span class="tab-badge tab-ok">✓</span>'
-        : ''}
+    <button class="tab-btn tab-active" data-tab="d-lev"
+            onclick="switchTab('doc-tabs','d-lev',this)">
+      ${icon('clipboard-text', 14)} Levantamiento
     </button>
-    <button class="tab-btn"            data-tab="d-notas"  onclick="switchTab('doc-tabs','d-notas',this)">
-      Notas${(project.documentacion?.notas||[]).length ? `<span class="tab-badge tab-ok">${(project.documentacion?.notas||[]).length}</span>` : ''}
+    <button class="tab-btn" data-tab="d-fases"
+            onclick="switchTab('doc-tabs','d-fases',this)">
+      ${icon('camera', 14)} Fases
+      ${totalFases > 0 ? `<span class="tab-badge tab-ok">${totalFases}</span>` : ''}
+    </button>
+    <button class="tab-btn" data-tab="d-notas"
+            onclick="switchTab('doc-tabs','d-notas',this)">
+      ${icon('note', 14)} Notas
+      ${cNotas ? `<span class="tab-badge tab-ok">${cNotas}</span>` : ''}
     </button>
   </div>
 
-  <!-- Fase 1: Levantamiento -->
+  <!-- Tab 1: Levantamiento -->
   <div id="d-lev" class="tab-panel tab-panel-active">
     ${renderLevantamiento(project, tipo, edit)}
   </div>
 
-  <!-- Fase 2: Antes -->
-  <div id="d-antes" class="tab-panel">
-    ${renderFase(project, 'antes', 'Antes de la instalación', projectId, edit)}
+  <!-- Tab 2: Fases (Antes / Durante / Cierre) -->
+  <div id="d-fases" class="tab-panel">
+    <div class="fase-selector">
+      <button class="fase-btn fase-active" id="fase-btn-antes"
+              onclick="switchFase('antes',this,'${projectId}')">
+        <span class="fase-ico">🏗️</span>
+        Antes
+        ${cAntes ? `<span class="fase-count">${cAntes}</span>` : ''}
+      </button>
+      <button class="fase-btn" id="fase-btn-durante"
+              onclick="switchFase('durante',this,'${projectId}')">
+        <span class="fase-ico">🔧</span>
+        Durante
+        ${cDurante ? `<span class="fase-count">${cDurante}</span>` : ''}
+      </button>
+      <button class="fase-btn" id="fase-btn-despues"
+              onclick="switchFase('despues',this,'${projectId}')">
+        <span class="fase-ico">✅</span>
+        Cierre
+        ${cDespues ? `<span class="fase-count">${cDespues}</span>` : ''}
+      </button>
+    </div>
+
+    <div id="fase-panel-antes" class="fase-panel fase-panel-active">
+      ${renderFase(project, 'antes', 'Antes de la instalación', projectId, edit)}
+    </div>
+    <div id="fase-panel-durante" class="fase-panel">
+      ${renderFase(project, 'durante', 'Durante la instalación', projectId, edit)}
+    </div>
+    <div id="fase-panel-despues" class="fase-panel">
+      ${renderFase(project, 'despues', 'Cierre general', projectId, edit, false)}
+    </div>
   </div>
 
-  <!-- Fase 3: Durante -->
-  <div id="d-durante" class="tab-panel">
-    ${renderFase(project, 'durante', 'Durante la instalación', projectId, edit)}
-  </div>
-
-  <!-- Fase 4: Cierre general -->
-  <div id="d-despues" class="tab-panel">
-    ${renderFase(project, 'despues', 'Cierre general', projectId, edit, false)}
-  </div>
-
-  <!-- Notas de documentación -->
+  <!-- Tab 3: Notas -->
   <div id="d-notas" class="tab-panel">
     <div class="card">
       <div class="card-title-row">
@@ -75,6 +105,22 @@ export async function renderDocumentacion(projectId, session) {
       </div>
     </div>
   </div>
+  <script>
+    (function() {
+      const tabTarget  = sessionStorage.getItem('doc-tab-target');
+      const faseTarget = sessionStorage.getItem('doc-fase-target');
+      if (tabTarget) {
+        sessionStorage.removeItem('doc-tab-target');
+        const tabBtn = document.querySelector('[data-tab="' + tabTarget + '"]');
+        if (tabBtn) tabBtn.click();
+      }
+      if (faseTarget) {
+        sessionStorage.removeItem('doc-fase-target');
+        const faseBtn = document.getElementById('fase-btn-' + faseTarget);
+        if (faseBtn) faseBtn.click();
+      }
+    })();
+  </script>
   `;
 }
 
@@ -84,9 +130,38 @@ function renderLevantamiento(project, tipo, edit) {
   const dis = edit ? '' : 'disabled';
   const pid = project.id;
 
-  const commonFields = `
-    <div class="card">
-      <h3 class="card-title">Datos del techo y sitio</h3>
+  // Reinicializar campos libres con los datos del proyecto (evita estado stale)
+  _camposLibres = [...(lev.camposLibres || [])];
+
+  // Detectar si secciones tienen datos para abrir acordeón pre-llenado
+  const hasSitio   = !!(lev.tipTecho || lev.azimut || lev.distTableroInversor);
+  const hasElec    = !!(lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga);
+  const hasSombras = !!(lev.sombras?.checklist?.length || lev.sombras?.foto || lev.sombras?.notas);
+  const hasConsumo = !!(lev.recibos?.length || lev.aparatos?.length || lev.tarifaCFE);
+  const hasCampos  = !!lev.camposLibres?.length;
+
+  // Helper para wrapper de acordeón
+  const acc = (id, title, emoji, open, content) => `
+    <div class="accordion-section">
+      <button type="button" class="accordion-toggle ${open ? 'acc-open' : ''}"
+              onclick="toggleAcc(this,'acc-${id}')">
+        <span class="acc-icon">${emoji}</span>
+        <span class="acc-title">${title}</span>
+        <span class="acc-arrow">▾</span>
+      </button>
+      <div id="acc-${id}" class="accordion-body ${open ? '' : 'acc-collapsed'}">
+        ${content}
+      </div>
+    </div>`;
+
+  // Campos dinámicos según tipo de sistema
+  const dinamico = renderCamposDinamicos(tipo, lev, edit, pid);
+
+  return `
+  <form id="form-levantamiento" onsubmit="guardarLevantamiento(event,'${pid}')"
+        ${edit ? `oninput="_levAutoSave('${pid}')" onchange="_levAutoSave('${pid}')"` : ''}>
+
+    ${acc('sitio', 'Datos del techo y sitio', '🏠', true, `
       <div class="form-row">
         <div class="form-group"><label>Tipo de techo</label>
           <select name="tipTecho" ${dis}>
@@ -115,10 +190,9 @@ function renderLevantamiento(project, tipo, edit) {
       </div>
       <div class="form-group"><label>Área disponible en techo (m²)</label>
         <input type="number" name="areaDisponible" value="${lev.areaDisponible||''}" step="0.5" ${dis}/></div>
-    </div>
+    `)}
 
-    <div class="card">
-      <h3 class="card-title">Estado eléctrico existente</h3>
+    ${acc('elec', 'Estado eléctrico existente', '⚡', hasElec, `
       <div class="form-group"><label>Tipo de servicio CFE</label>
         <select name="tipoServicioCFE" ${dis}>
           ${tipo==='aislado'?'<option value="NA">N/A (sin CFE)</option>':''}
@@ -129,7 +203,8 @@ function renderLevantamiento(project, tipo, edit) {
       <div class="form-row">
         <div class="form-group"><label>Tierra física</label>
           <select name="tierraFisica" ${dis}>
-            ${['Existe','No existe','Deficiente'].map(t=>`<option ${lev.tierraFisica===t?'selected':''}>${t}</option>`).join('')}
+            ${['Existe','No existe','Deficiente'].map(t=>
+              `<option ${lev.tierraFisica===t?'selected':''}>${t}</option>`).join('')}
           </select>
         </div>
         <div class="form-group"><label>Centro de carga</label>
@@ -139,10 +214,9 @@ function renderLevantamiento(project, tipo, edit) {
           </select>
         </div>
       </div>
-    </div>
+    `)}
 
-    <div class="card">
-      <h3 class="card-title">Sombras</h3>
+    ${acc('sombras', 'Análisis de sombras', '🌿', hasSombras, `
       <div class="sombras-check">
         ${['Árboles','Tinacos','Antenas','Edificios','Postes','Otra'].map(s=>`
           <label class="check-chip ${(lev.sombras?.checklist||[]).includes(s)?'check-active':''}">
@@ -156,47 +230,41 @@ function renderLevantamiento(project, tipo, edit) {
         <div class="ft-label">Foto de fuente de sombra (opcional)</div>
         <div class="ft-slot">
           ${lev.sombras?.foto
-            ? `${fotoMini(lev.sombras.foto,'Sombra')}<button class="btn-del-foto" onclick="delSombraFoto('${pid}')">✕</button>`
-            : (edit ? `<button class="btn-foto-sm" onclick="capSombraFoto('${pid}')">${icon('camera')} Foto</button>` : '—')}
+            ? `${fotoMini(lev.sombras.foto,'Sombra')}<button type="button" class="btn-del-foto" onclick="delSombraFoto('${pid}')">✕</button>`
+            : (edit ? `<button type="button" class="btn-foto-sm" onclick="capSombraFoto('${pid}')">${icon('camera')} Foto</button>` : '—')}
         </div>
       </div>
       <div class="form-group" style="margin-top:8px">
         <label>Notas de sombras</label>
         <textarea name="sombraNotas" rows="2" ${dis}>${esc(lev.sombras?.notas||'')}</textarea>
       </div>
-    </div>
-  `;
+    `)}
 
-  // Reinicializar campos libres con los datos del proyecto (evita estado stale entre navegaciones)
-  _camposLibres = [...(lev.camposLibres || [])];
+    ${dinamico ? acc('consumo', 'Consumo y configuración del sistema', '📊', hasConsumo, dinamico) : ''}
 
-  // Campos dinámicos según tipo de sistema
-  const dinamico = renderCamposDinamicos(tipo, lev, edit, pid);
-
-  return `
-  <form id="form-levantamiento" onsubmit="guardarLevantamiento(event,'${pid}')"
-        ${edit ? `oninput="_levAutoSave('${pid}')" onchange="_levAutoSave('${pid}')"` : ''}>
-    ${commonFields}
-    ${dinamico}
-    <div class="form-group">
-      <label>Observaciones generales</label>
-      <textarea name="observacionesGenerales" rows="3" ${dis}>${esc(lev.observacionesGenerales||'')}</textarea>
-    </div>
-    <!-- Campos libres adicionales -->
-    <div class="card">
-      <div class="card-title-row">
-        <h3 class="card-title">Campos adicionales</h3>
-        ${edit?`<button type="button" class="btn-sm btn-outline" onclick="addCampoLibre()">+ Campo</button>`:''}
+    ${acc('obs', 'Observaciones generales', '📝', !!(lev.observacionesGenerales), `
+      <div class="form-group">
+        <textarea name="observacionesGenerales" rows="3" ${dis}
+          placeholder="Condiciones especiales, acuerdos con cliente, pendientes…"
+        >${esc(lev.observacionesGenerales||'')}</textarea>
       </div>
+    `)}
+
+    ${acc('campos', 'Campos adicionales', '➕', hasCampos, `
       <div id="campos-libres">
         ${(lev.camposLibres||[]).map((c,i)=>`
           <div class="campo-libre-row">
-            <input type="text" placeholder="Nombre" value="${esc(c.nombre)}" ${dis} oninput="updCampoLibre(${i},'nombre',this.value)" />
-            <input type="text" placeholder="Valor" value="${esc(c.valor)}" ${dis} oninput="updCampoLibre(${i},'valor',this.value)" />
+            <input type="text" placeholder="Nombre" value="${esc(c.nombre)}" ${dis}
+                   oninput="updCampoLibre(${i},'nombre',this.value)" />
+            <input type="text" placeholder="Valor" value="${esc(c.valor)}" ${dis}
+                   oninput="updCampoLibre(${i},'valor',this.value)" />
             ${edit?`<button type="button" class="btn-del-sm" onclick="delCampoLibre(${i})">✕</button>`:''}
           </div>`).join('')}
       </div>
-    </div>
+      ${edit ? `<button type="button" class="btn-sm btn-outline" style="margin-top:8px"
+                        onclick="addCampoLibre()">+ Agregar campo</button>` : ''}
+    `)}
+
     ${edit?`<div class="form-actions lev-actions">
       <span id="lev-autosave" class="autosave-indicator"></span>
       <button type="submit" class="btn-primary">Guardar levantamiento</button>
@@ -690,6 +758,25 @@ function renderFase(project, fase, titulo, projectId, edit, required=false) {
   `;
 }
 
+// ── Acordeón helper ───────────────────────────────────────────────────────────
+window.toggleAcc = function(btn, bodyId) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  const isOpen = btn.classList.toggle('acc-open');
+  body.classList.toggle('acc-collapsed', !isOpen);
+};
+
+// ── Selector de fases (Antes / Durante / Cierre) ─────────────────────────────
+window.switchFase = function(fase, btn) {
+  // Actualizar botones
+  document.querySelectorAll('.fase-btn').forEach(b => b.classList.remove('fase-active'));
+  btn.classList.add('fase-active');
+  // Actualizar paneles
+  document.querySelectorAll('.fase-panel').forEach(p => p.classList.remove('fase-panel-active'));
+  const panel = document.getElementById(`fase-panel-${fase}`);
+  if (panel) panel.classList.add('fase-panel-active');
+};
+
 window.agregarFoto = function(projectId, fase) {
   capturePhoto(async (b64Array) => {
     const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
@@ -719,12 +806,10 @@ window.agregarFoto = function(projectId, fase) {
     p.documentacion.fases = p.documentacion.fases || { antes:[], durante:[], despues:[] };
     p.documentacion.fases[fase] = [...(p.documentacion.fases[fase]||[]), ...nuevas];
     await projects.update(projectId, { documentacion: p.documentacion });
+    // Guardar target (tab 'fases' + fase específica) para restaurar después del re-render
+    sessionStorage.setItem('doc-tab-target', 'd-fases');
+    sessionStorage.setItem('doc-fase-target', fase);
     navigate(`#proyecto/${projectId}/documentacion`);
-    setTimeout(() => {
-      const tabMap = { antes:'d-antes', durante:'d-durante', despues:'d-despues' };
-      const tabBtn = document.querySelector(`[data-tab="${tabMap[fase]}"]`);
-      if (tabBtn) tabBtn.click();
-    }, 200);
     toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
   }, { multiple: true });
 };

@@ -23,21 +23,42 @@ const app = document.getElementById('app');
 
 // ── Render helper ─────────────────────────────────────────────────────────────
 async function render(html, skeleton = '') {
-  if (typeof html === 'string') {
-    app.innerHTML = html;
-  } else {
-    if (skeleton) app.innerHTML = skeleton;
-    app.innerHTML = await html;
+  try {
+    if (typeof html === 'string') {
+      app.innerHTML = html;
+    } else {
+      if (skeleton) app.innerHTML = skeleton;
+      app.innerHTML = await html;
+    }
+    app.querySelectorAll('script').forEach(oldScript => {
+      const newScript = document.createElement('script');
+      newScript.textContent = oldScript.textContent;
+      oldScript.replaceWith(newScript);
+    });
+    // Fade-in suave entre vistas
+    app.style.animation = 'none';
+    app.offsetHeight; // fuerza reflow para reiniciar la animación
+    app.style.animation = 'viewFadeIn .2s ease';
+  } catch (err) {
+    console.error('[Ecofit] Error al renderizar vista:', err);
+    app.innerHTML = `
+      <div style="padding:32px 20px;text-align:center">
+        <div style="font-size:2.5rem;margin-bottom:12px">⚠️</div>
+        <h2 style="font-family:'DM Serif Display',serif;color:var(--text);margin-bottom:8px">
+          Error al cargar esta vista
+        </h2>
+        <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:20px">
+          ${esc(err.message || 'Error desconocido')}
+        </p>
+        <button class="btn-primary" onclick="navigate('#dashboard')">
+          Volver al inicio
+        </button>
+        <p style="color:var(--text-muted);font-size:.75rem;margin-top:12px">
+          Si el problema persiste, usa <strong>Ajustes → Forzar actualización</strong>.
+        </p>
+      </div>`;
+    app.style.animation = 'viewFadeIn .2s ease';
   }
-  app.querySelectorAll('script').forEach(oldScript => {
-    const newScript = document.createElement('script');
-    newScript.textContent = oldScript.textContent;
-    oldScript.replaceWith(newScript);
-  });
-  // Fade-in suave entre vistas
-  app.style.animation = 'none';
-  app.offsetHeight; // fuerza reflow para reiniciar la animación
-  app.style.animation = 'viewFadeIn .2s ease';
 }
 
 // ── Pull-to-refresh (solo dashboard) ─────────────────────────────────────────

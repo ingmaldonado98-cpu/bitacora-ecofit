@@ -586,12 +586,16 @@ export async function renderProjectForm(id, session) {
     <div class="form-group">
       <label>Tipo de sistema *</label>
       <div class="chip-group" id="chip-tipo">
-        ${Object.entries(TIPOS_SISTEMA).map(([k,v]) => `
-          <button type="button" class="chip ${project?.tipoSistema===k?'chip-active':''}"
-            onclick="selChip('chip-tipo','${k}','tipo-val',this)">${v.label}</button>
-        `).join('')}
+        ${Object.entries(TIPOS_SISTEMA).map(([k,v]) => {
+          // Pre-seleccionar 'interconectado' para proyectos nuevos (el 80% de casos)
+          const isActive = project
+            ? project.tipoSistema === k
+            : k === 'interconectado';
+          return `<button type="button" class="chip ${isActive?'chip-active':''}"
+            onclick="selChip('chip-tipo','${k}','tipo-val',this)">${v.label}</button>`;
+        }).join('')}
       </div>
-      <input type="hidden" name="tipoSistema" id="tipo-val" value="${project?.tipoSistema||''}">
+      <input type="hidden" name="tipoSistema" id="tipo-val" value="${project?.tipoSistema||'interconectado'}">
     </div>
 
     <div class="form-group">
