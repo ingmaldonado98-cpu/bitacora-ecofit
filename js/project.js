@@ -65,6 +65,19 @@ export async function renderProjectDetail(id, session) {
         <span class="meta-val" style="color:${prio.color}">● ${prio.label}</span>
       </div>
     </div>
+    ${project.clienteTelefono ? `
+    <div class="meta-item cliente-tel-row">
+      <span class="meta-lbl">${icon('phone', 12)} Contacto</span>
+      <div class="cliente-tel-actions">
+        <a class="btn-action-tel" href="tel:${esc(project.clienteTelefono.replace(/\D/g,''))}">
+          ${icon('phone', 14)} ${esc(project.clienteTelefono)}
+        </a>
+        <a class="btn-action-wa" href="https://wa.me/52${esc(project.clienteTelefono.replace(/\D/g,'').replace(/^52/,''))}"
+           target="_blank" rel="noopener">
+          ${icon('chat-circle-dots', 14)} WhatsApp
+        </a>
+      </div>
+    </div>` : ''}
     <div class="card-row">
       <div class="meta-item">
         <span class="meta-lbl">Tipo de sistema</span>
@@ -107,27 +120,12 @@ export async function renderProjectDetail(id, session) {
     </div>
   </div>
 
-  <!-- Datos del cliente (solo sistemas pequeños) -->
-  ${project.tipoSistema === 'sistema_pequeno' && (project.clienteFoto || project.clienteTelefono) ? `
+  <!-- Foto del cliente (solo sistemas pequeños) -->
+  ${project.tipoSistema === 'sistema_pequeno' && project.clienteFoto ? `
   <div class="card card-cliente">
-    ${project.clienteFoto ? `
     <div class="cliente-foto-wrap">
       ${fotoMini(getPendingSrc({url: project.clienteFoto}) || project.clienteFoto, 'Foto del cliente')}
-    </div>` : ''}
-    <div class="cliente-info">
-      <span class="meta-lbl">Datos de contacto</span>
-      <span class="cliente-nombre">${esc(project.clientName || '—')}</span>
-      ${project.clienteTelefono ? `
-      <div class="cliente-tel-actions">
-        <a class="btn-action-tel" href="tel:${esc(project.clienteTelefono.replace(/\D/g,''))}">
-          ${icon('phone', 14)} Llamar
-        </a>
-        <a class="btn-action-wa" href="https://wa.me/52${esc(project.clienteTelefono.replace(/\D/g,'').replace(/^52/,''))}"
-           target="_blank" rel="noopener">
-          ${icon('chat-circle-dots', 14)} WhatsApp
-        </a>
-      </div>
-      <span class="cliente-tel-num">${esc(project.clienteTelefono)}</span>` : ''}
+      <span class="meta-lbl" style="margin-top:4px">Foto del cliente</span>
     </div>
   </div>` : ''}
 
@@ -584,6 +582,15 @@ export async function renderProjectForm(id, session) {
     </div>
 
     <div class="form-group">
+      <label>Teléfono / WhatsApp <span class="hint-opt">(opcional)</span></label>
+      <div class="input-icon-wrap">
+        ${icon('phone', 16, 'input-icon')}
+        <input type="tel" name="clienteTelefono" placeholder="Ej: 612 123 4567"
+               value="${esc(project?.clienteTelefono||'')}" />
+      </div>
+    </div>
+
+    <div class="form-group">
       <label>Tipo de sistema *</label>
       <select name="tipoSistema" id="tipo-val"
               onchange="document.getElementById('campos-cliente').style.display=this.value==='sistema_pequeno'?'':'none'">
@@ -634,17 +641,8 @@ export async function renderProjectForm(id, session) {
              value='${JSON.stringify(project?.tecnicosApoyo||[])}'>
     </div>
 
-    <!-- Datos extra para sistema pequeño -->
+    <!-- Foto del cliente — solo para sistema pequeño -->
     <div id="campos-cliente" style="display:${project?.tipoSistema === 'sistema_pequeno' ? '' : 'none'}">
-      <div class="form-section-title">
-        ${icon('user', 14)} Datos del cliente
-        <span class="hint-badge">Solo sistema pequeño</span>
-      </div>
-      <div class="form-group">
-        <label>Teléfono / WhatsApp <span class="hint-opt">(opcional)</span></label>
-        <input type="tel" name="clienteTelefono" placeholder="Ej: 612 123 4567"
-               value="${esc(project?.clienteTelefono||'')}" />
-      </div>
       <div class="form-group">
         <label>Foto del cliente <span class="hint-opt">(referencia visual)</span></label>
         <div class="foto-cliente-form" id="foto-cliente-preview">
