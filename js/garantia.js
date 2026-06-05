@@ -441,16 +441,7 @@ window.scanSerial = function() {
   );
 };
 
-window.scanLoteEstructura = function() {
-  openScannerOverlay(
-    (code) => {
-      const inp = document.getElementById('est-lote');
-      if (inp) { inp.value = code; inp.focus(); }
-      toast(`✅ Lote escaneado: ${code}`);
-    },
-    { continuous: false, title: 'Escanear número de lote — Estructura' }
-  );
-};
+// scanLoteEstructura eliminado — campo Lote removido del formulario de estructura
 
 window.showFormEquipo = function(projectId) {
   const form = document.getElementById('form-equipo');
@@ -591,18 +582,16 @@ function renderEstructura(est, projectId, edit, cfg) {
       </div>
       <div class="card-row">
         <div class="meta-item"><span class="meta-lbl">Modelo</span><span class="meta-val">${esc(est.modelo||'—')}</span></div>
-        <div class="meta-item"><span class="meta-lbl">Lote</span><span class="meta-val">${esc(est.numLote||'—')}</span></div>
-      </div>
-      <div class="card-row">
-        <div class="meta-item"><span class="meta-lbl">Metros riel</span><span class="meta-val">${est.metrosRiel||'—'} m</span></div>
         <div class="meta-item"><span class="meta-lbl">Fijación</span><span class="meta-val">${esc(est.tipoFijacion||'—')}</span></div>
       </div>
       <div class="card-row">
+        <div class="meta-item"><span class="meta-lbl">Metros riel</span><span class="meta-val">${est.metrosRiel||'—'} m</span></div>
         <div class="meta-item"><span class="meta-lbl">Mid-clamps</span><span class="meta-val">${est.midClamps||0} pzas</span></div>
+      </div>
+      <div class="card-row">
         <div class="meta-item"><span class="meta-lbl">End-clamps</span><span class="meta-val">${est.endClamps||0} pzas</span></div>
       </div>
       <div class="eq-fotos">
-        ${fotoMini(est.fotoEtiqueta,'Etiqueta lote')}
         ${fotoMini(est.fotoFrontal,'Frontal')}
         ${fotoMini(est.fotoAngulo,'Ángulo')}
       </div>
@@ -631,16 +620,6 @@ export async function renderEstructuraForm(projectId, session) {
     </div>
     <div class="form-group"><label>Modelo / Referencia</label>
       <input type="text" name="modelo" value="${esc(est.modelo||'')}" /></div>
-    <div class="form-group"><label>Número de lote</label>
-      <div class="serial-row">
-        <input type="text" name="numLote" id="est-lote" value="${esc(est.numLote||'')}" placeholder="Leer etiqueta o escribir" />
-        <button type="button" class="btn-icon" onclick="scanLoteEstructura()" title="Escanear código de lote">
-          ${icon('barcode')}
-        </button>
-        <button type="button" class="btn-icon" onclick="capEqFoto('etiqueta','slot-est-etiq')" title="Foto de etiqueta">${icon('camera')}</button>
-      </div>
-      <div id="slot-est-etiq">${fotoMini(est.fotoEtiqueta,'Etiqueta lote')}</div>
-    </div>
     <div class="form-row">
       <div class="form-group"><label>Metros de riel (m)</label>
         <input type="number" name="metrosRiel" min="0" step="0.1" value="${est.metrosRiel||''}" /></div>
@@ -683,12 +662,11 @@ window.guardarEstructura = async function(e, projectId) {
     marca:             fd.get('marca'),
     sistemaEstructural:fd.get('sistemaEstructural'),
     modelo:            fd.get('modelo').trim(),
-    numLote:           fd.get('numLote').trim(),
+    // numLote eliminado (no se incluye en factura para identificación)
     metrosRiel:        parseFloat(fd.get('metrosRiel'))||0,
     tipoFijacion:      fd.get('tipoFijacion'),
     midClamps:         parseInt(fd.get('midClamps'))||0,
     endClamps:         parseInt(fd.get('endClamps'))||0,
-    fotoEtiqueta:      _eqFotos.etiqueta || p.garantia.estructura?.fotoEtiqueta || null,
     fotoFrontal:       _eqFotos.frontal  || p.garantia.estructura?.fotoFrontal  || null,
     fotoAngulo:        _eqFotos.angulo   || p.garantia.estructura?.fotoAngulo   || null,
     notas:             fd.get('notas').trim(),
