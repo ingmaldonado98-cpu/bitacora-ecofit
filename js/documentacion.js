@@ -456,7 +456,8 @@ function renderLevantamiento(project, tipo, edit) {
       </div>
     `)}
 
-    ${acc('elec_consumo', 'Eléctrico y consumo', '⚡', hasElecConsumo, `
+    ${/* Eléctrico y consumo — no aplica para sistema_pequeno ni otro */
+      !['sistema_pequeno','otro'].includes(tipo) ? acc('elec_consumo', 'Eléctrico y consumo', '⚡', hasElecConsumo, `
       <div class="form-group"><label>Tipo de servicio CFE</label>
         <select name="tipoServicioCFE" ${dis}>
           ${tipo==='aislado'?'<option value="NA">N/A (sin CFE)</option>':''}
@@ -479,7 +480,7 @@ function renderLevantamiento(project, tipo, edit) {
         </div>
       </div>
       ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
-    `)}
+    `) : ''}
 
     ${acc('notas', 'Notas del levantamiento', '📝', hasNotas, `
       <div class="form-group">
