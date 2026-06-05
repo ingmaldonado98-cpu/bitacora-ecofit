@@ -1062,6 +1062,91 @@ body.scanner-native-active > *:not(.scanner-native-ui) { visibility: hidden; }
 .resultado-chip { font-weight: 600; }
 .resultado-banner { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border: 1px solid; border-radius: var(--radius); margin-top: 16px; }
 
+/* ── Auditoría — selector de modo ────────────────────────────────────────── */
+.aud-mode-bar {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.aud-mode-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 12px; border: 1px solid var(--border2); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-muted); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: .82rem; font-weight: 600;
+  transition: all .15s;
+}
+.aud-mode-btn:hover { border-color: var(--g500); color: var(--text); }
+.aud-mode-active {
+  background: var(--g700); border-color: var(--g500); color: var(--g300);
+}
+.aud-mode-sub {
+  font-weight: 400; font-size: .72rem; color: inherit; opacity: .75;
+}
+
+/* ── Auditoría — sección header ──────────────────────────────────────────── */
+.aud-sec-header {
+  font-size: .72rem; font-weight: 700; color: var(--g300); text-transform: uppercase;
+  letter-spacing: .06em; padding: 10px 0 4px; margin-top: 6px;
+  border-bottom: 1px solid var(--g700);
+}
+
+/* ── Auditoría Rápida ────────────────────────────────────────────────────── */
+.aud-rapido-grid { display: flex; flex-direction: column; gap: 0; }
+.aud-rapido-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--border);
+}
+.aud-rapido-label { flex: 1; font-size: .84rem; color: var(--text); }
+.aud-rapido-btns  { display: flex; gap: 4px; flex-shrink: 0; }
+.rq-btn {
+  padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border2);
+  background: var(--bg); font-size: .75rem; font-weight: 700; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all .12s; color: var(--text-muted);
+}
+.rq-btn:disabled { opacity: .5; cursor: default; }
+.rq-active-si { background: rgba(46,189,66,.18); border-color: var(--g500); color: var(--g300); }
+.rq-active-no { background: rgba(239,68,68,.18); border-color: #ef4444; color: #f87171; }
+.rq-active-na { background: rgba(144,184,152,.1); border-color: var(--text-muted); color: var(--text-muted); }
+
+/* ── Auditoría Formal — checklist ────────────────────────────────────────── */
+.aud-formal-item { flex-direction: column; align-items: flex-start; gap: 6px; }
+.aud-formal-main { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.aud-formal-label { font-size: .84rem; color: var(--text); }
+.aud-formal-ref   { font-size: .7rem; color: var(--g300); font-weight: 600; }
+.aud-item-obs-wrap {
+  padding: 0 0 8px 0; width: 100%;
+}
+.aud-item-obs {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 10px; font-size: .78rem; color: var(--text-muted);
+  font-family: 'DM Sans', sans-serif;
+}
+.aud-item-obs-static {
+  font-size: .78rem; color: var(--text-muted); padding: 0 0 8px 0;
+  font-style: italic;
+}
+
+/* ── Auditoría Formal — mediciones ───────────────────────────────────────── */
+.aud-med-table { display: flex; flex-direction: column; gap: 0; margin-top: 8px; }
+.aud-med-header {
+  display: grid; grid-template-columns: 1fr .6fr 1fr;
+  font-size: .7rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em;
+  padding: 6px 4px; border-bottom: 1px solid var(--border2);
+}
+.aud-med-row {
+  display: grid; grid-template-columns: 1fr .6fr 1fr;
+  align-items: center; padding: 9px 4px;
+  border-bottom: 1px solid var(--border); gap: 8px;
+}
+.aud-med-label   { font-size: .82rem; color: var(--text); }
+.aud-med-input-wrap { display: flex; align-items: center; gap: 4px; }
+.aud-med-input {
+  width: 70px; background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 5px 8px; font-size: .85rem; color: var(--text);
+  font-family: 'DM Sans', sans-serif; text-align: right;
+}
+.aud-med-unit  { font-size: .72rem; color: var(--text-muted); min-width: 24px; }
+.aud-med-ref   { font-size: .72rem; color: var(--text-muted); }
+
 /* ── QR ───────────────────────────────────────────────────────────────────── */
 .qr-card { text-align: center; }
 .qr-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
