@@ -2059,3 +2059,9 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
   min-height: 58px; justify-content: center;
 }
 .tool-btn:hover { border-color: var(--g500); color: var(--text); background: var(--surface2); }
+
+/* ── Separador dentro del acordeón eléctrico+consumo ─────────────────────── */
+.lev-sep {
+  border-top: 1px dashed var(--border2);
+  margin: 14px 0 10px;
+}

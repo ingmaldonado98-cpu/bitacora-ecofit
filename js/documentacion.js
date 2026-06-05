@@ -134,11 +134,12 @@ function renderLevantamiento(project, tipo, edit) {
   _camposLibres = [...(lev.camposLibres || [])];
 
   // Detectar si secciones tienen datos para abrir acordeón pre-llenado
-  const hasSitio   = !!(lev.tipTecho || lev.azimut || lev.distTableroInversor);
-  const hasElec    = !!(lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga);
-  const hasSombras = !!(lev.sombras?.checklist?.length || lev.sombras?.foto || lev.sombras?.notas);
-  const hasConsumo = !!(lev.recibos?.length || lev.aparatos?.length || lev.tarifaCFE);
-  const hasCampos  = !!lev.camposLibres?.length;
+  const hasSitio      = !!(lev.tipTecho || lev.distTableroInversor);
+  const hasElecConsumo= !!(lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga ||
+                           lev.recibos?.length || lev.aparatos?.length || lev.tarifaCFE ||
+                           lev.autonomia || lev.cargasCriticas?.length);
+  const hasSombras    = !!(lev.sombras?.checklist?.length || lev.sombras?.foto || lev.sombras?.notas);
+  const hasNotas      = !!(lev.observacionesGenerales);
 
   // Helper para wrapper de acordeón
   const acc = (id, title, emoji, open, content) => `
@@ -177,42 +178,16 @@ function renderLevantamiento(project, tipo, edit) {
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Azimut (°)</label>
-          <input type="number" name="azimut" value="${lev.azimut||''}" placeholder="180" ${dis}/></div>
         <div class="form-group"><label>Inclinación del techo (°)</label>
           <input type="number" name="inclinacion" value="${lev.inclinacion||''}" placeholder="15" ${dis}/></div>
+        <div class="form-group"><label>Área disponible en techo (m²)</label>
+          <input type="number" name="areaDisponible" value="${lev.areaDisponible||''}" step="0.5" ${dis}/></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>Dist. tablero→inversor (m)</label>
           <input type="number" name="distTableroInversor" value="${lev.distTableroInversor||''}" step="0.5" ${dis}/></div>
         <div class="form-group"><label>Dist. inversor→paneles (m)</label>
           <input type="number" name="distInversorPaneles" value="${lev.distInversorPaneles||''}" step="0.5" ${dis}/></div>
-      </div>
-      <div class="form-group"><label>Área disponible en techo (m²)</label>
-        <input type="number" name="areaDisponible" value="${lev.areaDisponible||''}" step="0.5" ${dis}/></div>
-    `)}
-
-    ${acc('elec', 'Estado eléctrico existente', '⚡', hasElec, `
-      <div class="form-group"><label>Tipo de servicio CFE</label>
-        <select name="tipoServicioCFE" ${dis}>
-          ${tipo==='aislado'?'<option value="NA">N/A (sin CFE)</option>':''}
-          ${['Monofásico 127V','Monofásico 220V','Bifásico','Trifásico','N/A (sin CFE)'].map(t=>
-            `<option ${lev.tipoServicioCFE===t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Tierra física</label>
-          <select name="tierraFisica" ${dis}>
-            ${['Existe','No existe','Deficiente'].map(t=>
-              `<option ${lev.tierraFisica===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group"><label>Centro de carga</label>
-          <select name="centroCarga" ${dis}>
-            ${['Disponible','Saturado','Requiere actualización','N/A'].map(t=>
-              `<option ${lev.centroCarga===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
       </div>
     `)}
 
@@ -240,29 +215,37 @@ function renderLevantamiento(project, tipo, edit) {
       </div>
     `)}
 
-    ${dinamico ? acc('consumo', 'Consumo y configuración del sistema', '📊', hasConsumo, dinamico) : ''}
-
-    ${acc('obs', 'Observaciones generales', '📝', !!(lev.observacionesGenerales), `
-      <div class="form-group">
-        <textarea name="observacionesGenerales" rows="3" ${dis}
-          placeholder="Condiciones especiales, acuerdos con cliente, pendientes…"
-        >${esc(lev.observacionesGenerales||'')}</textarea>
+    ${acc('elec_consumo', 'Eléctrico y consumo', '⚡', hasElecConsumo, `
+      <div class="form-group"><label>Tipo de servicio CFE</label>
+        <select name="tipoServicioCFE" ${dis}>
+          ${tipo==='aislado'?'<option value="NA">N/A (sin CFE)</option>':''}
+          ${['Monofásico 127V','Monofásico 220V','Bifásico','Trifásico','N/A (sin CFE)'].map(t=>
+            `<option ${lev.tipoServicioCFE===t?'selected':''}>${t}</option>`).join('')}
+        </select>
       </div>
+      <div class="form-row">
+        <div class="form-group"><label>Tierra física</label>
+          <select name="tierraFisica" ${dis}>
+            ${['Existe','No existe','Deficiente'].map(t=>
+              `<option ${lev.tierraFisica===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Centro de carga</label>
+          <select name="centroCarga" ${dis}>
+            ${['Disponible','Saturado','Requiere actualización','N/A'].map(t=>
+              `<option ${lev.centroCarga===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
     `)}
 
-    ${acc('campos', 'Campos adicionales', '➕', hasCampos, `
-      <div id="campos-libres">
-        ${(lev.camposLibres||[]).map((c,i)=>`
-          <div class="campo-libre-row">
-            <input type="text" placeholder="Nombre" value="${esc(c.nombre)}" ${dis}
-                   oninput="updCampoLibre(${i},'nombre',this.value)" />
-            <input type="text" placeholder="Valor" value="${esc(c.valor)}" ${dis}
-                   oninput="updCampoLibre(${i},'valor',this.value)" />
-            ${edit?`<button type="button" class="btn-del-sm" onclick="delCampoLibre(${i})">✕</button>`:''}
-          </div>`).join('')}
+    ${acc('notas', 'Notas del levantamiento', '📝', hasNotas, `
+      <div class="form-group">
+        <textarea name="observacionesGenerales" rows="4" ${dis}
+          placeholder="Condiciones especiales del sitio, acuerdos con el cliente, materiales extra, pendientes…"
+        >${esc(lev.observacionesGenerales||'')}</textarea>
       </div>
-      ${edit ? `<button type="button" class="btn-sm btn-outline" style="margin-top:8px"
-                        onclick="addCampoLibre()">+ Agregar campo</button>` : ''}
     `)}
 
     ${edit?`<div class="form-actions lev-actions">
@@ -635,19 +618,19 @@ window.guardarLevantamiento = async function(e, projectId) {
 
   const newLev = {
     ...lev,
-    tipTecho:           fd.get('tipTecho'),
-    orientacion:        fd.get('orientacion'),
-    azimut:             parseFloat(fd.get('azimut'))||null,
-    inclinacion:        parseFloat(fd.get('inclinacion'))||null,
-    distTableroInversor:parseFloat(fd.get('distTableroInversor'))||null,
-    distInversorPaneles:parseFloat(fd.get('distInversorPaneles'))||null,
-    areaDisponible:     parseFloat(fd.get('areaDisponible'))||null,
-    tipoServicioCFE:    fd.get('tipoServicioCFE'),
-    tierraFisica:       fd.get('tierraFisica'),
-    centroCarga:        fd.get('centroCarga'),
-    sombras:            { checklist:sombrasChecklist, foto:lev.sombras?.foto||null, notas:fd.get('sombraNotas')||'' },
+    tipTecho:            fd.get('tipTecho'),
+    orientacion:         fd.get('orientacion'),
+    // azimut: eliminado (innecesario en campo)
+    inclinacion:         parseFloat(fd.get('inclinacion'))||null,
+    distTableroInversor: parseFloat(fd.get('distTableroInversor'))||null,
+    distInversorPaneles: parseFloat(fd.get('distInversorPaneles'))||null,
+    areaDisponible:      parseFloat(fd.get('areaDisponible'))||null,
+    tipoServicioCFE:     fd.get('tipoServicioCFE'),
+    tierraFisica:        fd.get('tierraFisica'),
+    centroCarga:         fd.get('centroCarga'),
+    sombras:             { checklist:sombrasChecklist, foto:lev.sombras?.foto||null, notas:fd.get('sombraNotas')||'' },
     observacionesGenerales: fd.get('observacionesGenerales')||'',
-    camposLibres:       _camposLibres.filter(c=>c.nombre),
+    // camposLibres eliminado — reemplazado por observacionesGenerales (Notas del levantamiento)
   };
 
   if (tipo==='interconectado'||tipo==='hibrido'||tipo==='hibrido_respaldo') {
