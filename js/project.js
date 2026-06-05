@@ -129,75 +129,8 @@ export async function renderProjectDetail(id, session) {
     </div>
   </div>` : ''}
 
-  <!-- Progreso rápido -->
-  <div class="progress-chips">
-    <div class="prog-chip ${project.garantia?.fotoSistema ? 'prog-ok' : ''}">
-      <ph-icon name="${project.garantia?.fotoSistema ? 'check-circle' : 'circle'}"></ph-icon>
-      Foto general
-    </div>
-    <div class="prog-chip ${totalPaneles > 0 ? 'prog-ok' : ''}">
-      <ph-icon name="${totalPaneles > 0 ? 'check-circle' : 'circle'}"></ph-icon>
-      ${totalPaneles} paneles
-    </div>
-    <div class="prog-chip ${totalEquipos > 0 ? 'prog-ok' : ''}">
-      <ph-icon name="${totalEquipos > 0 ? 'check-circle' : 'circle'}"></ph-icon>
-      ${totalEquipos} equipos
-    </div>
-    <div class="prog-chip ${project.garantia?.fotosTecnicas?.tableroAC ? 'prog-ok' : ''}">
-      <ph-icon name="${project.garantia?.fotosTecnicas?.tableroAC ? 'check-circle' : 'circle'}"></ph-icon>
-      Tablero AC
-    </div>
-    <div class="prog-chip ${project.garantia?.fotosTecnicas?.inversorEnergizado ? 'prog-ok' : ''}">
-      <ph-icon name="${project.garantia?.fotosTecnicas?.inversorEnergizado ? 'check-circle' : 'circle'}"></ph-icon>
-      Inversor ✓
-    </div>
-    <div class="prog-chip ${(project.documentacion?.fases?.despues?.length > 0) ? 'prog-ok' : ''}">
-      <ph-icon name="${(project.documentacion?.fases?.despues?.length > 0) ? 'check-circle' : 'circle'}"></ph-icon>
-      Foto final
-    </div>
-  </div>
-
-  <!-- Checklist de progreso siempre visible -->
-  ${renderChecklistProgreso(project)}
-
-  <!-- Módulos navegación -->
-  <div class="modules-grid">
-    <button class="module-btn mod-garantia" onclick="navigate('#proyecto/${id}/garantia')">
-      ${icon('seal-check', 30)}
-      <span>Garantía</span>
-      <span class="mod-sub">Equipos · Paneles · Fotos</span>
-    </button>
-    <button class="module-btn mod-docs" onclick="navigate('#proyecto/${id}/documentacion')">
-      ${icon('images', 30)}
-      <span>Documentación</span>
-      <span class="mod-sub">Levantamiento · Fotos</span>
-    </button>
-    ${(admin || isLider(session)) ? `<button class="module-btn mod-auditoria" onclick="navigate('#proyecto/${id}/auditoria')">
-      ${icon('magnifying-glass-plus', 30)}
-      <span>Auditoría</span>
-      <span class="mod-sub">Checklist · Dictamen</span>
-    </button>` : ''}
-    <button class="module-btn mod-qr" onclick="navigate('#proyecto/${id}/qr')">
-      ${icon('qr-code', 30)}
-      <span>QR Cliente</span>
-      <span class="mod-sub">PNG descargable</span>
-    </button>
-    <button class="module-btn mod-calc" onclick="navigate('#calculadora/${id}')">
-      ${icon('calculator', 30)}
-      <span>Calculadora</span>
-      <span class="mod-sub">BOM · Estructura · Montaje</span>
-    </button>
-    <button class="module-btn mod-cl" onclick="navigate('#checklist/${id}')">
-      ${icon('check-square', 30)}
-      <span>Checklist</span>
-      <span class="mod-sub">Herramienta · Revisión · Campo</span>
-    </button>
-    ${admin ? `<button class="module-btn mod-pdf" onclick="navigate('#proyecto/${id}/pdf')">
-      ${icon('file-arrow-down', 30)}
-      <span>Exportar PDF</span>
-      <span class="mod-sub">Cliente · Técnico</span>
-    </button>` : ''}
-  </div>
+  <!-- Módulos con progreso — orden: Documentación → Garantía → Auditoría -->
+  ${renderModulosProgreso(project, id, session, admin)}
 
   <!-- Cambio de estado -->
   ${myTransitions.length ? `
@@ -247,7 +180,95 @@ export async function renderProjectDetail(id, session) {
   `;
 }
 
-// ── Checklist de progreso siempre visible ─────────────────────────────────────
+// ── Módulos con progreso ──────────────────────────────────────────────────────
+function renderModulosProgreso(project, id, session, admin) {
+  // ── Calcular progreso por módulo ──────────────────────────────────────────
+  const doc = project.documentacion || {};
+  const gar = project.garantia || {};
+  const aud = project.auditoria || {};
+  const ft  = gar.fotosTecnicas || {};
+
+  // Documentación: levantamiento + 3 fases
+  const docItems = [
+    { label: 'Levantamiento',  ok: !!(doc.levantamiento?.tipTecho) },
+    { label: `Techo (${doc.fases?.techo?.length||doc.fases?.antes?.length||0})`,
+      ok: (doc.fases?.techo?.length||doc.fases?.antes?.length||0) > 0 },
+    { label: `Proceso (${doc.fases?.proceso?.length||doc.fases?.durante?.length||0})`,
+      ok: (doc.fases?.proceso?.length||doc.fases?.durante?.length||0) > 0 },
+    { label: `Cierre (${doc.fases?.cierre?.length||doc.fases?.despues?.length||0})`,
+      ok: (doc.fases?.cierre?.length||doc.fases?.despues?.length||0) > 0 },
+  ];
+  const docDone = docItems.filter(i=>i.ok).length;
+  const docPct  = Math.round(docDone / docItems.length * 100);
+
+  // Garantía: foto sistema + fotos técnicas + equipos + paneles
+  const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
+  const garItems = [
+    { label: 'Foto del sistema',        ok: !!gar.fotoSistema },
+    { label: 'Fotos técnicas',          ok: !!(ft.tableroAC || ft.inversorEnergizado) },
+    { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
+    { label: `Paneles (${totalPaneles})`,           ok: totalPaneles > 0 },
+  ];
+  const garDone = garItems.filter(i=>i.ok).length;
+  const garPct  = Math.round(garDone / garItems.length * 100);
+
+  // Auditoría: checklist + resultado
+  const checkDone  = (aud.checklist?.length||0);
+  const checkTotal = 11;
+  const audItems = [
+    { label: `Checklist (${checkDone}/${checkTotal})`, ok: checkDone >= checkTotal },
+    { label: 'Resultado',                              ok: !!aud.resultado },
+  ];
+  const audDone = audItems.filter(i=>i.ok).length;
+  const audPct  = Math.round(audDone / audItems.length * 100);
+
+  const puedeAuditoria = admin || isLider(session);
+
+  const modCard = (title, iconName, colorClass, pct, items, link) => `
+    <div class="mod-prog-card ${colorClass}" onclick="navigate('${link}')">
+      <div class="mpc-top">
+        <div class="mpc-icon">${icon(iconName, 22)}</div>
+        <div class="mpc-info">
+          <span class="mpc-title">${title}</span>
+          <div class="mpc-chips">
+            ${items.map(i=>`<span class="mpc-chip ${i.ok?'mpc-ok':''}">${i.ok?'✓ ':''} ${i.label}</span>`).join('')}
+          </div>
+        </div>
+        <div class="mpc-right">
+          <span class="mpc-pct ${pct===100?'mpc-pct-done':''}">${pct}%</span>
+          ${icon('caret-right', 16, 'mpc-arrow')}
+        </div>
+      </div>
+      <div class="mpc-bar-wrap">
+        <div class="mpc-bar ${pct===100?'mpc-bar-done':''}" style="width:${pct}%"></div>
+      </div>
+    </div>`;
+
+  return `
+  <div class="modulos-progreso">
+    ${modCard('Documentación', 'clipboard-text', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`)}
+    ${modCard('Garantía', 'seal-check', 'mpc-gar', garPct, garItems, `#proyecto/${id}/garantia`)}
+    ${puedeAuditoria ? modCard('Auditoría', 'magnifying-glass-plus', 'mpc-aud', audPct, audItems, `#proyecto/${id}/auditoria`) : ''}
+  </div>
+
+  <!-- Herramientas secundarias -->
+  <div class="tools-row">
+    <button class="tool-btn" onclick="navigate('#calculadora/${id}')">
+      ${icon('calculator', 18)}<span>Calculadora</span>
+    </button>
+    <button class="tool-btn" onclick="navigate('#checklist/${id}')">
+      ${icon('check-square', 18)}<span>Checklist</span>
+    </button>
+    <button class="tool-btn" onclick="navigate('#proyecto/${id}/qr')">
+      ${icon('qr-code', 18)}<span>QR Cliente</span>
+    </button>
+    ${admin ? `<button class="tool-btn" onclick="navigate('#proyecto/${id}/pdf')">
+      ${icon('file-arrow-down', 18)}<span>Exportar PDF</span>
+    </button>` : ''}
+  </div>`;
+}
+
+// ── Checklist de progreso (conservado para compatibilidad) ─────────────────────
 function renderChecklistProgreso(project) {
   const totalPaneles = (project.garantia?.paneles?.strings||[])
     .reduce((s,str)=>s+(str.paneles?.length||0),0);
