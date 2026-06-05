@@ -1950,3 +1950,25 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 }
 .fase-panel { display: none; }
 .fase-panel.fase-panel-active { display: block; }
+
+/* ── Dashboard topbar (reemplaza header-brand) ────────────────────────────── */
+.dash-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 0 8px;
+}
+.dash-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.5rem; color: var(--text); letter-spacing: .01em;
+}
+.dash-topbar-actions { display: flex; align-items: center; gap: 8px; }
+.dash-count-badge {
+  font-size: .78rem; color: var(--text-muted);
+  background: var(--surface2); border: 1px solid var(--border);
+  padding: 3px 10px; border-radius: 20px;
+}
+
+/* Tarjeta de concluido (variante más compacta) */
+.project-card-conc {
+  opacity: .85;
+}
+.project-card-conc:hover { opacity: 1; }

@@ -9,6 +9,7 @@ import { renderAuditoria } from './auditoria.js';
 import { renderQR } from './qr.js';
 import { renderPDFExport } from './pdf.js';
 import { renderSettings } from './settings.js';
+import { renderConcluidos } from './concluidos.js';
 import { renderInventario } from './inventario.js';
 import { renderCalculadora } from './calculadora.js';
 import { renderChecklistModule, renderChecklistsList } from './checklist.js';
@@ -190,6 +191,10 @@ async function route() {
 
       case 'checklist':
         await render(renderChecklistModule(id, session));
+        break;
+
+      case 'concluidos':
+        await render(renderConcluidos(session));
         break;
 
       case 'settings':

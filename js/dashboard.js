@@ -18,25 +18,21 @@ export async function renderDashboard(session) {
   _tecnicoFilter = null;
   _page = 0;
   const [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
-  const stats = calcStats(all);
 
-  const pendientes = all.filter(p => p.estado === 'pendiente_revision')
+  // Proyectos activos = todo excepto cerrado y cancelado
+  const activos = all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
+  const stats = calcStats(activos);
+
+  const pendientes = activos.filter(p => p.estado === 'pendiente_revision')
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
   updateNavBadge(pendientes.length);
 
   return `
-  <div class="view-header">
-    <div class="header-brand">
-      <svg width="28" height="28" viewBox="0 0 256 256" fill="currentColor" class="brand-sun">
-        <path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/>
-      </svg>
-      <div>
-        <h1 class="brand-title">Ecofit Solar</h1>
-        <span class="brand-sub">Bitácora de Instalaciones</span>
-      </div>
-    </div>
-    <div class="header-actions">
-      ${isLider(session) ? `<button class="btn-icon-hdr" onclick="navigate('#nuevo-proyecto')" title="Nuevo proyecto">
+  <div class="dash-topbar">
+    <h1 class="dash-title">Proyectos</h1>
+    <div class="dash-topbar-actions">
+      ${isLider(session) ? `
+      <button class="btn-icon-hdr" onclick="navigate('#nuevo-proyecto')" title="Nuevo proyecto">
         <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
           <path d="M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z"/>
         </svg>
@@ -46,19 +42,10 @@ export async function renderDashboard(session) {
           <path d="M228.92,49.69a8,8,0,0,0-6.86-1.45L160.93,63.52,99.58,32.84a8,8,0,0,0-6.37-.4L29.21,55.07A8,8,0,0,0,24,62.46V200a8,8,0,0,0,9.94,7.76l61.13-15.28,61.35,30.68A8.15,8.15,0,0,0,160,224a8,8,0,0,0,2.06-.27l64-16A8,8,0,0,0,232,200V56A8,8,0,0,0,228.92,49.69ZM104,52.94l48,24V203.06l-48-24ZM40,74.08l48-17.11V188.17L40,200.33ZM216,181.92l-48,12V62.94l48-12Z"/>
         </svg>
       </button>
-      <button class="btn-icon-hdr" onclick="navigate('#settings')" title="Ajustes">
-        <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
-          <path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,72a24,24,0,1,1,24-24A24,24,0,0,1,128,152Zm109.94-52.79a12,12,0,0,0-7.27-9.6l-15.53-6.07L225,70.79a12,12,0,0,0-2.63-13c-4.68-4.69-11.81-5.85-17.79-3.88l-15.3,5.2-9.47-12.83a12,12,0,0,0-12.65-4.41l-17.06,4.5-4.93-15.51A12,12,0,0,0,133.5,23h-11a12,12,0,0,0-11.67,8.87L106,47.38,88.94,42.88a12,12,0,0,0-12.65,4.41L66.82,60.12,51.52,54.92c-6-1.97-13.11-.81-17.79,3.88A12,12,0,0,0,31.1,71.93l9.86,12.61L25.43,90.61a12,12,0,0,0-7.27,9.6A102.4,102.4,0,0,0,17,112a102.4,102.4,0,0,0,1.16,11.79,12,12,0,0,0,7.27,9.6l15.53,6.07L31,152.79a12,12,0,0,0,2.63,13c4.68,4.68,11.81,5.85,17.79,3.87l15.3-5.19,9.47,12.83a12,12,0,0,0,12.65,4.41l17.06-4.5,4.93,15.51A12,12,0,0,0,122.5,201h11a12,12,0,0,0,11.67-8.87l4.88-15.51,17.06,4.5a12,12,0,0,0,12.65-4.41l9.47-12.83,15.3,5.19c6,2,13.11.81,17.79-3.87a12,12,0,0,0,2.63-13l-9.86-12.62,15.53-6.07a12,12,0,0,0,7.27-9.6A102.4,102.4,0,0,0,239,112,102.4,102.4,0,0,0,237.84,100.21Z"/>
-        </svg>
-      </button>
     </div>
   </div>
 
   <div class="stats-row">
-    <div class="stat-pill">
-      <span class="sp-num">${stats.total}</span>
-      <span class="sp-lbl">Total</span>
-    </div>
     <div class="stat-pill sp-active">
       <span class="sp-num">${stats.en_progreso}</span>
       <span class="sp-lbl">En progreso</span>
@@ -67,24 +54,24 @@ export async function renderDashboard(session) {
       <span class="sp-num">${stats.pendiente_revision}</span>
       <span class="sp-lbl">Por revisar</span>
     </div>
-    <div class="stat-pill sp-closed">
-      <span class="sp-num">${stats.cerrado}</span>
-      <span class="sp-lbl">Cerrados</span>
+    <div class="stat-pill">
+      <span class="sp-num">${stats.total}</span>
+      <span class="sp-lbl">Activos</span>
     </div>
   </div>
 
   ${isAdmin(session) && pendientes.length ? renderParaRevisar(pendientes, allUsers) : ''}
-  ${isAdmin(session) ? renderWorkload(all, allUsers) : ''}
 
   <div class="search-filter-bar">
     <div class="search-wrap">
       <ph-icon name="magnifying-glass" class="search-icon"></ph-icon>
-      <input type="search" id="dash-search" placeholder="Buscar por ID, cliente, serial…"
+      <input type="search" id="dash-search" placeholder="Buscar por nombre, cliente, serial…"
              oninput="window._dashSearch(this.value)" class="search-input" />
     </div>
     <select id="dash-filter-estado" class="filter-select" onchange="window._dashFilter()">
       <option value="">Todos los estados</option>
-      ${Object.entries(ESTADOS).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
+      ${Object.entries(ESTADOS).filter(([k]) => !['cerrado','cancelado'].includes(k))
+        .map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
     </select>
     <select id="dash-filter-tipo" class="filter-select" onchange="window._dashFilter()">
       <option value="">Todos los tipos</option>
@@ -93,7 +80,7 @@ export async function renderDashboard(session) {
   </div>
 
   <div id="projects-list">
-    ${renderProjectList(all)}
+    ${renderProjectList(activos)}
   </div>
 
   ${isLider(session) ? `
@@ -135,7 +122,8 @@ function renderWorkload(all, allUsers) {
 let _allProjects = [];
 
 export function initDashboardFilters(all) {
-  _allProjects = all;
+  // Solo proyectos activos en el dashboard principal
+  _allProjects = all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
 }
 
 const PAGE_SIZE = 20;
@@ -155,7 +143,8 @@ window._dashSearch = function(q) {
   clearTimeout(_searchTimer);
   _searchTimer = setTimeout(async () => {
     const all = q.trim() ? await projects.search(q) : await projects.getAll();
-    _allProjects = all;
+    // El dashboard solo muestra proyectos activos (no cerrados ni cancelados)
+    _allProjects = all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
     _page = 0;
     applyFilters();
   }, 350);
@@ -285,8 +274,10 @@ function renderParaRevisar(pendientes, allUsers) {
   </div>`;
 }
 
-function calcStats(all) {
-  const r = { total: all.length, en_progreso: 0, pendiente_revision: 0, cerrado: 0 };
-  all.forEach(p => { if (r[p.estado] !== undefined) r[p.estado]++; });
+function calcStats(list) {
+  const r = { total: list.length, en_progreso: 0, pendiente_revision: 0 };
+  list.forEach(p => { if (r[p.estado] !== undefined) r[p.estado]++; });
   return r;
 }
+
+// ── También actualizar el _dashSearch para excluir cerrados ──────────────────
