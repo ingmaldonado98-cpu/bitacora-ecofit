@@ -450,7 +450,7 @@ export async function renderChecklistsList(session) {
     const cfg = p.projectConfig || null;
     const techo = cfg?.techo || cl.techo || 'cemento';
     const herr = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
-    const cons = cfg ? getConsumibles(cfg.estructura, cfg.base, techo) : [];
+    const cons = cfg ? (cfg.computed?.consumibles || []) : [];
 
     const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length;
     const doneItems  =

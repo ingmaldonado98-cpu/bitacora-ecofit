@@ -83,6 +83,9 @@ export async function renderAuditoria(projectId, session) {
 
   _edit = edit;
   _projectId = projectId;
+  _rapidoMap = { ...(aud.rapidoChecklist || {}) };
+  _formalMap = { ...(aud.formalChecklist || {}) };
+  _formalObs = { ...(aud.formalObs || {}) };
 
   return `
   <div class="view-header">
@@ -106,13 +109,13 @@ export async function renderAuditoria(projectId, session) {
   </div>
 
   <div id="aud-content">
-    ${modo === 'rapido' ? renderRapido(project, aud, edit) : renderFormal(project, aud, edit)}
+    ${modo === 'rapido' ? renderRapido(project, aud, edit, session) : renderFormal(project, aud, edit)}
   </div>
   `;
 }
 
 // ── Modo Rápido ───────────────────────────────────────────────────────────────
-function renderRapido(project, aud, edit) {
+function renderRapido(project, aud, edit, session) {
   const cl = aud.rapidoChecklist || {};
   const done = CHECKLIST_RAPIDO.filter(i => cl[i.id]).length;
   const total = CHECKLIST_RAPIDO.length;

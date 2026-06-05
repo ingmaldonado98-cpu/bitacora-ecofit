@@ -469,8 +469,7 @@ window.guardarEditUser = async function(id) {
   const email = document.getElementById('ue-email-' + id)?.value.trim() || null;
 
   try {
-    const update = { rol };
-    if (email) { update.email = email; update.authEmail = email; }
+    const update = { rol, email: email || null, authEmail: email || null };
     await users.update(id, update);
     toast('✅ Usuario actualizado');
     navigate('#settings');
