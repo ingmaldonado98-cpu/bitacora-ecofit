@@ -361,26 +361,20 @@ function renderUsersList(allUsers, session) {
 
     ${u.id !== session.id ? `
     <div class="form-inline-card" id="uedit-${u.id}" style="display:none">
-      <div class="form-row">
-        <div class="form-group"><label>Nombre</label>
-          <input type="text" id="ue-nombre-${u.id}" value="${esc(u.nombre)}" /></div>
-        <div class="form-group"><label>Usuario</label>
-          <input type="text" id="ue-username-${u.id}" value="${esc(u.username)}" /></div>
-      </div>
+      <p class="hint-text" style="margin-bottom:10px">
+        🔒 El nombre y contraseña solo los puede cambiar el propio usuario desde su sesión.
+      </p>
       <div class="form-row">
         <div class="form-group"><label>Rol</label>
           <select id="ue-rol-${u.id}">
             ${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.rol===k?'selected':''}>${v.label}</option>`).join('')}
           </select>
         </div>
+        <div class="form-group">
+          <label>Email de recuperación <span style="color:var(--text-muted);font-size:.75rem">(para reset de contraseña)</span></label>
+          <input type="email" id="ue-email-${u.id}" value="${esc(u.authEmail||u.email||'')}" placeholder="correo@gmail.com" />
+        </div>
       </div>
-      <div class="form-group">
-        <label>Email de recuperación <span style="color:var(--text-muted);font-size:.75rem">(para reset de contraseña)</span></label>
-        <input type="email" id="ue-email-${u.id}" value="${esc(u.email||'')}" placeholder="correo@gmail.com" />
-      </div>
-      <p class="hint-text" style="margin:4px 0">
-        🔒 La contraseña solo puede cambiarla el propio usuario desde su sesión.
-      </p>
       <div class="form-actions">
         <button class="btn-outline btn-sm" onclick="document.getElementById('uedit-${u.id}').style.display='none';document.getElementById('urow-${u.id}').style.display=''">Cancelar</button>
         <button class="btn-primary btn-sm" onclick="guardarEditUser('${u.id}')">Guardar</button>
@@ -471,16 +465,11 @@ window.editarUser = function(id) {
 };
 
 window.guardarEditUser = async function(id) {
-  const nombre   = document.getElementById('ue-nombre-' + id).value.trim();
-  const username = document.getElementById('ue-username-' + id).value.trim().toLowerCase();
-  const rol      = document.getElementById('ue-rol-' + id).value;
-  const email    = document.getElementById('ue-email-' + id)?.value.trim() || null;
-
-  if (!nombre || !username) { toast('Nombre y usuario son obligatorios', 'error'); return; }
+  const rol   = document.getElementById('ue-rol-' + id).value;
+  const email = document.getElementById('ue-email-' + id)?.value.trim() || null;
 
   try {
-    // Guardar tanto email (display) como authEmail (usado para reset de contraseña)
-    const update = { nombre, username, rol };
+    const update = { rol };
     if (email) { update.email = email; update.authEmail = email; }
     await users.update(id, update);
     toast('✅ Usuario actualizado');

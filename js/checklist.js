@@ -23,7 +23,9 @@ export async function renderChecklistModule(projectId, session) {
   const base       = cfg?.base || null;
 
   const herramienta = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
-  const consumibles = cfg ? getConsumibles(estructura, base, techo) : [];
+  const consumibles = cfg
+    ? (cfg.computed?.consumibles || []).map(c => ({ n: c.nombre, unit: c.unit, qty: c.qty }))
+    : [];
   const bomItems  = cfg?.computed?.bom || [];
   const doneHerr  = herramienta.filter(h => cl.herr?.[h.id]).length;
   const doneCons  = consumibles.filter((_, i) => cl.cons?.[String(i)]).length;
@@ -100,11 +102,11 @@ export async function renderChecklistModule(projectId, session) {
   <div id="cl-cons" class="tab-panel">
     ${cfg ? (() => {
       // ── Agrupar BOM por categoría ──────────────────────────────────────────
-      const grpOrder = ['rieles','bases','abrazaderas','accesorios','otro'];
-      const grpLabel = { rieles:'Rieles', bases:'Bases', abrazaderas:'Abrazaderas', accesorios:'Accesorios', otro:'Otros' };
+      const grpOrder = ['rieles','bases','abrazaderas','accesorios','tierra','otro'];
+      const grpLabel = { rieles:'Rieles', bases:'Bases', abrazaderas:'Abrazaderas', accesorios:'Accesorios', tierra:'Tierra / Puesta a tierra', otro:'Otros' };
       const bomByGrp = {};
       bomItems.forEach((item, i) => {
-        const g = item.grp || 'otro';
+        const g = (item.grp || 'otro').toLowerCase();
         if (!bomByGrp[g]) bomByGrp[g] = [];
         bomByGrp[g].push({ ...item, _idx: i });
       });
@@ -136,8 +138,6 @@ export async function renderChecklistModule(projectId, session) {
       </div>` : '';
 
       // ── Consumibles ────────────────────────────────────────────────────────
-      const qtyMap = {};
-      (cfg.computed?.consumibles || []).forEach(c => { qtyMap[c.nombre] = c; });
       const consSection = consumibles.length ? `
       <div class="card">
         <div class="card-title-row">
@@ -146,24 +146,17 @@ export async function renderChecklistModule(projectId, session) {
         </div>
         ${renderProgress(doneCons, consumibles.length)}
         <div class="cl-item-list">
-          ${consumibles.map((c, i) => {
-            const match = qtyMap[c.n];
-            const qtyBadge = match
-              ? `<span class="cl-qty-badge">${match.qty} ${match.unit}</span>`
-              : '';
-            return `
+          ${consumibles.map((c, i) => `
             <label class="cl-item ${cl.cons?.[String(i)] ? 'cl-item-done' : ''}">
               <input type="checkbox" ${cl.cons?.[String(i)] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
                 onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleCons('${projectId}',${i},this.checked)">
               <div class="cl-item-text" style="flex:1">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                   <span class="cl-item-name">${esc(c.n)}</span>
-                  ${qtyBadge}
+                  ${c.qty != null ? `<span class="cl-qty-badge">${c.qty} ${c.unit}</span>` : ''}
                 </div>
-                ${c.note ? `<span class="cl-item-note">${esc(c.note)}</span>` : ''}
               </div>
-            </label>`;
-          }).join('')}
+            </label>`).join('')}
         </div>
       </div>` : '';
 
