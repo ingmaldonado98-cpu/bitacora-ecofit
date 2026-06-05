@@ -247,9 +247,26 @@ export function cambioEstadoDialog(estadoLabel, notaRequerida) {
 }
 
 // ── Número de proyecto ─────────────────────────────────────────────────────────
+// Legado — conservado por compatibilidad con proyectos anteriores
 export function fmtProjectId(counter) {
   const year = new Date().getFullYear();
   return `EFS-${year}-${String(counter).padStart(4, '0')}`;
+}
+
+// Nuevo formato: Apellido / DD-Mmm / TipoSistema
+// Ejemplo: García / 15-Ene / Interconectado
+export function genDisplayId(clientName, dateIso, tipoSistema) {
+  const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  // Usar el último apellido (última palabra del nombre)
+  const palabras = (clientName || 'Cliente').trim().split(/\s+/);
+  const apellido = palabras.length > 1 ? palabras[palabras.length - 1] : palabras[0];
+  // Fecha de creación
+  const d = new Date(dateIso || new Date());
+  const dia = d.getDate();
+  const mes = MESES[d.getMonth()];
+  // Tipo de sistema
+  const tipoLabel = TIPOS_SISTEMA[tipoSistema]?.label || tipoSistema || 'General';
+  return `${apellido} / ${dia}-${mes} / ${tipoLabel}`;
 }
 
 // ── Obtener URL de una foto (maneja pendientes offline) ────────────────────────

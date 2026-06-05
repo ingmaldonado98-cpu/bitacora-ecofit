@@ -1,7 +1,7 @@
 // project.js — Creación, detalle y gestión del proyecto
 
 import { projects, users, kv } from './db.js';
-import { esc, fmtFecha, fmtFechaHora, fmtRelativa, fmtProjectId, uuid, isoNow, toast,
+import { esc, fmtFecha, fmtFechaHora, fmtRelativa, fmtProjectId, genDisplayId, uuid, isoNow, toast,
          ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog, inputDialog,
          capturePhoto, fotoMini, getPendingSrc } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } from './auth.js';
@@ -815,10 +815,12 @@ window._submitProject = async function(e, editId) {
       toast('Proyecto actualizado');
       navigate(`#proyecto/${editId}`);
     } else {
-      const counter = await kv.inc('project_counter', 1);
+      const createdAt = isoNow();
+      // Generar ID legible: Apellido / DD-Mmm / TipoSistema
+      const displayId = genDisplayId(data.clientName, createdAt, data.tipoSistema);
       const newProject = {
         id: uuid(),
-        displayId: fmtProjectId(counter),
+        displayId,
         ...data,
         estado: 'borrador',
         observaciones: [],
@@ -827,8 +829,8 @@ window._submitProject = async function(e, editId) {
         auditoria: null,
         driveSynced: false,
         createdBy: session?.id,
-        createdAt: isoNow(),
-        updatedAt: isoNow(),
+        createdAt,
+        updatedAt: createdAt,
       };
       await projects.add(newProject);
       toast(`Proyecto ${newProject.displayId} creado`);
