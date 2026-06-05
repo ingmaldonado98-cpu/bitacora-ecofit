@@ -25,10 +25,11 @@ if (!fs.existsSync(SW_PATH)) {
 }
 
 const content    = fs.readFileSync(SW_PATH, 'utf8');
-const match      = content.match(/(ecofit-v)(\d+)/);
+// Buscar el patrón de versión de build: 'ecofit-v6-v31' → incrementa el último número
+const match = content.match(/(ecofit-v\d+-v)(\d+)/);
 
 if (!match) {
-  console.error('❌ No se encontró el patrón "ecofit-vN" en sw.js');
+  console.error('❌ No se encontró el patrón "ecofit-v6-vN" en sw.js');
   process.exit(1);
 }
 
