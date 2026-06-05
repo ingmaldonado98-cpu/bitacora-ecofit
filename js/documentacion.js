@@ -274,7 +274,7 @@ function renderLevantamiento(project, tipo, edit) {
 
 function renderCamposDinamicos(tipo, lev, edit, pid) {
   const dis = edit ? '' : 'disabled';
-  if (tipo === 'interconectado' || tipo === 'hibrido') {
+  if (tipo === 'interconectado' || tipo === 'hibrido' || tipo === 'hibrido_respaldo') {
     return `
     <div class="card">
       <h3 class="card-title">Tarifa CFE</h3>
@@ -298,7 +298,7 @@ function renderCamposDinamicos(tipo, lev, edit, pid) {
         ${renderAparatos(lev.aparatos||[], edit)}
       </div>
     </div>
-    ${tipo==='hibrido'?`
+    ${(tipo==='hibrido'||tipo==='hibrido_respaldo')?`
     <div class="card">
       <h3 class="card-title">Configuración híbrida</h3>
       <div class="form-row">
@@ -383,10 +383,12 @@ function renderCamposDinamicos(tipo, lev, edit, pid) {
     </div>`;
   }
 
+  // 'respaldo' es legacy — los nuevos proyectos usan 'hibrido_respaldo'
+  // Se mantiene por compatibilidad con datos anteriores
   if (tipo === 'respaldo') {
     return `
     <div class="card">
-      <h3 class="card-title">Sistema de respaldo</h3>
+      <h3 class="card-title">Sistema de respaldo / Cargas</h3>
       <div class="form-group"><label>Tiempo de respaldo requerido (horas)</label>
         <input type="number" name="tiempoRespaldo" value="${lev.tiempoRespaldo||''}" min="0" step="0.5" ${dis}/></div>
       <div class="form-group"><label>Cargas a respaldar</label>
@@ -648,12 +650,15 @@ window.guardarLevantamiento = async function(e, projectId) {
     camposLibres:       _camposLibres.filter(c=>c.nombre),
   };
 
-  if (tipo==='interconectado'||tipo==='hibrido') {
+  if (tipo==='interconectado'||tipo==='hibrido'||tipo==='hibrido_respaldo') {
     newLev.tarifaCFE   = fd.get('tarifaCFE');
     newLev.modoConsumo = modoConsumo;
     newLev.recibos     = modoConsumo==='recibo' ? _recibos : [];
     newLev.aparatos    = modoConsumo==='aparatos' ? _aparatos : [];
-    if (tipo==='hibrido') { newLev.autonomia=parseFloat(fd.get('autonomia'))||null; newLev.bancoBaterias=parseFloat(fd.get('bancoBaterias'))||null; }
+    if (tipo==='hibrido'||tipo==='hibrido_respaldo') {
+      newLev.autonomia     = parseFloat(fd.get('autonomia'))||null;
+      newLev.bancoBaterias = parseFloat(fd.get('bancoBaterias'))||null;
+    }
   }
   if (tipo==='aislado') {
     newLev.autonomia=parseFloat(fd.get('autonomia'))||null;
@@ -671,7 +676,7 @@ window.guardarLevantamiento = async function(e, projectId) {
     newLev.profundidadPozo = parseFloat(fd.get('profundidadPozo'))||null;
     newLev.horasBombeo     = parseFloat(fd.get('horasBombeo'))||null;
   }
-  if (tipo==='respaldo') {
+  if (tipo==='respaldo') { // legacy
     newLev.tiempoRespaldo  = parseFloat(fd.get('tiempoRespaldo'))||null;
     newLev.cargasRespaldo  = _cargas.critica;
   }

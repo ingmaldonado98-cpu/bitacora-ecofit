@@ -585,17 +585,19 @@ export async function renderProjectForm(id, session) {
 
     <div class="form-group">
       <label>Tipo de sistema *</label>
-      <div class="chip-group" id="chip-tipo">
-        ${Object.entries(TIPOS_SISTEMA).map(([k,v]) => {
-          // Pre-seleccionar 'interconectado' para proyectos nuevos (el 80% de casos)
-          const isActive = project
-            ? project.tipoSistema === k
-            : k === 'interconectado';
-          return `<button type="button" class="chip ${isActive?'chip-active':''}"
-            onclick="selChip('chip-tipo','${k}','tipo-val',this)">${v.label}</button>`;
-        }).join('')}
-      </div>
-      <input type="hidden" name="tipoSistema" id="tipo-val" value="${project?.tipoSistema||'interconectado'}">
+      <select name="tipoSistema" id="tipo-val"
+              onchange="document.getElementById('campos-cliente').style.display=this.value==='sistema_pequeno'?'':'none'">
+        ${Object.entries(TIPOS_SISTEMA)
+          .filter(([,v]) => !v.legacy)
+          .map(([k,v]) => {
+            const selected = project
+              ? (project.tipoSistema === k ||
+                 // compatibilidad: hibrido/respaldo legacy → hibrido_respaldo
+                 (k === 'hibrido_respaldo' && ['hibrido','respaldo'].includes(project.tipoSistema)))
+              : k === 'interconectado';
+            return `<option value="${k}" ${selected?'selected':''}>${v.label}</option>`;
+          }).join('')}
+      </select>
     </div>
 
     <div class="form-group">
@@ -853,12 +855,11 @@ window._importCalc = async function(e) {
     // Pre-fill form fields from calculator JSON
     if (data.clientName) document.querySelector('[name="clientName"]').value = data.clientName;
     if (data.tipo) {
-      const map = { interconectado:'interconectado', hibrido:'hibrido', aislado:'aislado', bombeo:'bombeo' };
-      const tipo = map[data.tipo] || data.tipo;
-      document.getElementById('tipo-val').value = tipo;
-      document.querySelectorAll('#chip-tipo .chip').forEach(c => {
-        c.classList.toggle('chip-active', c.textContent.trim() === TIPOS_SISTEMA[tipo]?.label);
-      });
+      // Mapear tipos legacy al nuevo esquema
+      const legacyMap = { hibrido: 'hibrido_respaldo', respaldo: 'hibrido_respaldo' };
+      const tipo = legacyMap[data.tipo] || data.tipo;
+      const sel = document.getElementById('tipo-val');
+      if (sel) sel.value = tipo;
     }
     toast('✅ Datos importados — completa el formulario y crea el proyecto');
   } catch(err) {

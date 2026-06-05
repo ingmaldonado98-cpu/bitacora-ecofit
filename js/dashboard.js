@@ -75,7 +75,7 @@ export async function renderDashboard(session) {
     </select>
     <select id="dash-filter-tipo" class="filter-select" onchange="window._dashFilter()">
       <option value="">Todos los tipos</option>
-      ${Object.entries(TIPOS_SISTEMA).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
+      ${Object.entries(TIPOS_SISTEMA).filter(([,v]) => !v.legacy).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
     </select>
   </div>
 
