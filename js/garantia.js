@@ -48,7 +48,7 @@ export async function renderGarantia(projectId, session) {
   <!-- Equipos — ahora es el tab activo por defecto -->
   <div id="g-equipos" class="tab-panel tab-panel-active">
     <div class="card-title-row" style="padding:0 0 12px">
-      <h3 class="card-title">1C · Equipos instalados (${(g.equipos||[]).length})</h3>
+      <h3 class="card-title">Equipos instalados (${(g.equipos||[]).length})</h3>
       ${edit ? `<button class="btn-primary btn-sm" onclick="showFormEquipo('${projectId}')">+ Equipo</button>` : ''}
     </div>
     <div id="lista-equipos">
@@ -62,7 +62,7 @@ export async function renderGarantia(projectId, session) {
   <!-- 1D: Estructura -->
   <div id="g-estructura" class="tab-panel">
     <div class="card">
-      <h3 class="card-title">1D · Estructura de montaje</h3>
+      <h3 class="card-title">Estructura de montaje</h3>
       ${renderEstructura(g.estructura, projectId, edit, project.projectConfig)}
     </div>
   </div>
@@ -684,7 +684,7 @@ function renderPaneles(paneles, projectId, edit) {
 
   return `
   <div class="card">
-    <h3 class="card-title">1E · Paneles solares</h3>
+    <h3 class="card-title">Paneles solares</h3>
     <div class="form-row">
       <div class="form-group">
         <label>Marca</label>
