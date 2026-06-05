@@ -548,6 +548,15 @@ export async function renderProjectForm(id, session) {
     </div>
 
     <div class="form-group">
+      <label>Tipo de conexión</label>
+      <select name="tipoConexion">
+        <option value="interconectado" ${(project?.tipoConexion||'interconectado')==='interconectado'?'selected':''}>Interconectado a CFE</option>
+        <option value="aislado"        ${project?.tipoConexion==='aislado'       ?'selected':''}>Aislado (off-grid)</option>
+        <option value="hibrido"        ${project?.tipoConexion==='hibrido'       ?'selected':''}>Híbrido (con batería)</option>
+      </select>
+    </div>
+
+    <div class="form-group">
       <label>Prioridad</label>
       <select name="prioridad">
         ${Object.entries(PRIORIDADES).map(([k,v]) =>
@@ -725,6 +734,7 @@ window._submitProject = async function(e, editId) {
   const data = {
     clientName:      fd.get('clientName').trim(),
     tipoSistema,
+    tipoConexion:    fd.get('tipoConexion') || 'interconectado',
     prioridad:       fd.get('prioridad'),
     tecnicoLiderId:  fd.get('tecnicoLiderId') || null,
     tecnicosApoyo:   JSON.parse(fd.get('tecnicosApoyo') || '[]'),

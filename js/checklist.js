@@ -38,6 +38,13 @@ export async function renderChecklistModule(projectId, session) {
   const doneMat   = doneBOM + doneCons;
 
   return `
+  <div class="breadcrumb">
+    <span class="bc-link" onclick="navigate('#dashboard')">Inicio</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-link" onclick="navigate('#proyecto/${projectId}')">${esc(project.displayId)}</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Checklist</span>
+  </div>
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
       ${icon('caret-left')}

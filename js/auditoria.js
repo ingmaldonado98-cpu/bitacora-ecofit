@@ -3,6 +3,7 @@
 
 import { projects } from './db.js';
 import { esc, fotoMini, capturePhoto, toast, isoNow, confirmDialog } from './utils.js';
+import { uploadPhotoQueued } from './firebase.js';
 import { canEdit, isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
 
@@ -88,6 +89,13 @@ export async function renderAuditoria(projectId, session) {
   _formalObs = { ...(aud.formalObs || {}) };
 
   return `
+  <div class="breadcrumb">
+    <span class="bc-link" onclick="navigate('#dashboard')">Inicio</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-link" onclick="navigate('#proyecto/${projectId}')">${esc(project.displayId)}</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Auditoría</span>
+  </div>
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
       ${icon('caret-left')}
@@ -353,7 +361,7 @@ function renderFormal(project, aud, edit) {
         : (edit ? `<div class="empty-state">
             <div class="empty-state-icon">📄</div>
             <p class="empty-state-msg">Sin documento firmado.<br>Fotografía o escanea la hoja de entrega.</p>
-            <button type="button" class="empty-state-cta" onclick="capDocFirmado()">Capturar documento</button>
+            <button type="button" class="empty-state-cta" onclick="capDocFirmado('${project.id}')">Capturar documento</button>
           </div>` : '<p class="empty-msg-sm">Sin documento.</p>')}
     </div>
     <div id="slot-doc-firmado"></div>
@@ -426,18 +434,35 @@ window.guardarRapido = async function(projectId) {
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
 
   const tecnico = document.getElementById('rq-tecnico')?.value.trim();
-  const fecha   = document.getElementById('rq-fecha')?.value || isoNow();
+  const fecha   = document.getElementById('rq-fecha')?.value || isoNow().split('T')[0];
   const obs     = document.getElementById('rq-obs')?.value.trim() || '';
+
+  // Capturar GPS automáticamente si está disponible
+  let gps = null;
+  try {
+    if (navigator.geolocation) {
+      gps = await new Promise((res) => {
+        navigator.geolocation.getCurrentPosition(
+          p => res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) }),
+          () => res(null),
+          { timeout: 5000, maximumAge: 30000 }
+        );
+      });
+    }
+  } catch (_) { /* GPS no crítico */ }
 
   try {
     const p = await projects.getById(projectId);
     const aud = p.auditoria || {};
-    aud.modo         = 'rapido';
+    aud.modo          = 'rapido';
     aud.rapidoTecnico = tecnico;
-    aud.rapidoFecha  = fecha;
-    aud.rapidoObs    = obs;
+    aud.rapidoFecha   = isoNow();
+    aud.rapidoFechaDisplay = fecha;
+    aud.rapidoObs     = obs;
+    if (gps) aud.rapidoGps = gps;
     await projects.update(projectId, { auditoria: aud });
-    toast('✅ Verificación guardada');
+    const gpsMsg = gps ? ` · GPS ±${gps.acc}m` : '';
+    toast(`✅ Verificación guardada${gpsMsg}`);
     navigate(`#proyecto/${projectId}`);
   } catch (err) {
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar verificación'; }
@@ -542,12 +567,23 @@ window.guardarFormal = async function(e, projectId) {
 };
 
 // ── Foto documento firmado ────────────────────────────────────────────────────
-window.capDocFirmado = function() {
-  capturePhoto(b64 => {
-    _docFirmadoB64 = b64;
+window.capDocFirmado = function(projectId) {
+  capturePhoto(async b64 => {
     const slot = document.getElementById('slot-doc-firmado');
     if (slot) slot.innerHTML = fotoMini(b64, 'Documento firmado');
-    toast('Foto del documento capturada');
+    toast('Subiendo documento…');
+    try {
+      const url = await uploadPhotoQueued(b64, `projects/${projectId}/auditoria/doc-firmado-${Date.now()}.jpg`, projectId, 'auditoria.docFirmado');
+      _docFirmadoB64 = url;
+      toast('✅ Documento subido');
+    } catch (err) {
+      if (err.code === 'offline') {
+        _docFirmadoB64 = b64;
+        toast('Sin conexión — se subirá al reconectarte', 'warn', 5000);
+      } else {
+        toast('Error al subir: ' + err.message, 'error');
+      }
+    }
   });
 };
 

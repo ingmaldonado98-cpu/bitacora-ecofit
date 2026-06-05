@@ -77,6 +77,10 @@ export async function renderDashboard(session) {
       <option value="">Todos los tipos</option>
       ${Object.entries(TIPOS_SISTEMA).filter(([,v]) => !v.legacy).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
     </select>
+    <button class="dash-toggle-conc" id="btn-toggle-conc" onclick="window._toggleConcluidos()"
+            title="Ver proyectos cerrados y cancelados">
+      ${icon('seal-check', 16)} Concluidos
+    </button>
   </div>
 
   <div id="projects-list">
@@ -96,10 +100,24 @@ export async function renderDashboard(session) {
 // ── Filtros interactivos ───────────────────────────────────────────────────────
 let _allProjects = [];
 
+let _showConcluidos = false;
+
 export function initDashboardFilters(all) {
-  // Solo proyectos activos en el dashboard principal
+  _showConcluidos = false;
   _allProjects = all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
 }
+
+window._toggleConcluidos = async function() {
+  _showConcluidos = !_showConcluidos;
+  const btn = document.getElementById('btn-toggle-conc');
+  if (btn) btn.classList.toggle('dash-toggle-conc-active', _showConcluidos);
+  const all = await projects.getAll();
+  _allProjects = _showConcluidos
+    ? all.filter(p => ['cerrado', 'cancelado'].includes(p.estado))
+    : all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
+  _page = 0;
+  applyFilters();
+};
 
 const PAGE_SIZE = 20;
 let _page = 0;
@@ -240,10 +258,10 @@ function renderParaRevisar(pendientes, allUsers) {
   }).join('');
 
   return `
-  <div class="para-revisar-card">
+  <div class="para-revisar-card para-revisar-alert">
     <div class="pr-header">
-      <span class="pr-icon">⏳</span>
-      <span class="pr-title">${pendientes.length} proyecto${pendientes.length !== 1 ? 's' : ''} esperan revisión</span>
+      ${icon('warning-circle', 18, 'pr-alert-icon')}
+      <span class="pr-title">Acción requerida — ${pendientes.length} proyecto${pendientes.length !== 1 ? 's' : ''} esperan revisión</span>
     </div>
     ${rows}
   </div>`;
