@@ -960,9 +960,6 @@ window.delSombraFoto = async function(pid) {
   navigate(`#proyecto/${pid}/documentacion`);
 };
 
-// renderFase eliminada — reemplazada por renderSitio + renderFotosGrid
-}
-
 // ── Acordeón helper ───────────────────────────────────────────────────────────
 window.toggleAcc = function(btn, bodyId) {
   const body = document.getElementById(bodyId);
