@@ -24,11 +24,15 @@ export async function renderChecklistModule(projectId, session) {
 
   const herramienta = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
   const consumibles = cfg ? getConsumibles(estructura, base, techo) : [];
+  const bomItems  = cfg?.computed?.bom || [];
   const doneHerr  = herramienta.filter(h => cl.herr?.[h.id]).length;
   const doneCons  = consumibles.filter((_, i) => cl.cons?.[String(i)]).length;
+  const doneBOM   = bomItems.filter((_, i) => cl.bom?.[String(i)]).length;
   const doneAdmin = ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length;
   const allAdmin  = doneAdmin === ADMIN_REVIEW_ITEMS.length;
   const published = !!cl.publishedAt;
+  const totalMat  = bomItems.length + consumibles.length;
+  const doneMat   = doneBOM + doneCons;
 
   return `
   <div class="view-header">
@@ -62,13 +66,10 @@ export async function renderChecklistModule(projectId, session) {
       Herramienta${doneHerr === herramienta.length && herramienta.length ? '<span class="tab-badge tab-ok">✓</span>' : ''}
     </button>
     <button class="tab-btn" data-tab="cl-cons" onclick="switchTab('cl-tabs','cl-cons',this)">
-      Consumibles${cfg && doneCons === consumibles.length && consumibles.length ? '<span class="tab-badge tab-ok">✓</span>' : ''}
-    </button>
-    <button class="tab-btn" data-tab="cl-rev" onclick="switchTab('cl-tabs','cl-rev',this)">
-      Revisión${allAdmin ? '<span class="tab-badge tab-ok">✓</span>' : admin ? '<span class="tab-badge tab-req">!</span>' : ''}
+      Materiales${totalMat > 0 && doneMat === totalMat ? '<span class="tab-badge tab-ok">✓</span>' : (totalMat > 0 ? `<span class="tab-badge">${doneMat}/${totalMat}</span>` : '')}
     </button>
     <button class="tab-btn" data-tab="cl-guia" onclick="switchTab('cl-tabs','cl-guia',this)">
-      Guía${cfg ? '' : ''}
+      Guía técnica
     </button>
   </div>
 
@@ -94,20 +95,60 @@ export async function renderChecklistModule(projectId, session) {
     </div>
   </div>
 
-  <!-- Consumibles -->
+  <!-- Materiales: BOM + Consumibles unificados -->
   <div id="cl-cons" class="tab-panel">
-    <div class="card">
-      ${cfg ? (() => {
-        const qtyMap = {};
-        (cfg.computed?.consumibles || []).forEach(c => { qtyMap[c.nombre] = c; });
-        return `
+    ${cfg ? (() => {
+      // ── Agrupar BOM por categoría ──────────────────────────────────────────
+      const grpOrder = ['rieles','bases','abrazaderas','accesorios','otro'];
+      const grpLabel = { rieles:'Rieles', bases:'Bases', abrazaderas:'Abrazaderas', accesorios:'Accesorios', otro:'Otros' };
+      const bomByGrp = {};
+      bomItems.forEach((item, i) => {
+        const g = item.grp || 'otro';
+        if (!bomByGrp[g]) bomByGrp[g] = [];
+        bomByGrp[g].push({ ...item, _idx: i });
+      });
+      const bomSection = bomItems.length ? `
+      <div class="card">
+        <div class="card-title-row">
+          <h3 class="card-title">Lista de materiales <span style="color:var(--text-muted);font-weight:400;font-size:.8rem">${bomItems.length} ítems · ${cfg.layout?.totalPanels||0} paneles</span></h3>
+          <span class="cl-prog-lbl">${doneBOM}/${bomItems.length}</span>
+        </div>
+        ${renderProgress(doneBOM, bomItems.length)}
+        ${grpOrder.filter(g => bomByGrp[g]).map(g => `
+          <div class="cl-bom-group">
+            <span class="cl-bom-grp-lbl">${grpLabel[g] || g}</span>
+            <div class="cl-item-list">
+              ${bomByGrp[g].map(item => `
+              <label class="cl-item ${cl.bom?.[String(item._idx)] ? 'cl-item-done' : ''}">
+                <input type="checkbox" ${cl.bom?.[String(item._idx)] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
+                  onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleBOM('${projectId}',${item._idx},this.checked)">
+                <div class="cl-item-text" style="flex:1">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span class="cl-item-name">${esc(item.name)}</span>
+                    <span class="cl-bom-partnum">${esc(item.partNum||'')}</span>
+                    <span class="cl-qty-badge">${item.qty} ${item.unit}</span>
+                  </div>
+                </div>
+              </label>`).join('')}
+            </div>
+          </div>`).join('')}
+      </div>` : '';
+
+      // ── Consumibles ────────────────────────────────────────────────────────
+      const qtyMap = {};
+      (cfg.computed?.consumibles || []).forEach(c => { qtyMap[c.nombre] = c; });
+      const consSection = consumibles.length ? `
+      <div class="card">
+        <div class="card-title-row">
+          <h3 class="card-title">Consumibles de anclaje</h3>
+          <span class="cl-prog-lbl">${doneCons}/${consumibles.length}</span>
+        </div>
         ${renderProgress(doneCons, consumibles.length)}
         <div class="cl-item-list">
           ${consumibles.map((c, i) => {
             const match = qtyMap[c.n];
             const qtyBadge = match
-              ? `<span style="font-size:.72rem;font-family:monospace;font-weight:700;color:var(--solar);
-                  background:rgba(250,179,0,.12);border-radius:4px;padding:1px 6px;white-space:nowrap">${match.qty} ${match.unit}</span>`
+              ? `<span class="cl-qty-badge">${match.qty} ${match.unit}</span>`
               : '';
             return `
             <label class="cl-item ${cl.cons?.[String(i)] ? 'cl-item-done' : ''}">
@@ -122,47 +163,25 @@ export async function renderChecklistModule(projectId, session) {
               </div>
             </label>`;
           }).join('')}
-        </div>`;
-      })() : `
+        </div>
+      </div>` : '';
+
+      return bomSection + consSection;
+    })() : `
+    <div class="card">
       <div class="cl-no-cfg">
         ${icon('calculator', 36)}
-        <p>Genera el BOM en la calculadora para ver la lista de consumibles automáticamente.</p>
+        <p>Genera el BOM en la calculadora para ver la lista de materiales y consumibles automáticamente.</p>
         <button class="btn-outline btn-sm" onclick="navigate('#calculadora/${projectId}')">
           ${icon('calculator', 14)} Abrir calculadora
         </button>
-      </div>`}
-    </div>
+      </div>
+    </div>`}
   </div>
 
   <!-- Guía técnica -->
   <div id="cl-guia" class="tab-panel">
     ${renderGuiaTab(cfg, projectId)}
-  </div>
-
-  <!-- Revisión Admin -->
-  <div id="cl-rev" class="tab-panel">
-    <div class="card">
-      ${!admin ? `
-      <p class="empty-msg-sm">Solo administradores pueden completar la revisión previa.</p>` : `
-      ${renderProgress(doneAdmin, ADMIN_REVIEW_ITEMS.length)}
-      <div class="cl-item-list">
-        ${ADMIN_REVIEW_ITEMS.map(it => `
-        <label class="cl-item ${cl.admin?.[it.id] ? 'cl-item-done' : ''}">
-          <input type="checkbox" ${cl.admin?.[it.id] ? 'checked' : ''}
-            onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleAdmin('${projectId}','${it.id}',this.checked)">
-          <div class="cl-item-text">
-            <span class="cl-item-name">${esc(it.label)}</span>
-            <span class="cl-item-note">${esc(it.detail)}</span>
-          </div>
-        </label>`).join('')}
-      </div>
-      ${allAdmin && !published ? `
-      <div style="margin-top:14px">
-        <button class="btn-primary" onclick="clPublish('${projectId}')">
-          ${icon('check-circle', 16)} Aprobar y publicar al técnico
-        </button>
-      </div>` : ''}`}
-    </div>
   </div>
 
   <div class="cl-footer-actions">
@@ -326,6 +345,7 @@ async function _saveField(projectId, field, key, value) {
 
 window.clToggleHerr  = (pid, id, v)  => _saveField(pid, 'herr',  id,         v);
 window.clToggleCons  = (pid, idx, v) => _saveField(pid, 'cons',  String(idx), v);
+window.clToggleBOM   = (pid, idx, v) => _saveField(pid, 'bom',   String(idx), v);
 window.clToggleAdmin = (pid, id, v)  => _saveField(pid, 'admin', id,         v);
 window.clToggleExec  = (pid, id, v)  => _saveField(pid, 'exec',  id,         v);
 

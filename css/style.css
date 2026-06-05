@@ -2147,3 +2147,22 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 .eq-marca  { font-weight: 600; font-size: .88rem; color: var(--text); }
 .eq-modelo { font-size: .82rem; color: var(--text-muted); }
 .eq-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* ── Checklist — BOM groups + badges ─────────────────────────────────────── */
+.cl-bom-group { margin-bottom: 4px; }
+.cl-bom-grp-lbl {
+  display: block; font-size: .68rem; font-weight: 800;
+  color: var(--text-muted); letter-spacing: .08em; text-transform: uppercase;
+  padding: 8px 0 4px;
+}
+.cl-bom-partnum {
+  font-family: monospace; font-size: .72rem; color: var(--text-muted);
+}
+.cl-qty-badge {
+  font-size: .72rem; font-family: monospace; font-weight: 700;
+  color: var(--solar); background: rgba(240,192,0,.12);
+  border-radius: 4px; padding: 1px 6px; white-space: nowrap;
+}
+.cl-prog-lbl {
+  font-size: .78rem; color: var(--text-muted); font-weight: 600;
+}
