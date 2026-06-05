@@ -2123,3 +2123,11 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 .fotos-grid-header {
   display: flex; justify-content: flex-end; margin-bottom: 6px;
 }
+
+/* ── Botón link inline ────────────────────────────────────────────────────── */
+.btn-link {
+  background: none; border: none; padding: 0;
+  color: var(--g300); font-size: inherit; font-family: inherit;
+  cursor: pointer; text-decoration: underline; text-decoration-style: dotted;
+}
+.btn-link:hover { color: var(--g500); }

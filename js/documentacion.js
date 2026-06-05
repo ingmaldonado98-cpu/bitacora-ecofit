@@ -17,7 +17,6 @@ export async function renderDocumentacion(projectId, session) {
   const fases = project.documentacion?.fases || {};
   const _fpGet = (sitio, sub) => {
     if (fases?.[sitio]?.[sub]?.length) return fases[sitio][sub].length;
-    // Compatibilidad legacy: techo usa fases.antes/durante/despues
     if (sitio === 'techo') {
       const m = { antes:'antes', durante:'durante', cierre:'despues' };
       return (fases?.[m[sub]] || []).length;
@@ -29,6 +28,12 @@ export async function renderDocumentacion(projectId, session) {
   const cZona    = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('zonaDelSistema',f), 0);
   const cNotas   = (project.documentacion?.notas || []).length;
   const totalFases = cTecho + cCentros + cZona;
+
+  // Badge para "Cierre del proyecto" (fotos de garantia General)
+  const g = project.garantia || {};
+  const cCierre = (g.fotoSistema ? 1 : 0)
+    + Object.values(g.fotosTecnicas || {}).flat().length
+    + (g.fotosAdicionales || []).length;
 
   return `
   <div class="view-header">
@@ -48,6 +53,11 @@ export async function renderDocumentacion(projectId, session) {
             onclick="switchTab('doc-tabs','d-fases',this)">
       ${icon('camera', 14)} Fases
       ${totalFases > 0 ? `<span class="tab-badge tab-ok">${totalFases}</span>` : ''}
+    </button>
+    <button class="tab-btn" data-tab="d-cierre"
+            onclick="switchTab('doc-tabs','d-cierre',this)">
+      ${icon('seal-check', 14)} Cierre
+      ${cCierre > 0 ? `<span class="tab-badge tab-ok">${cCierre}</span>` : ''}
     </button>
     <button class="tab-btn" data-tab="d-notas"
             onclick="switchTab('doc-tabs','d-notas',this)">
@@ -95,7 +105,12 @@ export async function renderDocumentacion(projectId, session) {
     </div>
   </div>
 
-  <!-- Tab 3: Notas -->
+  <!-- Tab 3: Cierre del proyecto (contenido movido de Garantía > General) -->
+  <div id="d-cierre" class="tab-panel">
+    ${renderCierreProyecto(project, edit, projectId)}
+  </div>
+
+  <!-- Tab 4: Notas -->
   <div id="d-notas" class="tab-panel">
     <div class="card">
       <div class="card-title-row">
@@ -141,6 +156,214 @@ export async function renderDocumentacion(projectId, session) {
   </script>
   `;
 }
+
+// ── Cierre del proyecto (data en garantia.*, UI en Documentación) ─────────────
+function renderCierreProyecto(project, edit, projectId) {
+  const g  = project.garantia || {};
+  const ft = g.fotosTecnicas || {};
+
+  const SLOTS_TECNICOS = [
+    { key:'tableroAC',          label:'Tablero AC terminado',       req:true  },
+    { key:'tableroDC',          label:'Tablero DC terminado',       req:true  },
+    { key:'protecciones',       label:'Protecciones instaladas',    req:false },
+    { key:'inversorEnergizado', label:'Inversor energizado',        req:true  },
+    { key:'puestaATierra',      label:'Puesta a tierra',            req:false },
+    { key:'etiquetado',         label:'Etiquetado',                 req:false },
+  ];
+
+  // Obtener fotos técnicas (soporta legacy string y nuevo array)
+  const getFT = (key) => {
+    const v = ft[key];
+    if (!v) return [];
+    if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
+    return Array.isArray(v) ? v : [];
+  };
+
+  return `
+  <!-- Foto general del sistema -->
+  <div class="card">
+    <h3 class="card-title">Foto general del sistema <span class="req-badge">OBLIGATORIA</span></h3>
+    <div class="foto-slot" id="slot-foto-sistema-doc">
+      ${g.fotoSistema
+        ? `${fotoMini(g.fotoSistema,'Foto general')}
+           ${edit ? `<button class="btn-del-foto" onclick="delFotoSistemaDoc('${projectId}')">✕</button>` : ''}`
+        : (edit ? `<div class="empty-state">
+            <div class="empty-state-icon">📷</div>
+            <p class="empty-state-msg">Foto general del sistema terminado.</p>
+            <button class="empty-state-cta" onclick="capFotoSistemaDoc('${projectId}')">
+              ${icon('camera')} Tomar foto</button>
+           </div>` : '<p class="empty-msg-sm">Sin foto.</p>')}
+    </div>
+  </div>
+
+  <!-- Fotos técnicas de cierre -->
+  <div class="card">
+    <h3 class="card-title">Fotos técnicas de cierre</h3>
+    ${SLOTS_TECNICOS.map(s => {
+      const fotos = getFT(s.key);
+      const tiene = fotos.length > 0;
+      return `
+      <div class="foto-tecnica-row">
+        <div class="ft-label">
+          <ph-icon name="${tiene ? 'check-circle' : 'circle'}" class="${tiene ? 'icon-ok' : 'icon-pending'}"></ph-icon>
+          ${s.label}
+          ${s.req ? '<span class="req-badge">OBLIG.</span>' : ''}
+          ${tiene ? `<span class="ft-count">${fotos.length}</span>` : ''}
+        </div>
+        <div class="ft-fotos-grid">
+          ${fotos.map((f, i) => `
+            <div class="ft-foto-item">
+              ${fotoMini(f.url, s.label)}
+              ${edit ? `<button class="btn-del-foto-abs" onclick="delFotoTecnicaDoc('${projectId}','${s.key}',${i})">✕</button>` : ''}
+            </div>`).join('')}
+          ${edit ? `<button class="btn-foto-sm ft-add-btn" onclick="capFotoTecnicaDoc('${projectId}','${s.key}')">
+            ${icon('camera')} ${tiene ? '+' : 'Tomar'}
+          </button>` : (!tiene ? '<span class="ft-empty">—</span>' : '')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  <!-- Fotos adicionales de cierre -->
+  <div class="card">
+    <div class="card-title-row">
+      <h3 class="card-title">Fotos adicionales de cierre</h3>
+      ${edit ? `<button class="btn-primary btn-sm" onclick="capFotoAdicionalDoc('${projectId}')">
+        ${icon('camera')} Agregar</button>` : ''}
+    </div>
+    ${(g.fotosAdicionales || []).length === 0
+      ? (edit ? `<div class="empty-state">
+           <div class="empty-state-icon">📷</div>
+           <p class="empty-state-msg">Sin fotos adicionales aún.</p>
+           <button class="empty-state-cta" onclick="capFotoAdicionalDoc('${projectId}')">Agregar fotos</button>
+         </div>` : '<p class="empty-msg-sm">Sin fotos adicionales.</p>')
+      : `<div class="fotos-grid">
+          ${(g.fotosAdicionales || []).map((f, i) => `
+            <div class="foto-card">
+              ${fotoMini(f.data, 'Foto '+(i+1))}
+              ${f.nota ? `<p class="foto-nota">${esc(f.nota)}</p>` : ''}
+              ${edit ? `
+                <button class="btn-del-foto-abs" onclick="editFotoAdicionalDoc('${projectId}',${i})">✎</button>
+                <button class="btn-del-foto" onclick="delFotoAdicionalDoc('${projectId}',${i})">✕</button>
+              ` : ''}
+            </div>`).join('')}
+         </div>`}
+  </div>`;
+}
+
+// Handlers del Cierre — guardan en garantia.* y regresan a documentacion
+window.capFotoSistemaDoc = function(projectId) {
+  capturePhoto(async (b64) => {
+    toast('Subiendo foto…');
+    const result = await uploadPhotoQueued(b64, `projects/${projectId}/sistema.jpg`, projectId, 'fotoSistema');
+    const p = await projects.getById(projectId);
+    p.garantia = p.garantia || {};
+    p.garantia.fotoSistema = result.url || null;
+    if (result.pending) p.garantia._fotoSistemaPending = result.pendingId;
+    await projects.update(projectId, { garantia: p.garantia });
+    sessionStorage.setItem('doc-tab-target', 'd-cierre');
+    navigate(`#proyecto/${projectId}/documentacion`);
+    if (!result.pending) toast('✅ Foto guardada');
+  });
+};
+
+window.delFotoSistemaDoc = async function(projectId) {
+  if (!await confirmDialog('¿Eliminar foto del sistema?')) return;
+  const p = await projects.getById(projectId);
+  p.garantia.fotoSistema = null;
+  await projects.update(projectId, { garantia: p.garantia });
+  sessionStorage.setItem('doc-tab-target', 'd-cierre');
+  navigate(`#proyecto/${projectId}/documentacion`);
+};
+
+window.capFotoTecnicaDoc = function(projectId, key) {
+  capturePhoto(async (b64Array) => {
+    const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
+    const total = fotos.length;
+    const prog = uploadProgressBar(total);
+    const p = await projects.getById(projectId);
+    p.garantia.fotosTecnicas = p.garantia.fotosTecnicas || {};
+    const existentes = (() => {
+      const v = p.garantia.fotosTecnicas[key];
+      if (!v) return [];
+      if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
+      return Array.isArray(v) ? v : [];
+    })();
+    for (let i = 0; i < total; i++) {
+      prog.update(i + 1);
+      const fid = uuid();
+      const result = await uploadPhotoQueued(fotos[i],
+        `projects/${projectId}/tecnica_${key}_${fid}.jpg`, projectId, 'fotoTecnica', { key, itemId: fid });
+      existentes.push({ url: result.url || null, id: fid, createdAt: isoNow(),
+        ...(result.pending && { pending: true, pendingId: result.pendingId }) });
+    }
+    prog.done();
+    p.garantia.fotosTecnicas[key] = existentes;
+    await projects.update(projectId, { garantia: p.garantia });
+    sessionStorage.setItem('doc-tab-target', 'd-cierre');
+    navigate(`#proyecto/${projectId}/documentacion`);
+    toast(`✅ ${total} foto${total > 1 ? 's' : ''} guardada${total > 1 ? 's' : ''}`);
+  }, { multiple: true });
+};
+
+window.delFotoTecnicaDoc = async function(projectId, key, idx) {
+  if (!await confirmDialog('¿Eliminar esta foto?')) return;
+  const p = await projects.getById(projectId);
+  const v = p.garantia.fotosTecnicas[key];
+  const fotos = typeof v === 'string' ? [{ url: v, id: 'legacy' }] : (Array.isArray(v) ? v : []);
+  fotos.splice(idx, 1);
+  p.garantia.fotosTecnicas[key] = fotos.length ? fotos : null;
+  await projects.update(projectId, { garantia: p.garantia });
+  sessionStorage.setItem('doc-tab-target', 'd-cierre');
+  navigate(`#proyecto/${projectId}/documentacion`);
+};
+
+window.capFotoAdicionalDoc = function(projectId) {
+  capturePhoto(async (b64Array) => {
+    const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
+    const total = fotos.length;
+    const prog = uploadProgressBar(total);
+    const nuevas = [];
+    for (let i = 0; i < total; i++) {
+      prog.update(i + 1);
+      const fid = uuid();
+      const result = await uploadPhotoQueued(fotos[i],
+        `projects/${projectId}/adicional_${fid}.jpg`, projectId, 'fotoAdicional', { itemId: fid });
+      nuevas.push({ data: result.url || (result.pending ? fotos[i] : null),
+        nota: '', id: fid, createdAt: isoNow(),
+        ...(result.pending && { pending: true, pendingId: result.pendingId }) });
+    }
+    prog.done();
+    if (total === 1) nuevas[0].nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
+    const p = await projects.getById(projectId);
+    p.garantia = p.garantia || {};
+    p.garantia.fotosAdicionales = [...(p.garantia.fotosAdicionales || []), ...nuevas];
+    await projects.update(projectId, { garantia: p.garantia });
+    sessionStorage.setItem('doc-tab-target', 'd-cierre');
+    navigate(`#proyecto/${projectId}/documentacion`);
+    toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
+  }, { multiple: true });
+};
+
+window.delFotoAdicionalDoc = async function(projectId, idx) {
+  if (!await confirmDialog('¿Eliminar esta foto?')) return;
+  const p = await projects.getById(projectId);
+  p.garantia.fotosAdicionales.splice(idx, 1);
+  await projects.update(projectId, { garantia: p.garantia });
+  sessionStorage.setItem('doc-tab-target', 'd-cierre');
+  navigate(`#proyecto/${projectId}/documentacion`);
+};
+
+window.editFotoAdicionalDoc = async function(projectId, idx) {
+  const p = await projects.getById(projectId);
+  const actual = p.garantia.fotosAdicionales[idx]?.nota || '';
+  const nueva = await inputDialog('Editar nota:', actual);
+  if (nueva === null) return;
+  p.garantia.fotosAdicionales[idx].nota = nueva;
+  await projects.update(projectId, { garantia: p.garantia });
+  sessionStorage.setItem('doc-tab-target', 'd-cierre');
+  navigate(`#proyecto/${projectId}/documentacion`);
+};
 
 // ── Levantamiento dinámico ─────────────────────────────────────────────────────
 function renderLevantamiento(project, tipo, edit) {

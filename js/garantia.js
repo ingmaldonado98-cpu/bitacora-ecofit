@@ -26,10 +26,18 @@ export async function renderGarantia(projectId, session) {
     <span class="hdr-sub">${esc(project.displayId)}</span>
   </div>
 
-  <!-- Tabs internos -->
+  <!-- Tabs internos — General movido a Documentación > Cierre -->
+  <div class="garantia-notice card" style="margin-bottom:8px;padding:10px 14px;border-color:var(--border2)">
+    <span style="color:var(--text-muted);font-size:.82rem">
+      ${icon('info', 14)} La foto general y fotos técnicas de cierre están en
+      <button class="btn-link" onclick="navigate('#proyecto/${projectId}/documentacion')">
+        Documentación → Cierre
+      </button>
+    </span>
+  </div>
+
   <div class="tab-bar" id="garantia-tabs">
-    <button class="tab-btn tab-active" data-tab="g-general"   onclick="switchTab('garantia-tabs','g-general',this)">General</button>
-    <button class="tab-btn" data-tab="g-equipos"              onclick="switchTab('garantia-tabs','g-equipos',this)">Equipos</button>
+    <button class="tab-btn tab-active" data-tab="g-equipos"   onclick="switchTab('garantia-tabs','g-equipos',this)">Equipos</button>
     <button class="tab-btn" data-tab="g-estructura"           onclick="switchTab('garantia-tabs','g-estructura',this)">Estructura</button>
     <button class="tab-btn" data-tab="g-paneles"              onclick="switchTab('garantia-tabs','g-paneles',this)">Paneles</button>
     <button class="tab-btn" data-tab="g-notas"                onclick="switchTab('garantia-tabs','g-notas',this)">
@@ -37,30 +45,8 @@ export async function renderGarantia(projectId, session) {
     </button>
   </div>
 
-  <!-- 1A: Foto general + 1B: Fotos técnicas -->
-  <div id="g-general" class="tab-panel tab-panel-active">
-    <div class="card">
-      <h3 class="card-title">1A · Foto general del sistema <span class="req-badge">OBLIGATORIA</span></h3>
-      <div class="foto-slot" id="slot-foto-sistema">
-        ${g.fotoSistema
-          ? `${fotoMini(g.fotoSistema,'Foto general')}<button class="btn-del-foto" onclick="delFotoGeneral('${projectId}')">✕</button>`
-          : (edit ? `<button class="btn-foto-add" onclick="capturarFotoSistema('${projectId}')">
-              ${icon('camera', 32)}<span>Tomar foto</span>
-            </button>` : '<p class="empty-msg-sm">Sin foto.</p>')}
-      </div>
-    </div>
-
-    <div class="card">
-      <h3 class="card-title">1B · Fotos técnicas de cierre</h3>
-      ${renderFotosTecnicas(g.fotosTecnicas || {}, projectId, edit)}
-    </div>
-    <div class="card">
-      ${renderFotosAdicionales(g.fotosAdicionales || [], projectId, edit)}
-    </div>
-  </div>
-
-  <!-- 1C: Equipos -->
-  <div id="g-equipos" class="tab-panel">
+  <!-- Equipos — ahora es el tab activo por defecto -->
+  <div id="g-equipos" class="tab-panel tab-panel-active">
     <div class="card-title-row" style="padding:0 0 12px">
       <h3 class="card-title">1C · Equipos instalados (${(g.equipos||[]).length})</h3>
       ${edit ? `<button class="btn-primary btn-sm" onclick="showFormEquipo('${projectId}')">+ Equipo</button>` : ''}
