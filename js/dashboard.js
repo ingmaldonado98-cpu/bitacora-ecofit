@@ -91,32 +91,7 @@ export async function renderDashboard(session) {
 }
 
 // ── Carga de trabajo por técnico (solo admin) ─────────────────────────────────
-function renderWorkload(all, allUsers) {
-  const activos = ['borrador','en_progreso','pendiente_revision','observado'];
-  const tecnicos = allUsers.filter(u => u.activo && u.rol !== 'admin');
-  if (!tecnicos.length) return '';
-
-  const chips = tecnicos.map(u => {
-    const propios   = all.filter(p => activos.includes(p.estado) && p.tecnicoLiderId === u.id).length;
-    const apoyo     = all.filter(p => activos.includes(p.estado) && (p.tecnicosApoyo||[]).includes(u.id)).length;
-    const total     = propios + apoyo;
-    const color     = total === 0 ? 'var(--text-muted)' : total <= 2 ? 'var(--g300)' : total <= 4 ? 'var(--solar)' : 'var(--red)';
-    const rol       = u.rol === 'lider' ? 'Líder' : 'Apoyo';
-    return `
-    <button class="workload-chip" onclick="window._dashFilterTecnico('${u.id}')" title="Ver proyectos de ${esc(u.nombre)}">
-      <span class="wl-nombre">${esc(u.nombre.split(' ')[0])}</span>
-      <span class="wl-rol">${rol}</span>
-      <span class="wl-count" style="color:${color}">${total}</span>
-      ${propios && apoyo ? `<span class="wl-sub">${propios}L·${apoyo}A</span>` : ''}
-    </button>`;
-  }).join('');
-
-  return `
-  <div class="workload-bar">
-    <span class="wl-label">Carga</span>
-    ${chips}
-  </div>`;
-}
+// renderWorkload eliminada — barra de carga de técnicos removida del dashboard
 
 // ── Filtros interactivos ───────────────────────────────────────────────────────
 let _allProjects = [];

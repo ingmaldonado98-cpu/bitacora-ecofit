@@ -276,106 +276,7 @@ function renderModulosProgreso(project, id, session, admin) {
   </div>`;
 }
 
-// ── Checklist de progreso (conservado para compatibilidad) ─────────────────────
-function renderChecklistProgreso(project) {
-  const totalPaneles = (project.garantia?.paneles?.strings||[])
-    .reduce((s,str)=>s+(str.paneles?.length||0),0);
-  const ft = project.garantia?.fotosTecnicas || {};
-
-  const items = [
-    {
-      label: 'Foto general del sistema',
-      ok:    !!project.garantia?.fotoSistema,
-      req:   true,
-      link:  `#proyecto/${project.id}/documentacion`, // movido a Doc > Cierre
-    },
-    {
-      label: `Paneles registrados (${totalPaneles})`,
-      ok:    totalPaneles > 0,
-      req:   true,
-      link:  `#proyecto/${project.id}/garantia`,
-    },
-    {
-      label: 'Tablero AC terminado',
-      ok:    !!ft.tableroAC,
-      req:   true,
-      link:  `#proyecto/${project.id}/documentacion`, // movido a Doc > Cierre
-    },
-    {
-      label: 'Inversor energizado',
-      ok:    !!ft.inversorEnergizado,
-      req:   true,
-      link:  `#proyecto/${project.id}/documentacion`, // movido a Doc > Cierre
-    },
-    {
-      label: 'Protecciones instaladas',
-      ok:    !!ft.protecciones,
-      req:   false,
-      link:  `#proyecto/${project.id}/documentacion`, // movido a Doc > Cierre
-    },
-    {
-      label: (() => {
-        // Compatible con estructura nueva (techo.cierre) y legacy (despues)
-        const f = project.documentacion?.fases;
-        const n = (f?.techo?.cierre?.length || f?.despues?.length || 0);
-        return `Fotos de cierre (${n})`;
-      })(),
-      ok: (() => {
-        const f = project.documentacion?.fases;
-        return (f?.techo?.cierre?.length || f?.despues?.length || 0) > 0;
-      })(),
-      req:   true,
-      link:  `#proyecto/${project.id}/documentacion`,
-    },
-    {
-      label: 'Equipos registrados',
-      ok:    (project.garantia?.equipos?.length||0) > 0,
-      req:   false,
-      link:  `#proyecto/${project.id}/garantia`,
-    },
-    {
-      label: 'Levantamiento de datos',
-      ok:    !!(project.documentacion?.levantamiento?.tipTecho),
-      req:   false,
-      link:  `#proyecto/${project.id}/documentacion`,
-    },
-  ];
-
-  const reqs   = items.filter(i => i.req);
-  const opts   = items.filter(i => !i.req);
-  const doneReqs = reqs.filter(i => i.ok).length;
-  const pct    = Math.round((items.filter(i=>i.ok).length / items.length) * 100);
-  const allReqsDone = reqs.every(i => i.ok);
-
-  return `
-  <div class="card checklist-progreso">
-    <div class="chk-header">
-      <h3 class="card-title">Progreso del proyecto</h3>
-      <span class="chk-pct ${allReqsDone?'chk-pct-ok':''}">${pct}%</span>
-    </div>
-    <div class="chk-bar-wrap">
-      <div class="chk-bar" style="width:${pct}%"></div>
-    </div>
-    <div class="chk-items">
-      ${reqs.map(i=>`
-        <div class="chk-item ${i.ok?'chk-ok':''}" onclick="navigate('${i.link}')">
-          <span class="chk-ico">${i.ok ? '✓' : '○'}</span>
-          <span class="chk-lbl">${i.label}</span>
-          ${i.req && !i.ok ? '<span class="chk-req-badge">Requerido</span>' : ''}
-          ${icon('caret-right', 14, 'chk-arrow')}
-        </div>`).join('')}
-      <details class="chk-opcionales">
-        <summary>Opcionales (${opts.filter(i=>i.ok).length}/${opts.length})</summary>
-        ${opts.map(i=>`
-          <div class="chk-item chk-opt ${i.ok?'chk-ok':''}" onclick="navigate('${i.link}')">
-            <span class="chk-ico">${i.ok ? '✓' : '○'}</span>
-            <span class="chk-lbl">${i.label}</span>
-            ${icon('caret-right', 14, 'chk-arrow')}
-          </div>`).join('')}
-      </details>
-    </div>
-  </div>`;
-}
+// renderChecklistProgreso eliminada — reemplazada por renderModulosProgreso
 
 // ── Badge fecha estimada ──────────────────────────────────────────────────────
 function fechaEstimadaBadge(fechaIso, estado) {
@@ -855,8 +756,10 @@ window._submitProject = async function(e, editId) {
       navigate(`#proyecto/${editId}`);
     } else {
       const createdAt = isoNow();
-      // Generar ID legible: Apellido / DD-Mmm / TipoSistema
-      const displayId = genDisplayId(data.clientName, createdAt, data.tipoSistema);
+      // Generar ID legible con anti-duplicados
+      const allProjects = await projects.getAll();
+      const existingIds = allProjects.map(p => p.displayId).filter(Boolean);
+      const displayId = genDisplayId(data.clientName, createdAt, data.tipoSistema, existingIds);
       const newProject = {
         id: uuid(),
         displayId,

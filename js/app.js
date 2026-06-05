@@ -22,6 +22,21 @@ import { initPendingMap, processQueue } from './photo-queue.js';
 
 const app = document.getElementById('app');
 
+// ── switchTab global — definida aquí para que esté disponible en todos los módulos
+// sin depender del orden de carga. Los módulos pueden registrar hooks en _onTabChange.
+window.switchTab = function(tabBarId, targetId, btn) {
+  const bar = document.getElementById(tabBarId);
+  if (!bar) return;
+  bar.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+  btn.classList.add('tab-active');
+  const container = bar.parentElement;
+  container.querySelectorAll(':scope > .tab-panel').forEach(p => p.classList.remove('tab-panel-active'));
+  const target = document.getElementById(targetId);
+  if (target) target.classList.add('tab-panel-active');
+  // Permite que los módulos reaccionen al cambio de tab (ej: detener scanner en garantia)
+  window._onTabChange?.(tabBarId, targetId);
+};
+
 // ── Render helper ─────────────────────────────────────────────────────────────
 async function render(html, skeleton = '') {
   try {

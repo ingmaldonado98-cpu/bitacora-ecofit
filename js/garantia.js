@@ -968,19 +968,10 @@ window._delNota = async function(projectId, scope, idx) {
   toast('Nota eliminada');
 };
 
-// ── Tab switcher ───────────────────────────────────────────────────────────────
-window.switchTab = function(tabBarId, targetId, btn) {
-  const bar = document.getElementById(tabBarId);
-  if (!bar) return;
-  bar.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-  btn.classList.add('tab-active');
-  // Solo ocultar panels que son hermanos de la tab-bar (evita chocar con otros grupos)
-  const container = bar.parentElement;
-  container.querySelectorAll(':scope > .tab-panel').forEach(p => p.classList.remove('tab-panel-active'));
-  const target = document.getElementById(targetId);
-  if (target) target.classList.add('tab-panel-active');
-  // Detener scanner si cambia de tab
-  if (_activeScanStringIdx >= 0) {
+// ── Hook de tab para el módulo de Garantía (detener scanner al cambiar de tab)
+// switchTab está definida globalmente en app.js — este hook añade el side-effect del scanner
+window._onTabChange = function(tabBarId) {
+  if (tabBarId === 'garantia-tabs' && _activeScanStringIdx >= 0) {
     stopScanner();
     const sc = document.getElementById(`scanner-${_activeScanStringIdx}`);
     if (sc) sc.style.display = 'none';

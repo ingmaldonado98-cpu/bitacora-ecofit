@@ -371,8 +371,12 @@ function renderLevantamiento(project, tipo, edit) {
   const dis = edit ? '' : 'disabled';
   const pid = project.id;
 
-  // Reinicializar campos libres con los datos del proyecto (evita estado stale)
+  // Reinicializar estado de módulo con datos del proyecto (evita estado stale entre navegaciones)
   _camposLibres = [...(lev.camposLibres || [])];
+  _cargas = {
+    critica:    [...(lev.cargasCriticas   || lev.cargasRespaldo || [])],
+    secundaria: [...(lev.cargasSecundarias || [])],
+  };
 
   // Detectar si secciones tienen datos para abrir acordeón pre-llenado
   const hasSitio      = !!(lev.tipTecho || lev.distTableroInversor);
