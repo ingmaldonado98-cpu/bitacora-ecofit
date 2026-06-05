@@ -73,7 +73,7 @@ export async function renderPDFExport(projectId, session) {
           ['sec-consumo',    '🔌 Consumo del cliente'],
           ['sec-antes',      '🔍 Fotos: Antes'],
           ['sec-durante',    '🔧 Fotos: Durante'],
-          ['sec-despues',    '✅ Fotos: Después'],
+          ['sec-despues',    '✅ Fotos: Cierre'],
           ['sec-observ',     '💬 Observaciones del proyecto'],
           ['sec-historial',  '🕓 Historial de cambios'],
           ['sec-auditoria',  '📋 Auditoría técnica'],
@@ -262,8 +262,9 @@ window.exportarPDFCliente = async function(projectId) {
     y = await addImage(doc, fotoSistema, 14, y, 120, 80);
   }
 
-  // Fotos "Después"
-  const fotos = project.documentacion?.fases?.despues || [];
+  // Fotos de Cierre (nueva estructura techo.cierre con fallback legacy despues)
+  const _fases = project.documentacion?.fases || {};
+  const fotos = _fases.techo?.cierre?.length ? _fases.techo.cierre : (_fases.despues || []);
   if (fotos.length) {
     doc.addPage(); addHeader(doc,'Resultado final', project); y = 44;
     let col = 0;
@@ -393,14 +394,19 @@ window.exportarPDFTecnico = async function(projectId) {
     }
   }
 
-  // Fotos por fase
-  for (const [id, fase, titulo] of [
-    ['sec-antes','antes','Fotos: Antes'],
-    ['sec-durante','durante','Fotos: Durante'],
-    ['sec-despues','despues','Fotos: Después'],
+  // Fotos por fase — compatible con nueva estructura (sitio.subfase) y legacy
+  const _fasesDoc = project.documentacion?.fases || {};
+  const _getFasesFotos = (legacy, sitio, sub) => {
+    if (_fasesDoc[sitio]?.[sub]?.length) return _fasesDoc[sitio][sub];
+    return _fasesDoc[legacy] || [];
+  };
+  for (const [id, legacy, sitio, sub, titulo] of [
+    ['sec-antes',   'antes',   'techo', 'antes',   'Fotos: Antes'],
+    ['sec-durante', 'durante', 'techo', 'durante', 'Fotos: Durante'],
+    ['sec-despues', 'despues', 'techo', 'cierre',  'Fotos: Cierre'],
   ]) {
     if (!sec(id)) continue;
-    const fotos = project.documentacion?.fases?.[fase] || [];
+    const fotos = _getFasesFotos(legacy, sitio, sub);
     if (!fotos.length) continue;
     doc.addPage(); addHeader(doc,titulo,project); y=44;
     let col=0;

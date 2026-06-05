@@ -3,7 +3,7 @@
 import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
-import { uploadPhotoQueued, uploadPhoto } from './firebase.js';
+import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 
 // ── Vista principal ────────────────────────────────────────────────────────────
@@ -956,36 +956,7 @@ window.delSombraFoto = async function(pid) {
   navigate(`#proyecto/${pid}/documentacion`);
 };
 
-// ── Fases Antes / Durante / Después ──────────────────────────────────────────
-function renderFase(project, fase, titulo, projectId, edit, required=false) {
-  const fotos = project.documentacion?.fases?.[fase] || [];
-  return `
-  <div class="card-title-row">
-    <h3 class="card-title">${titulo}</h3>
-    ${required?'<span class="req-badge">OBLIGATORIA</span>':''}
-    ${edit?`<button class="btn-primary btn-sm" onclick="agregarFoto('${projectId}','${fase}')">
-      ${icon('camera')} Agregar fotos</button>`:''}
-</div>
-  ${fotos.length===0
-    ? (edit
-        ? `<div class="empty-state">
-             <div class="empty-state-icon">${required ? '⚠️' : '📷'}</div>
-             <p class="empty-state-msg">${required ? 'Se requiere al menos una foto.<br>Puedes seleccionar varias a la vez.' : 'Sin fotos aún.'}</p>
-             <button class="empty-state-cta" onclick="agregarFoto('${projectId}','${fase}')">Agregar fotos</button>
-           </div>`
-        : `<p class="empty-msg-sm">${required?'⚠ Se requiere al menos una foto.':'Sin fotos aún.'}</p>`)
-    : `<div class="fotos-grid" id="fotos-${fase}">
-        ${fotos.map((f,i)=>`
-          <div class="foto-card">
-            ${fotoMini(f.data,`Foto ${i+1}`)}
-            ${f.nota?`<p class="foto-nota">${esc(f.nota)}</p>`:''}
-            ${edit?`
-              <button class="btn-del-foto-abs" onclick="editFotaNota('${projectId}','${fase}',${i})">✎</button>
-              <button class="btn-del-foto" onclick="delFotoFase('${projectId}','${fase}',${i})">✕</button>
-            `:''}
-          </div>`).join('')}
-      </div>`}
-  `;
+// renderFase eliminada — reemplazada por renderSitio + renderFotosGrid
 }
 
 // ── Acordeón helper ───────────────────────────────────────────────────────────

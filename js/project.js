@@ -120,7 +120,7 @@ export async function renderProjectDetail(id, session) {
     </div>
   </div>
 
-  <!-- Foto del cliente (solo sistemas pequeños) -->
+  <!-- Foto del cliente (solo sistemas pequeños y cuando existe la foto) -->
   ${project.tipoSistema === 'sistema_pequeno' && project.clienteFoto ? `
   <div class="card card-cliente">
     <div class="cliente-foto-wrap">
@@ -287,7 +287,7 @@ function renderChecklistProgreso(project) {
       label: 'Foto general del sistema',
       ok:    !!project.garantia?.fotoSistema,
       req:   true,
-      link:  `#proyecto/${project.id}/garantia`,
+      link:  `#proyecto/${project.id}/documentacion`, // movido a Doc > Cierre
     },
     {
       label: `Paneles registrados (${totalPaneles})`,
@@ -299,23 +299,31 @@ function renderChecklistProgreso(project) {
       label: 'Tablero AC terminado',
       ok:    !!ft.tableroAC,
       req:   true,
-      link:  `#proyecto/${project.id}/garantia`,
+      link:  `#proyecto/${project.id}/documentacion`, // movido a Doc > Cierre
     },
     {
       label: 'Inversor energizado',
       ok:    !!ft.inversorEnergizado,
       req:   true,
-      link:  `#proyecto/${project.id}/garantia`,
+      link:  `#proyecto/${project.id}/documentacion`, // movido a Doc > Cierre
     },
     {
       label: 'Protecciones instaladas',
       ok:    !!ft.protecciones,
       req:   false,
-      link:  `#proyecto/${project.id}/garantia`,
+      link:  `#proyecto/${project.id}/documentacion`, // movido a Doc > Cierre
     },
     {
-      label: `Fotos "Después" (${project.documentacion?.fases?.despues?.length||0})`,
-      ok:    (project.documentacion?.fases?.despues?.length||0) > 0,
+      label: (() => {
+        // Compatible con estructura nueva (techo.cierre) y legacy (despues)
+        const f = project.documentacion?.fases;
+        const n = (f?.techo?.cierre?.length || f?.despues?.length || 0);
+        return `Fotos de cierre (${n})`;
+      })(),
+      ok: (() => {
+        const f = project.documentacion?.fases;
+        return (f?.techo?.cierre?.length || f?.despues?.length || 0) > 0;
+      })(),
       req:   true,
       link:  `#proyecto/${project.id}/documentacion`,
     },
@@ -412,7 +420,9 @@ function renderStatusLog(log) {
 function _getFaltantes(project) {
   const faltantes = [];
   if (!project.garantia?.fotoSistema) faltantes.push('Foto general del sistema');
-  if (!(project.documentacion?.fases?.despues?.length > 0)) faltantes.push('Al menos una foto en fase "Después"');
+  const f = project.documentacion?.fases;
+  const hayFotosCierre = (f?.techo?.cierre?.length || f?.despues?.length || 0) > 0;
+  if (!hayFotosCierre) faltantes.push('Al menos una foto de Cierre en Documentación');
   const totalPaneles = (project.garantia?.paneles?.strings||[]).reduce((s,str)=>s+(str.paneles?.length||0),0);
   if (totalPaneles === 0) faltantes.push('Al menos un panel registrado con número de serie');
   if (!project.garantia?.fotosTecnicas?.tableroAC) faltantes.push('Foto del tablero AC terminado');

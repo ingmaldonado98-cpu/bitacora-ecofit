@@ -29,7 +29,8 @@ export async function renderChecklistModule(projectId, session) {
   const doneCons  = consumibles.filter((_, i) => cl.cons?.[String(i)]).length;
   const doneBOM   = bomItems.filter((_, i) => cl.bom?.[String(i)]).length;
   const doneAdmin = ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length;
-  const allAdmin  = doneAdmin === ADMIN_REVIEW_ITEMS.length;
+  // allAdmin solo es true si HAY ítems Y todos están marcados (evita true cuando length===0)
+  const allAdmin  = ADMIN_REVIEW_ITEMS.length > 0 && doneAdmin === ADMIN_REVIEW_ITEMS.length;
   const published = !!cl.publishedAt;
   const totalMat  = bomItems.length + consumibles.length;
   const doneMat   = doneBOM + doneCons;
@@ -51,12 +52,12 @@ export async function renderChecklistModule(projectId, session) {
       <span>por ${esc(cl.publishedBy || '—')} · ${cl.publishedAt ? new Date(cl.publishedAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : ''}</span>
     </div>
     ${admin ? `<button class="btn-outline btn-sm" onclick="clUnpublish('${projectId}')">Revocar</button>` : ''}
-  </div>` : admin && allAdmin ? `
+  </div>` : admin ? `
   <div class="cl-status-banner cl-ready">
     ${icon('check-circle', 18, 'icon-ok')}
     <div class="cl-status-text">
-      <strong>Revisión completa</strong>
-      <span>Listo para publicar al técnico</span>
+      <strong>Listo para publicar</strong>
+      <span>Aprueba el checklist para que el técnico lo vea como completado</span>
     </div>
     <button class="btn-primary btn-sm" onclick="clPublish('${projectId}')">Aprobar y publicar</button>
   </div>` : ''}
