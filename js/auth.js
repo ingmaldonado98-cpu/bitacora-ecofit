@@ -140,12 +140,13 @@ export function renderLogin() {
   <div class="login-screen">
     <div class="login-card">
       <div class="login-logo">
-        <svg width="56" height="56" viewBox="0 0 256 256" fill="var(--solar)">
-          <path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/>
+        <!-- Ícono de clipboard/bitácora en lugar del sol -->
+        <svg width="56" height="56" viewBox="0 0 256 256" fill="var(--accent)">
+          <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Zm-32-80a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,136Zm0,32a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,168ZM120,104a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h16A8,8,0,0,1,120,104Z"/>
         </svg>
       </div>
-      <h1 class="login-title">Ecofit Solar</h1>
-      <p class="login-sub">Bitácora de Instalaciones</p>
+      <h1 class="login-title">Bitácora</h1>
+      <p class="login-sub">de Instalaciones</p>
 
       <form id="login-form" class="login-form" onsubmit="window._submitLogin(event)">
         <div class="form-group">
@@ -170,7 +171,7 @@ export function renderLogin() {
         </button>
       </form>
 
-      <p class="login-version">Ecofit Solar Solutions · La Paz, BCS</p>
+      <p class="login-version">La Paz, Baja California Sur</p>
     </div>
   </div>`;
 }

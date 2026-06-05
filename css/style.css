@@ -177,14 +177,10 @@ body {
   max-width: 140px;
 }
 
-/* Fallback tipográfico cuando no hay logo.png */
-.hdr-logo-text {
-  display: flex; align-items: center; gap: 8px;
-}
-.hdr-sun-ico   { color: var(--solar); flex-shrink: 0; }
-.hdr-logo-words { display: flex; flex-direction: column; line-height: 1.15; }
-.hdr-logo-main { font-family: 'DM Serif Display', serif; font-size: 1rem; color: #ffffff; letter-spacing: .01em; }
-.hdr-logo-sub  { font-size: .6rem; color: var(--solar); letter-spacing: .06em; text-transform: uppercase; opacity: .85; }
+/* Título de la app en el header */
+.hdr-app-title { display: flex; flex-direction: column; line-height: 1.2; }
+.hdr-title-main { font-family: 'DM Serif Display', serif; font-size: 1.05rem; color: #ffffff; letter-spacing: .01em; }
+.hdr-title-sub  { font-size: .6rem; color: var(--g300); letter-spacing: .05em; text-transform: uppercase; opacity: .9; }
 
 .hdr-brand { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 
