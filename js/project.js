@@ -189,14 +189,22 @@ function renderModulosProgreso(project, id, session, admin) {
   const ft  = gar.fotosTecnicas || {};
 
   // Documentación: levantamiento + 3 fases
+  // Contar fotos en nueva estructura (sitio/subfase) con fallback legacy
+  const _fc = (sitio, sub) => {
+    const n = doc.fases?.[sitio]?.[sub]?.length || 0;
+    if (n > 0) return n;
+    if (sitio === 'techo') { const m={antes:'antes',durante:'durante',cierre:'despues'}; return doc.fases?.[m[sub]]?.length||0; }
+    return 0;
+  };
+  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('techo',f),0);
+  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('centrosCarga',f),0);
+  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('zonaDelSistema',f),0);
+
   const docItems = [
-    { label: 'Levantamiento',  ok: !!(doc.levantamiento?.tipTecho) },
-    { label: `Techo (${doc.fases?.techo?.length||doc.fases?.antes?.length||0})`,
-      ok: (doc.fases?.techo?.length||doc.fases?.antes?.length||0) > 0 },
-    { label: `Proceso (${doc.fases?.proceso?.length||doc.fases?.durante?.length||0})`,
-      ok: (doc.fases?.proceso?.length||doc.fases?.durante?.length||0) > 0 },
-    { label: `Cierre (${doc.fases?.cierre?.length||doc.fases?.despues?.length||0})`,
-      ok: (doc.fases?.cierre?.length||doc.fases?.despues?.length||0) > 0 },
+    { label: 'Levantamiento',                    ok: !!(doc.levantamiento?.tipTecho) },
+    { label: `Techo (${fTecho})`,                ok: fTecho > 0 },
+    { label: `Centros de carga (${fCentros})`,   ok: fCentros > 0 },
+    { label: `Zona del sistema (${fZona})`,      ok: fZona > 0 },
   ];
   const docDone = docItems.filter(i=>i.ok).length;
   const docPct  = Math.round(docDone / docItems.length * 100);
@@ -846,7 +854,11 @@ window._submitProject = async function(e, editId) {
         estado: 'borrador',
         observaciones: [],
         garantia: { fotoSistema: null, fotosTecnicas: {}, equipos: [], estructura: null, paneles: { marca:'', modelo:'', wp:0, strings:[] } },
-        documentacion: { levantamiento: {}, fases: { antes:[], durante:[], despues:[] } },
+        documentacion: { levantamiento: {}, fases: {
+          techo:          { antes:[], durante:[], cierre:[] },
+          centrosCarga:   { antes:[], durante:[], cierre:[] },
+          zonaDelSistema: { antes:[], durante:[], cierre:[] },
+        }},
         auditoria: null,
         driveSynced: false,
         createdBy: session?.id,

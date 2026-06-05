@@ -13,13 +13,22 @@ export async function renderDocumentacion(projectId, session) {
   const edit = canEdit(session, project);
   const tipo = project.tipoSistema || 'otro';
 
-  // Contar fotos por fase para badges
+  // Contar fotos por sitio para badges del tab
   const fases = project.documentacion?.fases || {};
-  const cAntes   = (fases.antes   || []).length;
-  const cDurante = (fases.durante || []).length;
-  const cDespues = (fases.despues || []).length;
+  const _fpGet = (sitio, sub) => {
+    if (fases?.[sitio]?.[sub]?.length) return fases[sitio][sub].length;
+    // Compatibilidad legacy: techo usa fases.antes/durante/despues
+    if (sitio === 'techo') {
+      const m = { antes:'antes', durante:'durante', cierre:'despues' };
+      return (fases?.[m[sub]] || []).length;
+    }
+    return 0;
+  };
+  const cTecho   = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('techo',f), 0);
+  const cCentros = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('centrosCarga',f), 0);
+  const cZona    = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('zonaDelSistema',f), 0);
   const cNotas   = (project.documentacion?.notas || []).length;
-  const totalFases = cAntes + cDurante + cDespues;
+  const totalFases = cTecho + cCentros + cZona;
 
   return `
   <div class="view-header">
@@ -52,37 +61,37 @@ export async function renderDocumentacion(projectId, session) {
     ${renderLevantamiento(project, tipo, edit)}
   </div>
 
-  <!-- Tab 2: Fases (Antes / Durante / Cierre) -->
+  <!-- Tab 2: Fases — 3 sitios × 3 subfases -->
   <div id="d-fases" class="tab-panel">
-    <div class="fase-selector">
-      <button class="fase-btn fase-active" id="fase-btn-antes"
-              onclick="switchFase('antes',this,'${projectId}')">
-        <span class="fase-ico">🏗️</span>
-        Antes
-        ${cAntes ? `<span class="fase-count">${cAntes}</span>` : ''}
+    <div class="sitio-selector">
+      <button class="sitio-btn sitio-active" id="sitio-btn-techo"
+              onclick="switchSitio('techo',this)">
+        <span class="sitio-ico">🏠</span>
+        <span class="sitio-lbl">Techo</span>
+        ${cTecho ? `<span class="sitio-count">${cTecho}</span>` : ''}
       </button>
-      <button class="fase-btn" id="fase-btn-durante"
-              onclick="switchFase('durante',this,'${projectId}')">
-        <span class="fase-ico">🔧</span>
-        Durante
-        ${cDurante ? `<span class="fase-count">${cDurante}</span>` : ''}
+      <button class="sitio-btn" id="sitio-btn-centrosCarga"
+              onclick="switchSitio('centrosCarga',this)">
+        <span class="sitio-ico">⚡</span>
+        <span class="sitio-lbl">Centros de carga</span>
+        ${cCentros ? `<span class="sitio-count">${cCentros}</span>` : ''}
       </button>
-      <button class="fase-btn" id="fase-btn-despues"
-              onclick="switchFase('despues',this,'${projectId}')">
-        <span class="fase-ico">✅</span>
-        Cierre
-        ${cDespues ? `<span class="fase-count">${cDespues}</span>` : ''}
+      <button class="sitio-btn" id="sitio-btn-zonaDelSistema"
+              onclick="switchSitio('zonaDelSistema',this)">
+        <span class="sitio-ico">☀️</span>
+        <span class="sitio-lbl">Zona del sistema</span>
+        ${cZona ? `<span class="sitio-count">${cZona}</span>` : ''}
       </button>
     </div>
 
-    <div id="fase-panel-antes" class="fase-panel fase-panel-active">
-      ${renderFase(project, 'antes', 'Antes de la instalación', projectId, edit)}
+    <div id="sitio-panel-techo" class="sitio-panel sitio-panel-active">
+      ${renderSitio(project, 'techo', edit, projectId)}
     </div>
-    <div id="fase-panel-durante" class="fase-panel">
-      ${renderFase(project, 'durante', 'Durante la instalación', projectId, edit)}
+    <div id="sitio-panel-centrosCarga" class="sitio-panel">
+      ${renderSitio(project, 'centrosCarga', edit, projectId)}
     </div>
-    <div id="fase-panel-despues" class="fase-panel">
-      ${renderFase(project, 'despues', 'Cierre general', projectId, edit, false)}
+    <div id="sitio-panel-zonaDelSistema" class="sitio-panel">
+      ${renderSitio(project, 'zonaDelSistema', edit, projectId)}
     </div>
   </div>
 
@@ -107,17 +116,26 @@ export async function renderDocumentacion(projectId, session) {
   </div>
   <script>
     (function() {
-      const tabTarget  = sessionStorage.getItem('doc-tab-target');
-      const faseTarget = sessionStorage.getItem('doc-fase-target');
+      const tabTarget   = sessionStorage.getItem('doc-tab-target');
+      const sitioTarget = sessionStorage.getItem('doc-sitio-target');
+      const subfaTarget = sessionStorage.getItem('doc-subfa-target');
       if (tabTarget) {
         sessionStorage.removeItem('doc-tab-target');
         const tabBtn = document.querySelector('[data-tab="' + tabTarget + '"]');
         if (tabBtn) tabBtn.click();
       }
-      if (faseTarget) {
-        sessionStorage.removeItem('doc-fase-target');
-        const faseBtn = document.getElementById('fase-btn-' + faseTarget);
-        if (faseBtn) faseBtn.click();
+      if (sitioTarget) {
+        sessionStorage.removeItem('doc-sitio-target');
+        const sitioBtn = document.getElementById('sitio-btn-' + sitioTarget);
+        if (sitioBtn) sitioBtn.click();
+      }
+      if (subfaTarget) {
+        sessionStorage.removeItem('doc-subfa-target');
+        // El botón de subfase se activa después del sitio (necesita pequeño delay)
+        setTimeout(() => {
+          const btn = document.getElementById('sf-btn-' + (sitioTarget||'techo') + '-' + subfaTarget);
+          if (btn) btn.click();
+        }, 50);
       }
     })();
   </script>
@@ -754,29 +772,120 @@ window.toggleAcc = function(btn, bodyId) {
   body.classList.toggle('acc-collapsed', !isOpen);
 };
 
-// ── Selector de fases (Antes / Durante / Cierre) ─────────────────────────────
-window.switchFase = function(fase, btn) {
-  // Actualizar botones
-  document.querySelectorAll('.fase-btn').forEach(b => b.classList.remove('fase-active'));
-  btn.classList.add('fase-active');
-  // Actualizar paneles
-  document.querySelectorAll('.fase-panel').forEach(p => p.classList.remove('fase-panel-active'));
-  const panel = document.getElementById(`fase-panel-${fase}`);
-  if (panel) panel.classList.add('fase-panel-active');
+// ── Render sitio (3 subfases: Antes / Durante / Cierre) ─────────────────────
+function renderSitio(project, sitio, edit, projectId) {
+  const SUBFASES = [
+    { id: 'antes',   ico: '📷', label: 'Antes',   hint: 'Referencia visual previa al trabajo' },
+    { id: 'durante', ico: '🔧', label: 'Durante',  hint: 'Proceso y avances de instalación' },
+    { id: 'cierre',  ico: '✅', label: 'Cierre',   hint: 'Estado final del sitio' },
+  ];
+  const fases = project.documentacion?.fases || {};
+
+  // Obtener fotos — soporta estructura nueva Y legacy (techo mapea a antes/durante/despues)
+  const getFotos = (sub) => {
+    if (fases?.[sitio]?.[sub]?.length) return fases[sitio][sub];
+    if (sitio === 'techo') {
+      const m = { antes:'antes', durante:'durante', cierre:'despues' };
+      return fases?.[m[sub]] || [];
+    }
+    return [];
+  };
+
+  return `
+  <div class="subfase-bar" id="sfbar-${sitio}">
+    ${SUBFASES.map((sf, idx) => {
+      const cnt = getFotos(sf.id).length;
+      return `<button class="subfase-btn ${idx===0?'sf-active':''}"
+                      id="sf-btn-${sitio}-${sf.id}"
+                      onclick="switchSubfase('${sitio}','${sf.id}',this)"
+                      title="${sf.hint}">
+        <span>${sf.ico} ${sf.label}</span>
+        ${cnt ? `<span class="subfase-count">${cnt}</span>` : ''}
+      </button>`;
+    }).join('')}
+  </div>
+  ${SUBFASES.map((sf, idx) => {
+    const fotos = getFotos(sf.id);
+    return `
+    <div id="sf-panel-${sitio}-${sf.id}" class="subfase-panel ${idx===0?'sf-active':''}">
+      ${renderFotosGrid(fotos, sitio, sf.id, sf.label, projectId, edit)}
+    </div>`;
+  }).join('')}`;
+}
+
+function renderFotosGrid(fotos, sitio, subfase, titulo, projectId, edit) {
+  const key = `${sitio}_${subfase}`;
+  if (!fotos.length) {
+    return edit ? `
+    <div class="empty-state">
+      <div class="empty-state-icon">📷</div>
+      <p class="empty-state-msg">Sin fotos de <strong>${titulo}</strong> aún.</p>
+      <button class="empty-state-cta" onclick="agregarFotoSitio('${projectId}','${sitio}','${subfase}')">
+        ${icon('camera')} Agregar fotos
+      </button>
+    </div>` : `<p class="empty-msg-sm">Sin fotos aún.</p>`;
+  }
+  return `
+  <div class="fotos-grid-header">
+    ${edit ? `<button class="btn-sm btn-outline" onclick="agregarFotoSitio('${projectId}','${sitio}','${subfase}')">
+      ${icon('camera')} + Agregar fotos
+    </button>` : ''}
+  </div>
+  <div class="fotos-grid" id="fotos-${key}">
+    ${fotos.map((f,i)=>`
+      <div class="foto-card">
+        ${fotoMini(f.data,`Foto ${i+1}`)}
+        ${f.nota?`<p class="foto-nota">${esc(f.nota)}</p>`:''}
+        ${edit?`
+          <button class="btn-del-foto-abs" onclick="editFotoNotaSitio('${projectId}','${sitio}','${subfase}',${i})">✎</button>
+          <button class="btn-del-foto" onclick="delFotoSitio('${projectId}','${sitio}','${subfase}',${i})">✕</button>
+        `:''}
+      </div>`).join('')}
+  </div>`;
+}
+
+// ── Selectores de sitio y subfase ─────────────────────────────────────────────
+window.switchSitio = function(sitio, btn) {
+  document.querySelectorAll('.sitio-btn').forEach(b => b.classList.remove('sitio-active'));
+  btn.classList.add('sitio-active');
+  document.querySelectorAll('.sitio-panel').forEach(p => p.classList.remove('sitio-panel-active'));
+  const panel = document.getElementById(`sitio-panel-${sitio}`);
+  if (panel) panel.classList.add('sitio-panel-active');
 };
 
-window.agregarFoto = function(projectId, fase) {
+window.switchSubfase = function(sitio, subfase, btn) {
+  const bar = document.getElementById(`sfbar-${sitio}`);
+  bar?.querySelectorAll('.subfase-btn').forEach(b => b.classList.remove('sf-active'));
+  btn.classList.add('sf-active');
+  const panelContainer = document.getElementById(`sitio-panel-${sitio}`);
+  panelContainer?.querySelectorAll('.subfase-panel').forEach(p => p.classList.remove('sf-active'));
+  const panel = document.getElementById(`sf-panel-${sitio}-${subfase}`);
+  if (panel) panel.classList.add('sf-active');
+};
+
+// Helper interno: obtener o crear la ruta fases[sitio][subfase]
+function _ensureFasesSitio(p, sitio, subfase) {
+  p.documentacion = p.documentacion || {};
+  p.documentacion.fases = p.documentacion.fases || {};
+  p.documentacion.fases[sitio] = p.documentacion.fases[sitio] || {};
+  p.documentacion.fases[sitio][subfase] = p.documentacion.fases[sitio][subfase] || [];
+  return p.documentacion.fases[sitio][subfase];
+}
+
+window.agregarFotoSitio = function(projectId, sitio, subfase) {
   capturePhoto(async (b64Array) => {
     const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
     const total = fotos.length;
-    const prog = uploadProgressBar(total);
+    const prog  = uploadProgressBar(total);
     const nuevas = [];
 
     for (let i = 0; i < total; i++) {
       prog.update(i + 1);
       const fid = uuid();
-      const result = await uploadPhotoQueued(fotos[i], `projects/${projectId}/${fase}_${fid}.jpg`,
-        projectId, 'fotoFase', { fase, itemId: fid });
+      const result = await uploadPhotoQueued(
+        fotos[i], `projects/${projectId}/${sitio}_${subfase}_${fid}.jpg`,
+        projectId, 'fotoFase', { sitio, subfase, itemId: fid }
+      );
       nuevas.push({
         data: result.url || (result.pending ? fotos[i] : null),
         nota: '', id: fid, createdAt: isoNow(),
@@ -790,33 +899,49 @@ window.agregarFoto = function(projectId, fase) {
     }
 
     const p = await projects.getById(projectId);
-    p.documentacion = p.documentacion || {};
-    p.documentacion.fases = p.documentacion.fases || { antes:[], durante:[], despues:[] };
-    p.documentacion.fases[fase] = [...(p.documentacion.fases[fase]||[]), ...nuevas];
+    const arr = _ensureFasesSitio(p, sitio, subfase);
+    arr.push(...nuevas);
     await projects.update(projectId, { documentacion: p.documentacion });
-    // Guardar target (tab 'fases' + fase específica) para restaurar después del re-render
-    sessionStorage.setItem('doc-tab-target', 'd-fases');
-    sessionStorage.setItem('doc-fase-target', fase);
+
+    sessionStorage.setItem('doc-tab-target',   'd-fases');
+    sessionStorage.setItem('doc-sitio-target',  sitio);
+    sessionStorage.setItem('doc-subfa-target',  subfase);
     navigate(`#proyecto/${projectId}/documentacion`);
     toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
   }, { multiple: true });
 };
 
-window.delFotoFase = async function(projectId, fase, idx) {
+window.delFotoSitio = async function(projectId, sitio, subfase, idx) {
   if (!await confirmDialog('¿Eliminar esta foto?')) return;
   const p = await projects.getById(projectId);
-  p.documentacion.fases[fase].splice(idx,1);
+  // Soportar legacy: si el foto está en fases[sitio][subfase] o en fases[legacyKey]
+  const arr = p.documentacion?.fases?.[sitio]?.[subfase];
+  if (arr) {
+    arr.splice(idx, 1);
+  } else if (sitio === 'techo') {
+    const m = { antes:'antes', durante:'durante', cierre:'despues' };
+    (p.documentacion.fases[m[subfase]] || []).splice(idx, 1);
+  }
   await projects.update(projectId, { documentacion: p.documentacion });
+  sessionStorage.setItem('doc-tab-target',   'd-fases');
+  sessionStorage.setItem('doc-sitio-target',  sitio);
+  sessionStorage.setItem('doc-subfa-target',  subfase);
   navigate(`#proyecto/${projectId}/documentacion`);
 };
 
-window.editFotaNota = async function(projectId, fase, idx) {
+window.editFotoNotaSitio = async function(projectId, sitio, subfase, idx) {
   const p = await projects.getById(projectId);
-  const actual = p.documentacion.fases[fase][idx].nota || '';
+  const arr = p.documentacion?.fases?.[sitio]?.[subfase]
+    || (sitio==='techo' ? p.documentacion?.fases?.[ {antes:'antes',durante:'durante',cierre:'despues'}[subfase] ] : null)
+    || [];
+  const actual = arr[idx]?.nota || '';
   const nueva = await inputDialog('Editar nota:', actual);
   if (nueva === null) return;
-  p.documentacion.fases[fase][idx].nota = nueva;
+  if (arr[idx]) arr[idx].nota = nueva;
   await projects.update(projectId, { documentacion: p.documentacion });
+  sessionStorage.setItem('doc-tab-target',   'd-fases');
+  sessionStorage.setItem('doc-sitio-target',  sitio);
+  sessionStorage.setItem('doc-subfa-target',  subfase);
   navigate(`#proyecto/${projectId}/documentacion`);
 };
 

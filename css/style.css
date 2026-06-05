@@ -2065,3 +2065,61 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
   border-top: 1px dashed var(--border2);
   margin: 14px 0 10px;
 }
+
+/* ── Selector de sitio (Techo / Centros de carga / Zona del sistema) ────────── */
+.sitio-selector {
+  display: flex; gap: 6px; flex-wrap: nowrap;
+  padding: 10px 0 6px; overflow-x: auto;
+  scrollbar-width: none;
+}
+.sitio-selector::-webkit-scrollbar { display: none; }
+.sitio-btn {
+  flex: 1; min-width: 90px; max-width: 140px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 6px; border: 1px solid var(--border2); border-radius: var(--radius);
+  background: var(--surface2); color: var(--text-muted); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: .72rem; font-weight: 500;
+  transition: all .15s; position: relative; text-align: center;
+  white-space: nowrap;
+}
+.sitio-btn .sitio-ico { font-size: 1.2rem; line-height: 1; }
+.sitio-btn .sitio-lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.sitio-btn:hover { border-color: var(--g500); color: var(--text); }
+.sitio-btn.sitio-active {
+  border-color: var(--g500); background: var(--g700); color: var(--g300); font-weight: 600;
+}
+.sitio-count {
+  position: absolute; top: 5px; right: 5px;
+  font-size: .62rem; background: var(--g500); color: #0f1a14;
+  padding: 1px 5px; border-radius: 8px; font-weight: 800;
+}
+
+.sitio-panel  { display: none; }
+.sitio-panel.sitio-panel-active { display: block; }
+
+/* ── Subfases (Antes / Durante / Cierre) dentro de cada sitio ───────────────── */
+.subfase-bar {
+  display: flex; gap: 4px; margin: 8px 0 6px;
+}
+.subfase-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 7px 4px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-muted); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 500;
+  transition: all .15s; position: relative;
+}
+.subfase-btn:hover { border-color: var(--border2); color: var(--text); }
+.subfase-btn.sf-active {
+  border-color: var(--g500); background: rgba(46,189,66,.1); color: var(--g300); font-weight: 600;
+}
+.subfase-count {
+  background: var(--g500); color: #0f1a14;
+  font-size: .62rem; font-weight: 800; padding: 1px 5px; border-radius: 8px;
+}
+
+.subfase-panel  { display: none; }
+.subfase-panel.sf-active { display: block; }
+
+.fotos-grid-header {
+  display: flex; justify-content: flex-end; margin-bottom: 6px;
+}
