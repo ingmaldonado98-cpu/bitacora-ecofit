@@ -294,19 +294,41 @@ window.delFotoTecnica = async function(projectId, key, idx) {
   navigate(`#proyecto/${projectId}/garantia`);
 };
 
+// ── Tipos de equipo ────────────────────────────────────────────────────────────
+const TIPOS_EQUIPO = [
+  { value: '',              label: '— Seleccionar tipo —' },
+  { value: 'inversor',      label: 'Inversor' },
+  { value: 'microinversor', label: 'Microinversor' },
+  { value: 'bateria',       label: 'Batería' },
+  { value: 'controladora',  label: 'Controladora / MPPT' },
+  { value: 'cargador',      label: 'Cargador' },
+  { value: 'optimizador',   label: 'Optimizador de potencia' },
+  { value: 'monitor',       label: 'Monitor / Gateway' },
+  { value: 'otro',          label: 'Otro' },
+];
+
 // ── 1C Equipos ────────────────────────────────────────────────────────────────
 function renderEquipos(equipos, projectId, edit, admin) {
   if (!equipos.length) return edit
     ? `<div class="empty-state"><div class="empty-state-icon">⚡</div>
-       <p class="empty-state-msg">Sin equipos registrados.<br>Agrega inversor, microinversor o cargador.</p>
-       <button class="empty-state-cta" onclick="document.getElementById('form-equipo')?.scrollIntoView({behavior:'smooth'})">+ Agregar equipo</button></div>`
+       <p class="empty-state-msg">Sin equipos registrados.<br>Agrega inversor, batería, controladora…</p>
+       <button class="empty-state-cta" onclick="showFormEquipo('${projectId}')">+ Agregar equipo</button></div>`
     : '<p class="empty-msg-sm">Sin equipos registrados.</p>';
-  return equipos.map((eq, i) => `
-    <div class="equipo-card">
+
+  return equipos.map((eq, i) => {
+    const tipoLabel = TIPOS_EQUIPO.find(t => t.value === eq.tipo)?.label || eq.tipo || '';
+    return `
+    <div class="equipo-card" id="eq-card-${i}">
       <div class="eq-header">
-        <span class="eq-marca">${esc(eq.marca)}</span>
-        <span class="eq-modelo">${esc(eq.modelo)}</span>
-        ${admin ? `<button class="btn-del-sm" onclick="delEquipo('${projectId}',${i})">✕</button>` : ''}
+        <div class="eq-id-info">
+          ${tipoLabel ? `<span class="eq-tipo-badge">${tipoLabel}</span>` : ''}
+          <span class="eq-marca">${esc(eq.marca)}</span>
+          <span class="eq-modelo">${esc(eq.modelo)}</span>
+        </div>
+        <div class="eq-actions">
+          ${edit ? `<button class="btn-icon-sm" onclick="editarEquipo('${projectId}',${i})" title="Editar equipo">✎</button>` : ''}
+          ${admin ? `<button class="btn-del-sm" onclick="delEquipo('${projectId}',${i})" title="Eliminar equipo">✕</button>` : ''}
+        </div>
       </div>
       <div class="eq-serial">
         ${icon('barcode')}
@@ -318,27 +340,41 @@ function renderEquipos(equipos, projectId, edit, admin) {
         ${fotoMini(eq.fotoAngulo, 'Ángulo')}
       </div>
       ${eq.notas ? `<p class="eq-notas">${esc(eq.notas)}</p>` : ''}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
-function formEquipo(projectId) {
+function formEquipo(projectId, eq = null, editIdx = -1) {
+  const isEdit = editIdx >= 0 && eq;
   return `
-    <h3 class="card-title">Agregar equipo</h3>
-    <div class="form-group">
-      <label>Marca *</label>
-      <select id="eq-marca">
-        ${MARCAS_EQUIPOS.map(m => `<option>${m}</option>`).join('')}
-      </select>
+    <h3 class="card-title">${isEdit ? 'Editar equipo' : 'Agregar equipo'}</h3>
+    <input type="hidden" id="eq-editing-idx" value="${editIdx}" />
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo *</label>
+        <select id="eq-tipo">
+          ${TIPOS_EQUIPO.map(t =>
+            `<option value="${t.value}" ${(isEdit ? eq.tipo : '') === t.value ? 'selected' : ''}>${t.label}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Marca *</label>
+        <select id="eq-marca">
+          ${MARCAS_EQUIPOS.map(m => `<option ${(isEdit ? eq.marca : '') === m ? 'selected' : ''}>${m}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div class="form-group">
       <label>Modelo *</label>
-      <input type="text" id="eq-modelo" placeholder="Ej: LXP-5K-48" />
+      <input type="text" id="eq-modelo" placeholder="Ej: LXP-5K-48"
+             value="${isEdit ? esc(eq.modelo) : ''}" />
     </div>
     <div class="form-group">
       <label>Número de serie</label>
       <div class="serial-row">
-        <input type="text" id="eq-serial" placeholder="Escribe o escanea el serial" />
+        <input type="text" id="eq-serial" placeholder="Escribe o escanea el serial"
+               value="${isEdit ? esc(eq.serial || '') : ''}" />
         <button type="button" class="btn-icon" onclick="scanSerial()" title="Escanear con cámara">
           ${icon('barcode')}
         </button>
@@ -346,28 +382,30 @@ function formEquipo(projectId) {
     </div>
     <div class="fotos-captura-row">
       <div class="foto-cap-slot" id="slot-eq-placa">
-        <button class="btn-foto-sm" onclick="capEqFoto('placa','slot-eq-placa')">
-          ${icon('camera')} Placa S/N
-        </button>
+        ${isEdit && eq.fotoPlaca
+          ? fotoMini(eq.fotoPlaca, 'Placa S/N')
+          : `<button class="btn-foto-sm" onclick="capEqFoto('placa','slot-eq-placa')">${icon('camera')} Placa S/N</button>`}
       </div>
       <div class="foto-cap-slot" id="slot-eq-frontal">
-        <button class="btn-foto-sm" onclick="capEqFoto('frontal','slot-eq-frontal')">
-          ${icon('camera')} Frontal
-        </button>
+        ${isEdit && eq.fotoFrontal
+          ? fotoMini(eq.fotoFrontal, 'Frontal')
+          : `<button class="btn-foto-sm" onclick="capEqFoto('frontal','slot-eq-frontal')">${icon('camera')} Frontal</button>`}
       </div>
       <div class="foto-cap-slot" id="slot-eq-angulo">
-        <button class="btn-foto-sm" onclick="capEqFoto('angulo','slot-eq-angulo')">
-          ${icon('camera')} Ángulo
-        </button>
+        ${isEdit && eq.fotoAngulo
+          ? fotoMini(eq.fotoAngulo, 'Ángulo')
+          : `<button class="btn-foto-sm" onclick="capEqFoto('angulo','slot-eq-angulo')">${icon('camera')} Ángulo</button>`}
       </div>
     </div>
     <div class="form-group">
       <label>Notas</label>
-      <textarea id="eq-notas" rows="2" placeholder="Observaciones opcionales…"></textarea>
+      <textarea id="eq-notas" rows="2" placeholder="Observaciones opcionales…">${isEdit ? esc(eq.notas || '') : ''}</textarea>
     </div>
     <div class="form-actions">
-      <button class="btn-outline btn-sm" onclick="document.getElementById('form-equipo').style.display='none'">Cancelar</button>
-      <button class="btn-primary btn-sm" onclick="guardarEquipo('${projectId}')">Guardar equipo</button>
+      <button class="btn-outline btn-sm" onclick="_cancelarFormEquipo()">Cancelar</button>
+      <button class="btn-primary btn-sm" onclick="guardarEquipo('${projectId}')">
+        ${isEdit ? 'Actualizar equipo' : 'Guardar equipo'}
+      </button>
     </div>
   `;
 }
@@ -416,32 +454,71 @@ window.scanLoteEstructura = function() {
 
 window.showFormEquipo = function(projectId) {
   const form = document.getElementById('form-equipo');
+  form.innerHTML = formEquipo(projectId); // siempre limpio al abrir
+  _clearEqFotos();
   form.style.display = 'block';
   form.scrollIntoView({ behavior:'smooth' });
 };
 
+window.editarEquipo = async function(projectId, idx) {
+  const p = await projects.getById(projectId);
+  const eq = p.garantia.equipos[idx];
+  if (!eq) return;
+  // Pre-cargar fotos existentes en _eqFotos para que guardarEquipo las conserve
+  _clearEqFotos();
+  if (eq.fotoPlaca)   _eqFotos.placa   = eq.fotoPlaca;
+  if (eq.fotoFrontal) _eqFotos.frontal = eq.fotoFrontal;
+  if (eq.fotoAngulo)  _eqFotos.angulo  = eq.fotoAngulo;
+
+  const form = document.getElementById('form-equipo');
+  form.innerHTML = formEquipo(projectId, eq, idx);
+  form.style.display = 'block';
+  form.scrollIntoView({ behavior:'smooth' });
+};
+
+window._cancelarFormEquipo = function() {
+  const form = document.getElementById('form-equipo');
+  form.style.display = 'none';
+  _clearEqFotos();
+};
+
 window.guardarEquipo = async function(projectId) {
+  const tipo   = document.getElementById('eq-tipo').value;
   const marca  = document.getElementById('eq-marca').value;
   const modelo = document.getElementById('eq-modelo').value.trim();
-  if (!modelo) { toast('El modelo es requerido','error'); return; }
+  if (!tipo)   { toast('Selecciona el tipo de equipo', 'error'); return; }
+  if (!modelo) { toast('El modelo es requerido', 'error'); return; }
 
-  const equipo = {
-    id: uuid(),
-    marca, modelo,
-    serial:      document.getElementById('eq-serial').value.trim(),
-    fotoPlaca:   _eqFotos.placa   || null,
-    fotoFrontal: _eqFotos.frontal || null,
-    fotoAngulo:  _eqFotos.angulo  || null,
-    notas:       document.getElementById('eq-notas').value.trim(),
-    createdAt:   isoNow(),
-  };
+  const editIdx = parseInt(document.getElementById('eq-editing-idx')?.value ?? '-1');
+  const isEdit  = editIdx >= 0;
 
   const p = await projects.getById(projectId);
   p.garantia = p.garantia || {};
-  p.garantia.equipos = [...(p.garantia.equipos || []), equipo];
+  p.garantia.equipos = p.garantia.equipos || [];
+
+  const equipo = {
+    id:          isEdit ? (p.garantia.equipos[editIdx]?.id || uuid()) : uuid(),
+    tipo, marca, modelo,
+    serial:      document.getElementById('eq-serial').value.trim(),
+    fotoPlaca:   _eqFotos.placa   || (isEdit ? p.garantia.equipos[editIdx]?.fotoPlaca   : null),
+    fotoFrontal: _eqFotos.frontal || (isEdit ? p.garantia.equipos[editIdx]?.fotoFrontal : null),
+    fotoAngulo:  _eqFotos.angulo  || (isEdit ? p.garantia.equipos[editIdx]?.fotoAngulo  : null),
+    notas:       document.getElementById('eq-notas').value.trim(),
+    createdAt:   isEdit ? (p.garantia.equipos[editIdx]?.createdAt || isoNow()) : isoNow(),
+    updatedAt:   isoNow(),
+  };
+
+  if (isEdit) {
+    p.garantia.equipos[editIdx] = equipo;
+    toast('✅ Equipo actualizado');
+  } else {
+    p.garantia.equipos = [...p.garantia.equipos, equipo];
+    toast('✅ Equipo registrado');
+  }
+
   await projects.update(projectId, { garantia: p.garantia });
-  Object.keys(_eqFotos).forEach(k => delete _eqFotos[k]);
-  toast('✅ Equipo registrado');
+  _clearEqFotos();
+  sessionStorage.setItem('garantia-tab-target', 'g-equipos');
   navigate(`#proyecto/${projectId}/garantia`);
 };
 
@@ -450,6 +527,7 @@ window.delEquipo = async function(projectId, idx) {
   const p = await projects.getById(projectId);
   p.garantia.equipos = p.garantia.equipos.filter((_,i) => i !== idx);
   await projects.update(projectId, { garantia: p.garantia });
+  sessionStorage.setItem('garantia-tab-target', 'g-equipos');
   navigate(`#proyecto/${projectId}/garantia`);
 };
 

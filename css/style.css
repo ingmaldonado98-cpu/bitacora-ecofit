@@ -2131,3 +2131,19 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
   cursor: pointer; text-decoration: underline; text-decoration-style: dotted;
 }
 .btn-link:hover { color: var(--g500); }
+
+/* ── Equipo card — tipo badge + layout actualizado ──────────────────────────── */
+.eq-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 8px; margin-bottom: 6px;
+}
+.eq-id-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.eq-tipo-badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  background: rgba(46,189,66,.15); color: var(--g300);
+  border: 1px solid rgba(46,189,66,.3); border-radius: 6px;
+  padding: 2px 8px; width: fit-content;
+}
+.eq-marca  { font-weight: 600; font-size: .88rem; color: var(--text); }
+.eq-modelo { font-size: .82rem; color: var(--text-muted); }
+.eq-actions { display: flex; gap: 4px; flex-shrink: 0; }
