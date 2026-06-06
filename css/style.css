@@ -2367,3 +2367,27 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .calc-prop-meta  { display: block; font-size: .72rem; color: var(--text-muted); margin-top: 2px; }
 .calc-prop-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .calc-prop-del   { background: none; border: 1px solid var(--red); color: var(--red); border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: .78rem; }
+
+/* ── Photo preview overlay (capturePhoto confirm step) ───────────────────── */
+.photo-preview-ov {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.88);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.photo-preview-modal {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 16px; max-width: 420px; width: 100%;
+  display: flex; flex-direction: column; gap: 14px;
+  box-shadow: var(--shadow);
+}
+.photo-preview-lbl {
+  font-size: .9rem; font-weight: 600; color: var(--text);
+  text-align: center;
+}
+.photo-preview-img {
+  width: 100%; border-radius: var(--radius-sm);
+  max-height: 58vh; object-fit: contain; background: #000;
+}
+.photo-preview-actions { display: flex; gap: 10px; }
+.photo-preview-actions button { flex: 1; justify-content: center; }

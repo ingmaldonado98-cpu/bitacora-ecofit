@@ -107,7 +107,7 @@ export async function renderGarantia(projectId, session) {
 
 // ── 1A Foto del sistema ────────────────────────────────────────────────────────
 window.capturarFotoSistema = function(projectId) {
-  capturePhoto(async (b64) => {
+  capturePhoto(async (b64, _files, fileMeta) => {
     toast(navigator.onLine ? 'Subiendo foto…' : 'Sin conexión — foto guardada localmente');
     const result = await uploadPhotoQueued(b64, `projects/${projectId}/sistema.jpg`, projectId, 'fotoSistema');
     const slot = document.getElementById('slot-foto-sistema');
@@ -116,10 +116,11 @@ window.capturarFotoSistema = function(projectId) {
     const p = await projects.getById(projectId);
     p.garantia = p.garantia || {};
     p.garantia.fotoSistema = result.url || null;
+    p.garantia.fotoSistemaFuente = fileMeta?.fuente || 'camera';
     if (result.pending) p.garantia._fotoSistemaPending = result.pendingId;
     await projects.update(projectId, { garantia: p.garantia });
     if (!result.pending) toast('✅ Foto guardada');
-  });
+  }, { projectId, fase: 'cierre', campo: 'SistemaGeneral', preview: true });
 };
 
 window.delFotoGeneral = async function(projectId) {

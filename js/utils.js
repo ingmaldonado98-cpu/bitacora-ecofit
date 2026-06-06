@@ -90,19 +90,41 @@ export function compressImage(file, maxDim = 1280, quality = 0.72) {
   });
 }
 
-// Captura foto con input file (abre cámara directo en móvil)
-export function capturePhoto(callback, { multiple = false } = {}) {
+// Captura foto con input file (abre cámara directo en móvil).
+// Opciones: multiple, projectId, fase, campo → renombran el archivo automáticamente.
+//           preview → muestra confirmación antes de llamar al callback (solo single).
+export function capturePhoto(callback, { multiple = false, projectId, fase, campo, preview = false } = {}) {
   const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.capture = 'environment'; // cámara trasera
+  input.type        = 'file';
+  input.accept      = 'image/*';
+  input.capture     = 'environment'; // abre cámara trasera directamente en Android
   if (multiple) input.multiple = true;
+
   input.onchange = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     try {
-      const compressed = await Promise.all(files.map(f => compressImage(f)));
-      await callback(multiple ? compressed : compressed[0], files);
+      // Renombrar con metadata si se proporcionan projectId + fase + campo
+      const renamedFiles = (projectId && fase && campo)
+        ? files.map((f, i) => {
+            const ts  = new Date().toISOString().slice(0, 16).replace('T', '_').replace(/:/g, '-');
+            const sfx = multiple && files.length > 1 ? `_${i + 1}` : '';
+            return new File([f], `${projectId}_${fase}_${campo}${sfx}_${ts}.jpg`, { type: f.type });
+          })
+        : files;
+
+      const compressed = await Promise.all(renamedFiles.map(f => compressImage(f)));
+      const fileMeta   = { fuente: 'camera', nombres: renamedFiles.map(f => f.name) };
+
+      if (preview && !multiple) {
+        _showPhotoPreview(
+          compressed[0],
+          () => callback(compressed[0], renamedFiles, fileMeta),
+          () => capturePhoto(callback, { multiple, projectId, fase, campo, preview })
+        );
+      } else {
+        await callback(multiple ? compressed : compressed[0], renamedFiles, fileMeta);
+      }
     } catch (err) {
       if (err.code === 'offline') {
         toast('Sin conexión — la foto no se guardó. Conéctate e intenta de nuevo.', 'error', 6000);
@@ -113,6 +135,25 @@ export function capturePhoto(callback, { multiple = false } = {}) {
     }
   };
   input.click();
+}
+
+// Preview de confirmación antes de aceptar la foto (uso interno)
+function _showPhotoPreview(b64, onConfirm, onRetake) {
+  const ov = document.createElement('div');
+  ov.className = 'photo-preview-ov';
+  ov.innerHTML = `
+    <div class="photo-preview-modal">
+      <p class="photo-preview-lbl">¿Usar esta foto?</p>
+      <img src="${b64}" class="photo-preview-img" alt="Vista previa de la foto capturada">
+      <div class="photo-preview-actions">
+        <button class="btn-outline photo-preview-retake">↩ Retomar</button>
+        <button class="btn-primary photo-preview-confirm">✓ Confirmar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+  ov.querySelector('.photo-preview-retake').onclick  = () => { ov.remove(); onRetake(); };
+  ov.querySelector('.photo-preview-confirm').onclick = () => { ov.remove(); onConfirm(); };
 }
 
 // ── Barra de progreso de subida ───────────────────────────────────────────────

@@ -1069,7 +1069,9 @@ function _ensureFasesSitio(p, sitio, subfase) {
 }
 
 window.agregarFotoSitio = function(projectId, sitio, subfase) {
-  capturePhoto(async (b64Array) => {
+  // preview:true en fotos de una sola imagen para que el técnico confirme antes de subir
+  const single = false; // multiple siempre activo en fases de sitio
+  capturePhoto(async (b64Array, _files, fileMeta) => {
     const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
     const total = fotos.length;
     const prog  = uploadProgressBar(total);
@@ -1085,6 +1087,7 @@ window.agregarFotoSitio = function(projectId, sitio, subfase) {
       nuevas.push({
         data: result.url || (result.pending ? fotos[i] : null),
         nota: '', id: fid, createdAt: isoNow(),
+        fuente: fileMeta?.fuente || 'camera',
         ...(result.pending && { pending: true, pendingId: result.pendingId }),
       });
     }
@@ -1104,7 +1107,7 @@ window.agregarFotoSitio = function(projectId, sitio, subfase) {
     sessionStorage.setItem('doc-subfa-target',  subfase);
     navigate(`#proyecto/${projectId}/documentacion`);
     toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
-  }, { multiple: true });
+  }, { multiple: true, projectId, fase: sitio, campo: subfase });
 };
 
 window.delFotoSitio = async function(projectId, sitio, subfase, idx) {

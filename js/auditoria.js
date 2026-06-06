@@ -568,7 +568,7 @@ window.guardarFormal = async function(e, projectId) {
 
 // ── Foto documento firmado ────────────────────────────────────────────────────
 window.capDocFirmado = function(projectId) {
-  capturePhoto(async b64 => {
+  capturePhoto(async (b64, _files, fileMeta) => {
     const slot = document.getElementById('slot-doc-firmado');
     if (slot) slot.innerHTML = fotoMini(b64, 'Documento firmado');
     toast('Subiendo documento…');
@@ -584,7 +584,7 @@ window.capDocFirmado = function(projectId) {
         toast('Error al subir: ' + err.message, 'error');
       }
     }
-  });
+  }, { projectId, fase: 'auditoria', campo: 'DocFirmado', preview: true });
 };
 
 window.delDocFirmado = async function(projectId) {
