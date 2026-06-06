@@ -1,6 +1,6 @@
 // calculadora.js — Calculadora BOM · Bitácora Ecofit V6
 
-import { toast, confirmDialog, isoNow } from './utils.js';
+import { toast, confirmDialog, isoNow, esc } from './utils.js';
 import { icon } from './icons.js';
 import { projects, inventario as invStore, kv } from './db.js';
 import {
@@ -384,8 +384,6 @@ function renderBOM() {
       ${items.map(item => {
         const invId = BOM_INV_MAP[item.partNum];
         const stock = invId ? (_stockData[invId] ?? null) : null;
-        const mat   = invId ? _materials.find(m=>m.id===invId) : null;
-        const stockMin = mat?.stockMin ?? 0;
         const stockBadge = stock !== null
           ? (() => {
               const diff = stock - item.qty;
@@ -429,7 +427,6 @@ function renderBOM() {
       <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">${t.nota}</div>
     </div>`).join('');
 
-  // Cortes de riel
   const rdUniq = [...new Set(getRowData())].sort((a,b)=>a-b);
   const corteRows = rdUniq.map(c=>{
     const cut = railCutForRow(c, cs.pW, cs.estructura);
@@ -442,35 +439,74 @@ function renderBOM() {
     </div>`;
   }).join('');
 
+  const totalMat = bom.reduce((s,i)=>s+i.qty, 0);
+
   return `
-  <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:12px 14px;background:var(--surface2);display:flex;justify-content:space-between;align-items:center">
-      <h3 class="card-title" style="margin:0">Lista de materiales</h3>
-      <span style="font-size:.78rem;color:var(--text-muted)">${bom.length} ítems · ${totalPanels()} paneles</span>
+  <!-- Resumen total -->
+  <div class="card calc-bom-total">
+    <div class="cbt-title">Resumen BOM</div>
+    <div class="cbt-items">
+      <div class="cbt-item">
+        <span class="cbt-num">${totalPanels()}</span>
+        <span class="cbt-lbl">paneles</span>
+      </div>
+      <div class="cbt-sep"></div>
+      <div class="cbt-item">
+        <span class="cbt-num">${bom.length}</span>
+        <span class="cbt-lbl">tipos material</span>
+      </div>
+      <div class="cbt-sep"></div>
+      <div class="cbt-item">
+        <span class="cbt-num">${totalMat}</span>
+        <span class="cbt-lbl">pzas total</span>
+      </div>
+      <div class="cbt-sep"></div>
+      <div class="cbt-item">
+        <span class="cbt-num">${consumibles.length}</span>
+        <span class="cbt-lbl">consumibles</span>
+      </div>
     </div>
-    ${bomRows}
   </div>
 
-  <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:10px 14px;background:var(--surface2)">
-      <h3 class="card-title" style="margin:0">Consumibles de anclaje</h3>
-    </div>
-    ${consRows}
-  </div>
+  <!-- Lista de materiales (expandible, abierta por defecto) -->
+  <details class="calc-section card" open>
+    <summary class="calc-section-hdr">
+      <span>Lista de materiales</span>
+      <span class="calc-section-badge">${bom.length} ítems · ${totalPanels()} paneles</span>
+      <span class="calc-section-caret">▾</span>
+    </summary>
+    <div class="calc-section-body">${bomRows}</div>
+  </details>
 
-  <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:10px 14px;background:var(--surface2)">
-      <h3 class="card-title" style="margin:0">Cortes de riel</h3>
-    </div>
-    ${corteRows}
-  </div>
+  <!-- Consumibles -->
+  <details class="calc-section card">
+    <summary class="calc-section-hdr">
+      <span>Consumibles de anclaje</span>
+      <span class="calc-section-badge">${consumibles.length} ítems</span>
+      <span class="calc-section-caret">▾</span>
+    </summary>
+    <div class="calc-section-body">${consRows}</div>
+  </details>
 
-  <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:10px 14px;background:var(--surface2)">
-      <h3 class="card-title" style="margin:0">Torques de apriete</h3>
-    </div>
-    ${torqRows}
-  </div>`;
+  <!-- Cortes de riel -->
+  <details class="calc-section card">
+    <summary class="calc-section-hdr">
+      <span>Cortes de riel</span>
+      <span class="calc-section-badge">${rdUniq.length} tipo${rdUniq.length!==1?'s':''}</span>
+      <span class="calc-section-caret">▾</span>
+    </summary>
+    <div class="calc-section-body">${corteRows}</div>
+  </details>
+
+  <!-- Torques -->
+  <details class="calc-section card">
+    <summary class="calc-section-hdr">
+      <span>Torques de apriete</span>
+      <span class="calc-section-badge">${torques.length} ítems</span>
+      <span class="calc-section-caret">▾</span>
+    </summary>
+    <div class="calc-section-body">${torqRows}</div>
+  </details>`;
 }
 
 // ── Guía de instalación ────────────────────────────────────────────────────
@@ -555,29 +591,63 @@ function renderGuia() {
 
 // ── CTA ────────────────────────────────────────────────────────────────────
 function renderCTA() {
+  if (!_projectId) {
+    return `
+    <div class="card">
+      <p style="font-size:.84rem;color:var(--text-muted);margin-bottom:12px">
+        Abre esta calculadora desde un proyecto para guardar el BOM directamente.
+      </p>
+      <button class="btn-outline btn-full" onclick="navigate('#dashboard')">
+        ${icon('house', 18)} Ir al inicio
+      </button>
+    </div>
+    <div style="height:20px"></div>`;
+  }
+
+  const prevDeduction = _project?.projectConfig?.inventoryDeducted;
+  const propuestas    = _project?.propuestas || [];
+  const nextNum       = propuestas.length + 1;
+
+  const propList = propuestas.length ? `
+  <div class="calc-prop-list">
+    <div class="calc-prop-list-title">Propuestas guardadas</div>
+    ${propuestas.map((p, i) => `
+    <div class="calc-prop-item">
+      <div class="calc-prop-info">
+        <span class="calc-prop-nombre">${esc(p.nombre || `Propuesta ${i+1}`)}</span>
+        <span class="calc-prop-meta">
+          ${new Date(p.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'})}
+          · ${p.bom?.length||0} mat · ${p.config?.layout?.totalPanels||0} pan.
+        </span>
+      </div>
+      <div class="calc-prop-actions">
+        <button class="btn-sm btn-outline" onclick="calcCargarPropuesta(${i})">Cargar</button>
+        <button class="btn-sm calc-prop-del" onclick="calcEliminarPropuesta(${i})">✕</button>
+      </div>
+    </div>`).join('')}
+  </div>` : '';
+
   return `
   <div class="card">
-    ${_projectId ? (() => {
-      const prevDeduction = _project?.projectConfig?.inventoryDeducted;
-      return `
-    <button class="btn-primary btn-full" onclick="calcGuardar()">
-      ${icon('floppy-disk', 18)}
-      Guardar BOM en proyecto
-    </button>
-    <p style="font-size:.75rem;color:var(--text-muted);text-align:center;margin-top:8px">
-      Se guardará en <b>${_project?.displayId || _projectId}</b>
-    </p>
-    ${prevDeduction ? `<p style="font-size:.72rem;color:var(--g300);text-align:center;margin-top:4px">
+    <h3 class="card-title" style="margin-bottom:12px">Guardar propuesta</h3>
+    <div class="form-group" style="margin-bottom:12px">
+      <label style="font-size:.78rem;color:var(--text-muted)">Nombre</label>
+      <input type="text" id="inp-prop-nombre" class="input-field"
+        placeholder="Ej: Techo sur — 8 paneles K2"
+        value="Propuesta ${nextNum}" />
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-primary" style="flex:1;min-width:140px" onclick="calcGuardarPropuesta()">
+        ${icon('floppy-disk', 16)} Guardar propuesta
+      </button>
+      <button class="btn-outline" style="flex:1;min-width:140px" onclick="calcGuardar()">
+        ${icon('check', 16)} Aplicar al proyecto
+      </button>
+    </div>
+    ${prevDeduction ? `<p style="font-size:.72rem;color:var(--g300);text-align:center;margin-top:8px">
       ✓ Inventario descontado el ${new Date(prevDeduction).toLocaleDateString('es-MX',{day:'2-digit',month:'short'})}
-    </p>` : ''}`;
-    })() : `
-    <p style="font-size:.84rem;color:var(--text-muted);margin-bottom:12px">
-      Abre esta calculadora desde un proyecto para guardar el BOM directamente.
-    </p>
-    <button class="btn-outline btn-full" onclick="navigate('#dashboard')">
-      ${icon('house', 18)}
-      Ir al inicio
-    </button>`}
+    </p>` : ''}
+    ${propList}
   </div>
   <div style="height:20px"></div>`;
 }
@@ -728,6 +798,56 @@ window.calcGuardar = async () => {
   }
 };
 
+
+// ── Guardar como propuesta ────────────────────────────────────────────────
+window.calcGuardarPropuesta = async () => {
+  if (!_projectId) return;
+  const nombre = document.getElementById('inp-prop-nombre')?.value?.trim()
+    || `Propuesta ${(_project?.propuestas?.length||0)+1}`;
+  try {
+    const cfg        = buildProjectConfig(cs);
+    const rd         = getRowData();
+    const bom        = calcBOM(rd, cs.estructura, cs.subtipo, cs.base, cs.pW);
+    const consumibles = calcConsumibles(rd, cs.estructura, cs.techo);
+    const nueva = {
+      id:          Date.now().toString(),
+      nombre,
+      createdAt:   isoNow(),
+      createdBy:   _session?.nombre || _session?.username || '—',
+      config:      cfg,
+      bom,
+      consumibles,
+    };
+    const propuestas = [...(_project?.propuestas || []), nueva];
+    await projects.update(_projectId, { propuestas });
+    _project = { ..._project, propuestas };
+    toast(`Propuesta "${nombre}" guardada ✓`);
+    calcRender();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+};
+
+window.calcCargarPropuesta = (i) => {
+  const p = _project?.propuestas?.[i];
+  if (!p?.config) return;
+  loadFromConfig(p.config);
+  calcRender();
+  toast(`Propuesta "${p.nombre || `#${i+1}`}" cargada`);
+};
+
+window.calcEliminarPropuesta = async (i) => {
+  const p = _project?.propuestas?.[i];
+  if (!p) return;
+  const ok = await confirmDialog(`¿Eliminar propuesta "${p.nombre || `#${i+1}`}"?`);
+  if (!ok) return;
+  const propuestas = [...(_project?.propuestas || [])];
+  propuestas.splice(i, 1);
+  await projects.update(_projectId, { propuestas });
+  _project = { ..._project, propuestas };
+  toast('Propuesta eliminada');
+  calcRender();
+};
 
 // ── Bind ───────────────────────────────────────────────────────────────────
 function calcBind() {

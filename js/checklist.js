@@ -3,7 +3,7 @@
 import { projects } from './db.js';
 import { esc, toast, isoNow } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
-import { HERRAMIENTA, getConsumibles, ADMIN_REVIEW_ITEMS } from '../modules/checklist/index.js';
+import { HERRAMIENTA, getConsumibles, ADMIN_REVIEW_ITEMS, getExecBlocks } from '../modules/checklist/index.js';
 import { buildDiagramSVG, buildGuiaData, buildTorqueTable } from '../modules/calculadora/index.js';
 
 let _clDiagScale = 1;
@@ -31,11 +31,16 @@ export async function renderChecklistModule(projectId, session) {
   const doneCons  = consumibles.filter((_, i) => cl.cons?.[String(i)]).length;
   const doneBOM   = bomItems.filter((_, i) => cl.bom?.[String(i)]).length;
   const doneAdmin = ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length;
-  // allAdmin solo es true si HAY ítems Y todos están marcados (evita true cuando length===0)
   const allAdmin  = ADMIN_REVIEW_ITEMS.length > 0 && doneAdmin === ADMIN_REVIEW_ITEMS.length;
   const published = !!cl.publishedAt;
   const totalMat  = bomItems.length + consumibles.length;
   const doneMat   = doneBOM + doneCons;
+
+  // Bloques de ejecución por tipo de sistema
+  const execBlocks   = getExecBlocks(project.tipoSistema, techo);
+  const execAllItems = execBlocks.flatMap(b => b.items);
+  const doneExec     = execAllItems.filter(it => cl.exec?.[it.id]).length;
+  const totalExec    = execAllItems.length;
 
   return `
   <div class="breadcrumb">
@@ -78,8 +83,11 @@ export async function renderChecklistModule(projectId, session) {
     <button class="tab-btn" data-tab="cl-cons" onclick="switchTab('cl-tabs','cl-cons',this)">
       Materiales${totalMat > 0 && doneMat === totalMat ? '<span class="tab-badge tab-ok">✓</span>' : (totalMat > 0 ? `<span class="tab-badge">${doneMat}/${totalMat}</span>` : '')}
     </button>
+    <button class="tab-btn" data-tab="cl-exec" onclick="switchTab('cl-tabs','cl-exec',this)">
+      Ejecución${doneExec === totalExec && totalExec ? '<span class="tab-badge tab-ok">✓</span>' : `<span class="tab-badge">${doneExec}/${totalExec}</span>`}
+    </button>
     <button class="tab-btn" data-tab="cl-guia" onclick="switchTab('cl-tabs','cl-guia',this)">
-      Guía técnica
+      Guía
     </button>
   </div>
 
@@ -178,6 +186,34 @@ export async function renderChecklistModule(projectId, session) {
         </button>
       </div>
     </div>`}
+  </div>
+
+  <!-- Ejecución por bloques -->
+  <div id="cl-exec" class="tab-panel">
+    ${renderProgress(doneExec, totalExec)}
+    ${execBlocks.map(block => {
+      const blockDone  = block.items.filter(it => cl.exec?.[it.id]).length;
+      const blockTotal = block.items.length;
+      const allDone    = blockDone === blockTotal;
+      return `
+      <details class="cl-exec-block card" ${allDone ? '' : 'open'}>
+        <summary class="cl-exec-block-hdr">
+          <span class="cl-exec-block-title">${esc(block.label)}</span>
+          <span class="cl-exec-block-badge ${allDone ? 'cl-exec-ok' : ''}">${allDone ? '✓' : `${blockDone}/${blockTotal}`}</span>
+          <span class="cl-exec-caret">▾</span>
+        </summary>
+        <div class="cl-item-list" style="padding:0 4px 8px">
+          ${block.items.map(it => `
+          <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
+            <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
+              onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${projectId}','${it.id}',this.checked)">
+            <div class="cl-item-text">
+              <span class="cl-item-name">${esc(it.n)}</span>
+            </div>
+          </label>`).join('')}
+        </div>
+      </details>`;
+    }).join('')}
   </div>
 
   <!-- Guía técnica -->

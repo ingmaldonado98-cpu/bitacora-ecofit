@@ -232,6 +232,10 @@ function renderModulosProgreso(project, id, session, admin) {
 
   const puedeAuditoria = admin || isLider(session);
 
+  const totalDone    = docDone + garDone + (puedeAuditoria ? audDone : 0);
+  const totalPosible = docItems.length + garItems.length + (puedeAuditoria ? audItems.length : 0);
+  const generalPct   = totalPosible > 0 ? Math.round(totalDone / totalPosible * 100) : 0;
+
   const modCard = (title, iconName, colorClass, pct, items, link) => `
     <div class="mod-prog-card ${colorClass}" onclick="navigate('${link}')">
       <div class="mpc-top">
@@ -253,6 +257,21 @@ function renderModulosProgreso(project, id, session, admin) {
     </div>`;
 
   return `
+  <div class="card pp-card">
+    <div class="pp-header">
+      <span class="pp-title">Progreso general</span>
+      <span class="pp-pct ${generalPct === 100 ? 'pp-done' : ''}">${generalPct}%</span>
+    </div>
+    <div class="pp-bar-track">
+      <div class="pp-bar-fill ${generalPct === 100 ? 'pp-bar-done' : ''}" style="width:${generalPct}%"></div>
+    </div>
+    <div class="pp-subs">
+      <span class="pp-sub">Doc <b>${docPct}%</b></span>
+      <span class="pp-sub">Garantía <b>${garPct}%</b></span>
+      ${puedeAuditoria ? `<span class="pp-sub">Auditoría <b>${audPct}%</b></span>` : ''}
+    </div>
+  </div>
+
   <div class="modulos-progreso">
     ${modCard('Documentación', 'clipboard-text', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`)}
     ${modCard('Garantía', 'seal-check', 'mpc-gar', garPct, garItems, `#proyecto/${id}/garantia`)}

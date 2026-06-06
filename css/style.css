@@ -2165,6 +2165,19 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 }
 .mpc-bar-done { background: var(--g500); }
 
+/* ── Progreso general del proyecto ─────────────────────────────────────────── */
+.pp-card        { padding: 14px 16px; }
+.pp-header      { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.pp-title       { font-size: .78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.pp-pct         { font-size: 1.5rem; font-weight: 800; color: var(--g300); }
+.pp-done        { color: var(--g500); }
+.pp-bar-track   { height: 8px; background: var(--surface3); border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
+.pp-bar-fill    { height: 100%; background: var(--g300); border-radius: 4px; transition: width .4s ease; min-width: 2px; }
+.pp-bar-done    { background: var(--g500); }
+.pp-subs        { display: flex; gap: 16px; flex-wrap: wrap; }
+.pp-sub         { font-size: .75rem; color: var(--text-muted); }
+.pp-sub b       { color: var(--text); }
+
 /* ── Herramientas secundarias ─────────────────────────────────────────────── */
 .tools-row {
   display: grid;
@@ -2287,3 +2300,70 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 .cl-prog-lbl {
   font-size: .78rem; color: var(--text-muted); font-weight: 600;
 }
+
+/* ── Checklist — bloques de ejecución ────────────────────────────────────── */
+details.cl-exec-block { padding: 0; overflow: hidden; margin-bottom: 10px; }
+details.cl-exec-block summary.cl-exec-block-hdr {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 14px; background: var(--surface2);
+  cursor: pointer; list-style: none; user-select: none;
+}
+details.cl-exec-block summary.cl-exec-block-hdr::-webkit-details-marker { display: none; }
+.cl-exec-block-title { flex: 1; font-size: .86rem; font-weight: 700; color: var(--text); }
+.cl-exec-block-badge {
+  font-size: .72rem; font-weight: 700; font-family: monospace;
+  color: var(--text-muted); background: var(--surface3);
+  border-radius: 10px; padding: 2px 8px;
+}
+.cl-exec-block-badge.cl-exec-ok { background: rgba(46,189,66,.15); color: var(--g300); }
+.cl-exec-caret { font-size: .8rem; color: var(--text-muted); transition: transform .2s; }
+details.cl-exec-block[open] .cl-exec-caret { transform: rotate(180deg); }
+
+/* ── Calculadora — secciones expandibles ─────────────────────────────────── */
+details.calc-section { padding: 0; overflow: hidden; }
+details.calc-section summary.calc-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 14px; background: var(--surface2);
+  cursor: pointer; list-style: none; user-select: none;
+  font-size: .86rem; font-weight: 700; color: var(--text);
+}
+details.calc-section summary.calc-section-hdr::-webkit-details-marker { display: none; }
+details.calc-section summary.calc-section-hdr span:first-child { flex: 1; }
+.calc-section-badge {
+  font-size: .72rem; color: var(--text-muted); font-weight: 400;
+}
+.calc-section-caret {
+  font-size: .8rem; color: var(--text-muted);
+  transition: transform .2s;
+}
+details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
+.calc-section-body { padding-bottom: 4px; }
+
+/* ── Calculadora — resumen BOM total ─────────────────────────────────────── */
+.calc-bom-total { padding: 14px 16px; }
+.cbt-title {
+  font-size: .72rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px;
+}
+.cbt-items { display: flex; gap: 0; align-items: stretch; }
+.cbt-item  { flex: 1; text-align: center; padding: 4px 0; }
+.cbt-sep   { width: 1px; background: var(--border); margin: 0 4px; }
+.cbt-num   { display: block; font-size: 1.4rem; font-weight: 900; font-family: monospace; color: var(--g300); }
+.cbt-lbl   { display: block; font-size: .68rem; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Calculadora — propuestas ────────────────────────────────────────────── */
+.calc-prop-list       { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+.calc-prop-list-title {
+  font-size: .72rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px;
+}
+.calc-prop-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.calc-prop-item:last-child { border-bottom: none; }
+.calc-prop-info  { flex: 1; min-width: 0; }
+.calc-prop-nombre{ display: block; font-size: .86rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calc-prop-meta  { display: block; font-size: .72rem; color: var(--text-muted); margin-top: 2px; }
+.calc-prop-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.calc-prop-del   { background: none; border: 1px solid var(--red); color: var(--red); border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: .78rem; }
