@@ -1,8 +1,8 @@
 // sw.js — Service Worker Bitácora Ecofit V6
 // ⚠ Cambiar BUILD_DATE y CACHE_NAME en cada deploy para invalidar caché
-const BUILD_DATE  = '2026-06-05d';
-const CACHE_NAME  = 'ecofit-v6-v35';
-const SW_VERSION  = '6.35.0';
+const BUILD_DATE  = '2026-06-06';
+const CACHE_NAME  = 'ecofit-v6-v36';
+const SW_VERSION  = '6.36.0';
 
 const APP_SHELL = [
   './',
