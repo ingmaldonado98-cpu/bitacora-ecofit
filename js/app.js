@@ -2,7 +2,7 @@
 
 import { renderLogin, getSession, logout, requireAuth } from './auth.js';
 import { renderDashboard, initDashboardFilters, updateNavBadge } from './dashboard.js';
-import { renderProjectDetail, renderProjectForm } from './project.js';
+import { renderProjectDetail, renderProjectForm, calcFaseEstado } from './project.js';
 import { renderGarantia, renderEstructuraForm } from './garantia.js';
 import { renderDocumentacion } from './documentacion.js';
 import { renderAuditoria } from './auditoria.js';
@@ -173,11 +173,23 @@ async function route() {
           if (subsub === 'estructura') {
             await render(renderEstructuraForm(id, session));
           } else {
+            const _gp = await projects.getById(id);
+            const _ge = calcFaseEstado(_gp || {});
+            if (_ge.gar === 'bloqueada') {
+              toast('Completa el Levantamiento en Documentación primero.', 'warn', 4000);
+              navigate(`#proyecto/${id}`); return;
+            }
             await render(renderGarantia(id, session));
           }
         } else if (sub === 'documentacion') {
           await render(renderDocumentacion(id, session));
         } else if (sub === 'auditoria') {
+          const _ap = await projects.getById(id);
+          const _ae = calcFaseEstado(_ap || {});
+          if (_ae.aud === 'bloqueada') {
+            toast('Completa Garantía primero (foto del sistema + equipos o fotos técnicas).', 'warn', 4000);
+            navigate(`#proyecto/${id}`); return;
+          }
           await render(renderAuditoria(id, session));
         } else if (sub === 'qr') {
           await render(renderQR(id, session));

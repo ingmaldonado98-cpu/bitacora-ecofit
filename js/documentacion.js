@@ -2,7 +2,7 @@
 
 import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar } from './utils.js';
-import { canEdit, isAdmin } from './auth.js';
+import { canEdit, isAdmin, isLider } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 
@@ -129,6 +129,22 @@ export async function renderDocumentacion(projectId, session) {
       </div>
     </div>
   </div>
+  ${(isAdmin(session) || isLider(session)) ? (() => {
+    const firma = project.fases?.firmas?.doc;
+    return `
+  <div class="fase-firma-wrap">
+    ${firma
+      ? `<div class="fase-firma-ok">
+           ${icon('seal-check', 16)} Documentación firmada por <b>${esc(firma.nombre || firma.firmado_por)}</b>
+           <span class="fase-firma-fecha">${fmtFechaHora(firma.firmado_en)}</span>
+         </div>`
+      : `<button class="btn-firma-fase" onclick="window._firmarFase('${projectId}','doc')">
+           ${icon('signature', 16)} Firmar Documentación
+         </button>`
+    }
+  </div>`;
+  })() : ''}
+
   <script>
     (function() {
       const tabTarget   = sessionStorage.getItem('doc-tab-target');

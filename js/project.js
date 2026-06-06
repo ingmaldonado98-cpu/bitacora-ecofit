@@ -180,6 +180,83 @@ export async function renderProjectDetail(id, session) {
   `;
 }
 
+// ── Estado secuencial de fases ────────────────────────────────────────────────
+// Retorna { doc, gar, aud } con valores: 'disponible' | 'bloqueada' | 'completa'
+export function calcFaseEstado(project) {
+  const doc = project.documentacion || {};
+  const gar = project.garantia    || {};
+  const aud = project.auditoria   || {};
+
+  // Documentación: siempre disponible
+  const _fc = (sitio, sub) => {
+    const n = doc.fases?.[sitio]?.[sub]?.length || 0;
+    if (n > 0) return n;
+    if (sitio === 'techo') { const m={antes:'antes',durante:'durante',cierre:'despues'}; return doc.fases?.[m[sub]]?.length||0; }
+    return 0;
+  };
+  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('techo',f),0);
+  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('centrosCarga',f),0);
+  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('zonaDelSistema',f),0);
+  const docItemsOk = [
+    !!(doc.levantamiento?.tipTecho),
+    fTecho > 0,
+    fCentros > 0,
+    fZona > 0,
+  ].filter(Boolean).length;
+
+  const docCompleta  = docItemsOk >= 1; // al menos levantamiento iniciado
+  const docFirmada   = !!(project.fases?.firmas?.doc);
+
+  // Garantía: disponible cuando Documentación tiene al menos levantamiento
+  const garDesbloqueada = docCompleta;
+  const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
+  const garItemsOk = [
+    !!gar.fotoSistema,
+    !!(gar.fotosTecnicas?.tableroAC || gar.fotosTecnicas?.inversorEnergizado),
+    (gar.equipos?.length||0) > 0,
+    totalPaneles > 0,
+  ].filter(Boolean).length;
+  const garCompleta  = garItemsOk >= 2;
+  const garFirmada   = !!(project.fases?.firmas?.gar);
+
+  // Auditoría: disponible cuando Garantía tiene >= 2 ítems completados
+  const audDesbloqueada = garDesbloqueada && garItemsOk >= 2;
+  const audItemsOk = [
+    (aud.checklist?.length||0) >= 11,
+    !!aud.resultado,
+  ].filter(Boolean).length;
+  const audCompleta = audItemsOk >= 2;
+
+  return {
+    doc: 'disponible',
+    gar: garDesbloqueada  ? (garCompleta  ? 'completa' : 'disponible') : 'bloqueada',
+    aud: audDesbloqueada  ? (audCompleta  ? 'completa' : 'disponible') : 'bloqueada',
+    // Firmas para mostrar en UI
+    docFirmada, garFirmada,
+    // Textos de requisito para el tooltip del candado
+    garRequisito: 'Completa el Levantamiento en Documentación primero.',
+    audRequisito: `Completa Garantía primero (foto del sistema + al menos un equipo o foto técnica).`,
+  };
+}
+
+// ── Firmar fase ───────────────────────────────────────────────────────────────
+export async function firmarFase(projectId, fase) {
+  const session = getSession();
+  if (!session) { toast('Sesión no encontrada', 'error'); return; }
+  const p = await projects.getById(projectId);
+  const fases = p.fases || {};
+  fases.firmas = fases.firmas || {};
+  fases.firmas[fase] = {
+    firmado_por: session.uid,
+    nombre:      session.nombre || session.email,
+    firmado_en:  isoNow(),
+  };
+  await projects.update(projectId, { fases });
+  toast(`✅ Fase firmada por ${session.nombre || session.email}`);
+  navigate(`#proyecto/${projectId}`);
+}
+window._firmarFase = firmarFase;
+
 // ── Módulos con progreso ──────────────────────────────────────────────────────
 function renderModulosProgreso(project, id, session, admin) {
   // ── Calcular progreso por módulo ──────────────────────────────────────────
@@ -231,30 +308,42 @@ function renderModulosProgreso(project, id, session, admin) {
   const audPct  = Math.round(audDone / audItems.length * 100);
 
   const puedeAuditoria = admin || isLider(session);
+  const estado = calcFaseEstado(project);
 
   const totalDone    = docDone + garDone + (puedeAuditoria ? audDone : 0);
   const totalPosible = docItems.length + garItems.length + (puedeAuditoria ? audItems.length : 0);
   const generalPct   = totalPosible > 0 ? Math.round(totalDone / totalPosible * 100) : 0;
 
-  const modCard = (title, iconName, colorClass, pct, items, link) => `
-    <div class="mod-prog-card ${colorClass}" onclick="navigate('${link}')">
+  const modCard = (title, iconName, colorClass, pct, items, link, faseKey) => {
+    const locked = estado[faseKey] === 'bloqueada';
+    const firmada = estado[`${faseKey}Firmada`];
+    const clickHandler = locked
+      ? `toast('${faseKey === 'gar' ? estado.garRequisito : estado.audRequisito}', 'warn', 4000)`
+      : `navigate('${link}')`;
+    return `
+    <div class="mod-prog-card ${colorClass}${locked ? ' mpc-locked' : ''}" onclick="${clickHandler}">
       <div class="mpc-top">
-        <div class="mpc-icon">${icon(iconName, 22)}</div>
+        <div class="mpc-icon">${locked ? icon('lock-simple', 22) : icon(iconName, 22)}</div>
         <div class="mpc-info">
-          <span class="mpc-title">${title}</span>
+          <span class="mpc-title">${title}${firmada ? ' <span class="mpc-firmada">✓ Firmada</span>' : ''}</span>
           <div class="mpc-chips">
-            ${items.map(i=>`<span class="mpc-chip ${i.ok?'mpc-ok':''}">${i.ok?'✓ ':''} ${i.label}</span>`).join('')}
+            ${locked
+              ? `<span class="mpc-chip mpc-locked-msg">🔒 Bloqueada — cumple requisito previo</span>`
+              : items.map(i=>`<span class="mpc-chip ${i.ok?'mpc-ok':''}">${i.ok?'✓ ':''} ${i.label}</span>`).join('')
+            }
           </div>
         </div>
         <div class="mpc-right">
-          <span class="mpc-pct ${pct===100?'mpc-pct-done':''}">${pct}%</span>
-          ${icon('caret-right', 16, 'mpc-arrow')}
+          ${locked ? '' : `<span class="mpc-pct ${pct===100?'mpc-pct-done':''}">${pct}%</span>`}
+          ${locked ? icon('lock-simple', 16, 'mpc-arrow') : icon('caret-right', 16, 'mpc-arrow')}
         </div>
       </div>
+      ${locked ? '' : `
       <div class="mpc-bar-wrap">
         <div class="mpc-bar ${pct===100?'mpc-bar-done':''}" style="width:${pct}%"></div>
-      </div>
+      </div>`}
     </div>`;
+  };
 
   return `
   <div class="card pp-card">
@@ -273,9 +362,9 @@ function renderModulosProgreso(project, id, session, admin) {
   </div>
 
   <div class="modulos-progreso">
-    ${modCard('Documentación', 'clipboard-text', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`)}
-    ${modCard('Garantía', 'seal-check', 'mpc-gar', garPct, garItems, `#proyecto/${id}/garantia`)}
-    ${puedeAuditoria ? modCard('Auditoría', 'magnifying-glass-plus', 'mpc-aud', audPct, audItems, `#proyecto/${id}/auditoria`) : ''}
+    ${modCard('Documentación', 'clipboard-text', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`, 'doc')}
+    ${modCard('Garantía', 'seal-check', 'mpc-gar', garPct, garItems, `#proyecto/${id}/garantia`, 'gar')}
+    ${puedeAuditoria ? modCard('Auditoría', 'magnifying-glass-plus', 'mpc-aud', audPct, audItems, `#proyecto/${id}/auditoria`, 'aud') : ''}
   </div>
 
   <!-- Herramientas secundarias -->

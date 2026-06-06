@@ -4,7 +4,7 @@ import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
          uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION,
          openScannerOverlay } from './utils.js';
-import { canEdit, isAdmin } from './auth.js';
+import { canEdit, isAdmin, isLider } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 import { scanOnce, startContinuousScan, stopScanner } from './scanner.js';
@@ -91,6 +91,22 @@ export async function renderGarantia(projectId, session) {
       </div>
     </div>
   </div>
+  ${(isAdmin(session) || isLider(session)) ? (() => {
+    const firma = project.fases?.firmas?.gar;
+    return `
+  <div class="fase-firma-wrap">
+    ${firma
+      ? `<div class="fase-firma-ok">
+           ${icon('seal-check', 16)} Garantía firmada por <b>${esc(firma.nombre || firma.firmado_por)}</b>
+           <span class="fase-firma-fecha">${fmtFechaHora(firma.firmado_en)}</span>
+         </div>`
+      : `<button class="btn-firma-fase" onclick="window._firmarFase('${projectId}','gar')">
+           ${icon('signature', 16)} Firmar Garantía
+         </button>`
+    }
+  </div>`;
+  })() : ''}
+
   <script>
     (function() {
       const target = sessionStorage.getItem('garantia-tab-target');

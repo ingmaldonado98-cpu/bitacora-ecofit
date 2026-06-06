@@ -119,6 +119,22 @@ export async function renderAuditoria(projectId, session) {
   <div id="aud-content">
     ${modo === 'rapido' ? renderRapido(project, aud, edit, session) : renderFormal(project, aud, edit)}
   </div>
+
+  ${(() => {
+    const firma = project.fases?.firmas?.aud;
+    return `
+  <div class="fase-firma-wrap">
+    ${firma
+      ? `<div class="fase-firma-ok">
+           ${icon('seal-check', 16)} Auditoría firmada por <b>${esc(firma.nombre || firma.firmado_por)}</b>
+           <span class="fase-firma-fecha">${firma.firmado_en ? firma.firmado_en.slice(0,10) : ''}</span>
+         </div>`
+      : `<button class="btn-firma-fase" onclick="window._firmarFase('${projectId}','aud')">
+           ${icon('signature', 16)} Firmar Auditoría
+         </button>`
+    }
+  </div>`;
+  })()}
   `;
 }
 
