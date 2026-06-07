@@ -2273,6 +2273,13 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 }
 .tool-btn:hover { border-color: var(--g500); color: var(--text); background: var(--surface2); }
 
+/* ── Levantamiento — área calculada hint ─────────────────────────────────── */
+.lev-area-hint {
+  font-size: .8rem; color: var(--text-muted); margin: -4px 0 10px;
+  min-height: 1.2em;
+}
+.lev-area-hint strong { color: var(--text); }
+
 /* ── Separador dentro del acordeón eléctrico+consumo ─────────────────────── */
 .lev-sep {
   border-top: 1px dashed var(--border2);
@@ -2453,6 +2460,15 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 /* ── Validación Voc ───────────────────────────────────────────────────────── */
 .voc-inversor-hint { font-size: .82rem; color: var(--text-muted); margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
 .voc-inversor-hint.warn { color: var(--red); }
+.voc-no-inversor {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: rgba(220,53,69,.08); border: 1px solid rgba(220,53,69,.35);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
+  font-size: .83rem; color: var(--text);
+}
+.voc-no-inversor svg { flex-shrink: 0; margin-top: 2px; color: var(--red); }
+.voc-no-inversor strong { display: block; margin-bottom: 2px; color: var(--red); font-size: .87rem; }
+.voc-no-inversor span { color: var(--text-muted); line-height: 1.45; }
 .voc-badge { font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
 .voc-badge.voc-ok   { background: rgba(109,217,122,.12); color: var(--g500); border: 1px solid var(--g500); }
 .voc-badge.voc-warn { background: rgba(240,192,0,.12);   color: #c8a000;     border: 1px solid #c8a000; }

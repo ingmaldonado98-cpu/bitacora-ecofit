@@ -1,7 +1,7 @@
 // app.js — Router principal de la Bitácora Ecofit V6
 
 import { renderLogin, getSession, logout, requireAuth } from './auth.js';
-import { renderDashboard, initDashboardFilters, updateNavBadge } from './dashboard.js';
+import { renderDashboard, initDashboardFilters, populateTecnicoFilter, updateNavBadge } from './dashboard.js';
 import { renderProjectDetail, renderProjectForm, calcFaseEstado } from './project.js';
 import { renderGarantia, renderEstructuraForm } from './garantia.js';
 import { renderDocumentacion } from './documentacion.js';
@@ -13,7 +13,7 @@ import { renderConcluidos } from './concluidos.js';
 import { renderInventario } from './inventario.js';
 import { renderCalculadora } from './calculadora.js';
 import { renderChecklistModule, renderChecklistsList } from './checklist.js';
-import { projects } from './db.js';
+import { projects, users } from './db.js';
 import { toast, esc } from './utils.js';
 import { icon } from './icons.js';
 import { isNative, getPlugin } from './platform.js';
@@ -36,6 +36,12 @@ window.switchTab = function(tabBarId, targetId, btn) {
   // Permite que los módulos reaccionen al cambio de tab (ej: detener scanner en garantia)
   window._onTabChange?.(tabBarId, targetId);
 };
+
+// ── Error handler global: captura fallos de escritura en Firestore ────────────
+// firebase.js despacha 'ecofit:write-error' sin importar toast (evita circular dep)
+window.addEventListener('ecofit:write-error', (e) => {
+  toast(e.detail?.msg || 'Error al guardar. Intenta de nuevo.', 'error', 6000);
+});
 
 // ── Render helper ─────────────────────────────────────────────────────────────
 async function render(html, skeleton = '') {
@@ -151,9 +157,11 @@ async function route() {
     switch (view) {
       case 'dashboard':
       case '': {
-        const all = await projects.getAll();
-        initDashboardFilters(all);
+        const [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
+        initDashboardFilters(all, allUsers);
         await render(renderDashboard(session), skeletonDashboard());
+        // Poblar select de técnicos ahora que el DOM existe
+        populateTecnicoFilter(allUsers);
         break;
       }
       case 'nuevo-proyecto':

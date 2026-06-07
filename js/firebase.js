@@ -109,6 +109,23 @@ export async function seedAdminIfEmpty() {
   }
 }
 
+// ── Helper: notifica errores de escritura sin acoplar toast ───────────────
+function _dispatchWriteError(label, err) {
+  let msg;
+  if (err?.code === 'permission-denied') {
+    msg = `${label}: sin permiso. Verifica que tu sesión esté activa.`;
+  } else if (err?.code === 'not-found') {
+    msg = `${label}: documento no encontrado.`;
+  } else if (err?.code === 'unavailable') {
+    msg = `${label}: sin conexión. El cambio se guardará al reconectarse.`;
+  } else {
+    msg = `${label}. ${err?.message || 'Error desconocido'}`.trim();
+  }
+  // app.js escucha este evento y muestra toast — sin acoplamiento circular
+  window.dispatchEvent(new CustomEvent('ecofit:write-error', { detail: { msg } }));
+  console.error('[FB write]', label, err);
+}
+
 // ── Proyectos ──────────────────────────────────────────────────────────────
 export const fbProjects = {
   getAll: async () => {
@@ -122,7 +139,12 @@ export const fbProjects = {
   },
 
   add: async (data) => {
-    await setDoc(doc(fbDB, 'projects', data.id), data);
+    try {
+      await setDoc(doc(fbDB, 'projects', data.id), data);
+    } catch (err) {
+      _dispatchWriteError('Error al crear proyecto', err);
+      throw err;
+    }
   },
 
   update: async (id, changes) => {
@@ -130,18 +152,33 @@ export const fbProjects = {
     const snap = await getDoc(ref);
     if (!snap.exists()) throw new Error('Proyecto no encontrado');
     const updated = { ...snap.data(), ...changes, updatedAt: new Date().toISOString() };
-    await setDoc(ref, updated);
+    try {
+      await setDoc(ref, updated);
+    } catch (err) {
+      _dispatchWriteError('Error al guardar proyecto', err);
+      throw err;
+    }
     return updated;
   },
 
   delete: async (id) => {
-    await deleteDoc(doc(fbDB, 'projects', id));
+    try {
+      await deleteDoc(doc(fbDB, 'projects', id));
+    } catch (err) {
+      _dispatchWriteError('Error al eliminar proyecto', err);
+      throw err;
+    }
   },
 
   // Actualización atómica de un campo anidado sin read-modify-write
   // path: ej. 'checklistData.herr.herr-001'
   setField: async (id, path, value) => {
-    await updateDoc(doc(fbDB, 'projects', id), { [path]: value });
+    try {
+      await updateDoc(doc(fbDB, 'projects', id), { [path]: value });
+    } catch (err) {
+      _dispatchWriteError('Error al guardar campo', err);
+      throw err;
+    }
   },
 
   search: async (q) => {

@@ -1,8 +1,8 @@
 // sw.js — Service Worker Bitácora Ecofit V6
 // ⚠ Cambiar BUILD_DATE y CACHE_NAME en cada deploy para invalidar caché
 const BUILD_DATE  = '2026-06-06';
-const CACHE_NAME  = 'ecofit-v6-v40';
-const SW_VERSION  = '6.40.0';
+const CACHE_NAME  = 'ecofit-v6-v41';
+const SW_VERSION  = '6.41.0';
 
 const APP_SHELL = [
   './',
@@ -37,6 +37,7 @@ const APP_SHELL = [
   './ecofit-scanner.html',
   './js/vendor/zxing.min.js',
   './js/vendor/qrcode.min.js',
+  './js/vendor/jspdf.umd.min.js',
   './icons/icon.svg',
   './icons/logo.png',
   './icons/k2-systems.png',

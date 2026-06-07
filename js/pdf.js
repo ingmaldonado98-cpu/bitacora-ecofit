@@ -77,11 +77,13 @@ export async function renderPDFExport(projectId, session) {
           ['sec-observ',     '💬 Observaciones del proyecto'],
           ['sec-historial',  '🕓 Historial de cambios'],
           ['sec-auditoria',  '📋 Auditoría técnica'],
+          ['sec-voc',        '⚡ Validación Voc'],
+          ['sec-torque',     '🔩 Registro de torque'],
           ['sec-qr',         '📱 QR del cliente'],
         ].map(([id, label]) => `
-          <label class="check-chip pdf-check ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-despues'].includes(id)?'check-active':''}">
+          <label class="check-chip pdf-check ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-despues','sec-voc','sec-torque'].includes(id)?'check-active':''}">
             <input type="checkbox" id="${id}"
-              ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-despues'].includes(id)?'checked':''}>
+              ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-despues','sec-voc','sec-torque'].includes(id)?'checked':''}>
             ${label}
           </label>`).join('')}
       </div>
@@ -380,17 +382,116 @@ window.exportarPDFTecnico = async function(projectId) {
     doc.addPage(); addHeader(doc,'Levantamiento técnico',project); y=44;
     const lev = project.documentacion?.levantamiento||{};
     y=campo(doc,'Tipo de techo',lev.tipTecho,14,y);
+    if (lev.materialCubierta) y=campo(doc,'Material de cubierta',lev.materialCubierta,14,y);
     y=campo(doc,'Orientación',lev.orientacion,14,y);
-    y=campo(doc,'Azimut / Inclinación',`${lev.azimut||'—'}° / ${lev.inclinacion||'—'}°`,14,y);
+    if (lev.numPisos) y=campo(doc,'Número de pisos',`${lev.numPisos}`,14,y);
+    if (lev.tipoSujecion) y=campo(doc,'Tipo de sujeción',lev.tipoSujecion,14,y);
+    const dimText = lev.anchoTecho && lev.largoTecho
+      ? `${lev.anchoTecho} m × ${lev.largoTecho} m = ${(lev.anchoTecho*lev.largoTecho).toFixed(1)} m²`
+      : (lev.areaDisponible ? `${lev.areaDisponible} m²` : '—');
+    y=campo(doc,'Área disponible',dimText,14,y);
+    y=campo(doc,'Inclinación',`${lev.inclinacion||'—'}°`,14,y);
     y=campo(doc,'Dist. tablero→inversor',`${lev.distTableroInversor||'—'} m`,14,y);
-    y=campo(doc,'Área disponible',`${lev.areaDisponible||'—'} m²`,14,y);
+    y=campo(doc,'Dist. inversor→paneles',`${lev.distInversorPaneles||'—'} m`,14,y);
     y=campo(doc,'Servicio CFE',lev.tipoServicioCFE,14,y);
     y=campo(doc,'Tierra física',lev.tierraFisica,14,y);
+    y=campo(doc,'Centro de carga',lev.centroCarga,14,y);
     if (lev.sombras?.checklist?.length) {
-      y=campo(doc,'Sombras',lev.sombras.checklist.join(', '),14,y);
+      y=campo(doc,'Obstáculos de sombra',lev.sombras.checklist.join(', '),14,y);
     }
     if (lev.observacionesGenerales) {
-      y=campo(doc,'Observaciones',lev.observacionesGenerales,14,y);
+      const lineas = doc.splitTextToSize(lev.observacionesGenerales, 180);
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
+      doc.text('OBSERVACIONES', 14, y); y+=4;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+      doc.text(lineas, 14, y); y += lineas.length * 5;
+    }
+    // Fotos del levantamiento
+    const fotosLev = lev.fotosLevantamiento || [];
+    if (fotosLev.length) {
+      if (y > 220) { doc.addPage(); addHeader(doc,'Levantamiento — Fotos',project); y=44; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...VERDE);
+      doc.text('Fotos del levantamiento', 14, y); y+=6;
+      let col=0;
+      for (const f of fotosLev.slice(0,6)) {
+        const fx = 14 + col*98;
+        const newY = await addImage(doc, f.url||f, fx, y, 88, 62);
+        if (col===1) { y=newY+2; col=0; } else col=1;
+        if (y>240) { doc.addPage(); addHeader(doc,'Levant. Fotos (cont.)',project); y=44; col=0; }
+      }
+    }
+  }
+
+  // Validación Voc
+  const vocData = project.garantia?.validacionVoc;
+  if (sec('sec-voc') && vocData?.resultado) {
+    if (y > 200) { doc.addPage(); addHeader(doc,'Validación Voc',project); y=44; }
+    else { y+=4; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...VERDE);
+    doc.text('Validación Voc de string', 14, y); y+=7;
+    const resLabel = vocData.resultado === 'seguro' ? 'SEGURO ✓'
+                   : vocData.resultado === 'limite' ? 'EN EL LÍMITE ⚠'
+                   : 'EXCEDE EL LÍMITE ✗';
+    const resColor = vocData.resultado === 'seguro' ? [30,120,60]
+                   : vocData.resultado === 'limite' ? [180,140,0]
+                   : [200,40,40];
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...resColor);
+    doc.text(resLabel, 14, y); y+=6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+    y=campo(doc,'Voc del panel',`${vocData.vocPanel} V`,14,y);
+    y=campo(doc,'Paneles en serie',`${vocData.panelesSerie}`,110,y-12);
+    y=campo(doc,'Temp. mínima sitio',`${vocData.tMin}°C`,14,y);
+    y=campo(doc,'Coef. temp. Voc',`${vocData.coefVoc}%/°C`,110,y-12);
+    y=campo(doc,'Voc corregido por temp.',`${vocData.vocCorregido?.toFixed(2)} V`,14,y);
+    y=campo(doc,'Voc total del string',`${vocData.vocString?.toFixed(2)} V`,110,y-12);
+    y=campo(doc,'Voc máx. inversor',`${vocData.vocMaxInversor} V`,14,y);
+    y=campo(doc,'Margen de seguridad',`${vocData.margen?.toFixed(1)}%`,110,y-12);
+    if (vocData.mensaje) {
+      const lineas = doc.splitTextToSize(vocData.mensaje, 170);
+      doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...resColor);
+      doc.text(lineas, 14, y); y += lineas.length*5+4;
+    }
+  }
+
+  // Torque metrológico
+  const torqueData = project.checklistData?.torque || {};
+  const torqueKeys = Object.keys(torqueData);
+  if (sec('sec-torque') && torqueKeys.length) {
+    if (y > 200) { doc.addPage(); addHeader(doc,'Registro de torque',project); y=44; }
+    else { y+=4; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...VERDE);
+    doc.text('Registro de torque metrológico', 14, y); y+=7;
+    for (const key of torqueKeys) {
+      const t = torqueData[key];
+      if (!t) continue;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+      const verificado = t.verificado ? '✓' : '○';
+      const aplicado = t.aplicado != null ? `${t.aplicado} N·m` : '—';
+      const spec = t.especif || '—';
+      doc.text(`${verificado}  ${esc(t.componente || key)}  ·  Especif: ${spec}  ·  Aplicado: ${aplicado}`, 18, y); y+=5;
+      if (y>260) { doc.addPage(); addHeader(doc,'Torque (cont.)',project); y=44; }
+    }
+  }
+
+  // QR del cliente
+  if (sec('sec-qr') && window.QRCode) {
+    doc.addPage(); addHeader(doc,'QR del sistema',project); y=44;
+    try {
+      const canvas = document.createElement('canvas');
+      const qrUrl  = `${location.origin}${location.pathname}#proyecto/${projectId}`;
+      await new Promise((res,rej) => {
+        new window.QRCode(canvas, { text: qrUrl, width:200, height:200,
+          colorDark:'#1B4332', colorLight:'#ffffff', correctLevel: window.QRCode.CorrectLevel.M });
+        setTimeout(res, 300); // QRCode.js es sync pero la imagen puede tardar un frame
+      });
+      const qrB64 = canvas.toDataURL('image/png');
+      y = campo(doc,'URL del sistema',`${location.origin}${location.pathname}#proyecto/${projectId}`,14,y);
+      y = await addImage(doc, qrB64, 14, y, 60, 60);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
+      doc.text('Escanear para acceder al expediente digital del sistema', 14, y); y+=10;
+    } catch (err) {
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+      doc.text(`URL: ${location.origin}${location.pathname}#proyecto/${projectId}`, 14, y); y+=6;
     }
   }
 

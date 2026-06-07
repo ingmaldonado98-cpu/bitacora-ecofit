@@ -431,24 +431,66 @@ function renderLevantamiento(project, tipo, edit) {
               `<option ${lev.tipTecho===t?'selected':''}>${t}</option>`).join('')}
           </select>
         </div>
-        <div class="form-group"><label>Orientación</label>
+        <div class="form-group"><label>Material de cubierta</label>
+          <select name="materialCubierta" ${dis}>
+            ${['Concreto','Lámina galvanizada','Teja barro','IMSA','Policarbonato','Otro'].map(t=>
+              `<option ${lev.materialCubierta===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Orientación del techo</label>
           <select name="orientacion" ${dis}>
             ${['Sur','Poniente','Oriente','Norte','Sur-Poniente','Sur-Oriente'].map(t=>
               `<option ${lev.orientacion===t?'selected':''}>${t}</option>`).join('')}
           </select>
         </div>
+        <div class="form-group"><label>Número de pisos</label>
+          <input type="number" name="numPisos" value="${lev.numPisos||''}" min="1" max="30"
+                 placeholder="1" ${dis}/></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>Inclinación del techo (°)</label>
           <input type="number" name="inclinacion" value="${lev.inclinacion||''}" placeholder="15" ${dis}/></div>
-        <div class="form-group"><label>Área disponible en techo (m²)</label>
-          <input type="number" name="areaDisponible" value="${lev.areaDisponible||''}" step="0.5" ${dis}/></div>
+        <div class="form-group"><label>Tipo de sujeción recomendada</label>
+          <select name="tipoSujecion" ${dis}>
+            ${['Tornillo autoperforante','Ancla química','Perfil flotante (ballast)','Abrazadera estructural','Por definir'].map(t=>
+              `<option ${lev.tipoSujecion===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Ancho del área disponible (m)</label>
+          <input type="number" name="anchoTecho" value="${lev.anchoTecho||''}" step="0.5" placeholder="4.5" ${dis}
+                 oninput="_calcAreaTecho()"/>
+        </div>
+        <div class="form-group">
+          <label>Largo del área disponible (m)</label>
+          <input type="number" name="largoTecho" value="${lev.largoTecho||''}" step="0.5" placeholder="8.0" ${dis}
+                 oninput="_calcAreaTecho()"/>
+        </div>
+      </div>
+      <p id="lev-area-calc" class="lev-area-hint">
+        ${lev.anchoTecho && lev.largoTecho
+          ? `Área calculada: <strong>${(parseFloat(lev.anchoTecho)*parseFloat(lev.largoTecho)).toFixed(1)} m²</strong>`
+          : ''}
+      </p>
       <div class="form-row">
         <div class="form-group"><label>Dist. tablero→inversor (m)</label>
           <input type="number" name="distTableroInversor" value="${lev.distTableroInversor||''}" step="0.5" ${dis}/></div>
         <div class="form-group"><label>Dist. inversor→paneles (m)</label>
           <input type="number" name="distInversorPaneles" value="${lev.distInversorPaneles||''}" step="0.5" ${dis}/></div>
+      </div>
+      <!-- Fotos del levantamiento -->
+      <div class="foto-tecnica-row" style="margin-top:12px">
+        <div class="ft-label">${icon('camera',14)} Fotos del levantamiento</div>
+        <div id="slot-fotos-lev" class="ft-slot" style="flex-wrap:wrap;gap:6px">
+          ${(lev.fotosLevantamiento||[]).map((f,i)=>
+            `${fotoMini(f.url||f,'Foto '+(i+1))}${edit?`<button type="button" class="btn-del-foto" onclick="delFotoLev('${pid}',${i})">✕</button>`:''}`
+          ).join('')}
+          ${edit ? `<button type="button" class="btn-foto-sm" onclick="capFotoLev('${pid}')">${icon('camera')} Agregar foto</button>` : ''}
+        </div>
       </div>
     `)}
 
@@ -878,21 +920,28 @@ window.guardarLevantamiento = async function(e, projectId) {
   const condiciones = Array.from(e.target.querySelectorAll('[name^="cond_"]:checked')).map(cb=>cb.value);
   const modoConsumo = e.target.dataset.modoConsumo || (lev.modoConsumo||'recibo');
 
+  const anchoT = parseFloat(fd.get('anchoTecho')) || null;
+  const largoT = parseFloat(fd.get('largoTecho')) || null;
+
   const newLev = {
     ...lev,
     tipTecho:            fd.get('tipTecho'),
+    materialCubierta:    fd.get('materialCubierta') || null,
     orientacion:         fd.get('orientacion'),
-    // azimut: eliminado (innecesario en campo)
-    inclinacion:         parseFloat(fd.get('inclinacion'))||null,
-    distTableroInversor: parseFloat(fd.get('distTableroInversor'))||null,
-    distInversorPaneles: parseFloat(fd.get('distInversorPaneles'))||null,
-    areaDisponible:      parseFloat(fd.get('areaDisponible'))||null,
+    numPisos:            parseInt(fd.get('numPisos')) || null,
+    inclinacion:         parseFloat(fd.get('inclinacion')) || null,
+    tipoSujecion:        fd.get('tipoSujecion') || null,
+    anchoTecho:          anchoT,
+    largoTecho:          largoT,
+    areaDisponible:      (anchoT && largoT) ? parseFloat((anchoT * largoT).toFixed(2)) : (parseFloat(fd.get('areaDisponible')) || null),
+    distTableroInversor: parseFloat(fd.get('distTableroInversor')) || null,
+    distInversorPaneles: parseFloat(fd.get('distInversorPaneles')) || null,
     tipoServicioCFE:     fd.get('tipoServicioCFE'),
     tierraFisica:        fd.get('tierraFisica'),
     centroCarga:         fd.get('centroCarga'),
     sombras:             { checklist:sombrasChecklist, foto:lev.sombras?.foto||null, notas:fd.get('sombraNotas')||'' },
-    observacionesGenerales: fd.get('observacionesGenerales')||'',
-    // camposLibres eliminado — reemplazado por observacionesGenerales (Notas del levantamiento)
+    fotosLevantamiento:  lev.fotosLevantamiento || [],
+    observacionesGenerales: fd.get('observacionesGenerales') || '',
   };
 
   if (tipo==='interconectado'||tipo==='hibrido'||tipo==='hibrido_respaldo') {
@@ -972,6 +1021,48 @@ window.capSombraFoto = function(pid) {
 window.delSombraFoto = async function(pid) {
   const p = await projects.getById(pid);
   p.documentacion.levantamiento.sombras.foto = null;
+  await projects.update(pid, { documentacion: p.documentacion });
+  navigate(`#proyecto/${pid}/documentacion`);
+};
+
+// ── Área techo: calcular en tiempo real ──────────────────────────────────────
+window._calcAreaTecho = function() {
+  const ancho = parseFloat(document.querySelector('[name="anchoTecho"]')?.value) || 0;
+  const largo = parseFloat(document.querySelector('[name="largoTecho"]')?.value) || 0;
+  const hint  = document.getElementById('lev-area-calc');
+  if (!hint) return;
+  if (ancho > 0 && largo > 0) {
+    hint.innerHTML = `Área calculada: <strong>${(ancho * largo).toFixed(1)} m²</strong>`;
+  } else {
+    hint.innerHTML = '';
+  }
+};
+
+// ── Fotos del levantamiento ───────────────────────────────────────────────────
+window.capFotoLev = function(pid) {
+  capturePhoto(async b64 => {
+    toast('Subiendo foto del levantamiento…');
+    const idx = Date.now();
+    const result = await uploadPhotoQueued(b64, `projects/${pid}/lev_${idx}.jpg`, pid, 'fotoLev');
+    const fotoUrl = result.url || (result.pending ? b64 : null);
+    if (!fotoUrl) { toast('No se pudo guardar la foto', 'error'); return; }
+
+    const p = await projects.getById(pid);
+    p.documentacion = p.documentacion || {};
+    p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+    const fotos = p.documentacion.levantamiento.fotosLevantamiento || [];
+    fotos.push({ url: fotoUrl, ts: new Date().toISOString() });
+    p.documentacion.levantamiento.fotosLevantamiento = fotos;
+    await projects.update(pid, { documentacion: p.documentacion });
+    navigate(`#proyecto/${pid}/documentacion`);
+  });
+};
+
+window.delFotoLev = async function(pid, idx) {
+  const p = await projects.getById(pid);
+  const fotos = p.documentacion?.levantamiento?.fotosLevantamiento || [];
+  fotos.splice(idx, 1);
+  p.documentacion.levantamiento.fotosLevantamiento = fotos;
   await projects.update(pid, { documentacion: p.documentacion });
   navigate(`#proyecto/${pid}/documentacion`);
 };

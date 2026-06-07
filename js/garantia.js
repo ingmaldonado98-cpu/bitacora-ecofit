@@ -154,8 +154,22 @@ function renderVocTab(project, projectId, edit) {
       ${semaforo ? `<span class="voc-badge ${semaforo.cls}">${semaforo.ico} ${semaforo.txt}</span>` : ''}
     </div>
     ${inversor
-      ? `<p class="voc-inversor-hint">${icon('cpu', 14)} Inversor detectado: <b>${esc(inversor.marca)} ${esc(inversor.modelo)}</b>${inversor.vocMax ? ` · Voc máx: <b>${inversor.vocMax} V</b>` : ' · <em>Sin Voc máx registrado</em>'}</p>`
-      : `<p class="voc-inversor-hint warn">${icon('warning', 14)} Sin inversor registrado. Agrega uno en la pestaña Equipos primero.</p>`
+      ? inversor.vocMax
+        ? `<p class="voc-inversor-hint">${icon('cpu', 14)} Inversor detectado: <b>${esc(inversor.marca)} ${esc(inversor.modelo)}</b> · Voc máx: <b>${inversor.vocMax} V</b></p>`
+        : `<div class="voc-no-inversor">${icon('warning-circle', 16)}
+            <div>
+              <strong>Inversor sin Voc máx registrado</strong><br>
+              <span>Edita el inversor en la pestaña <em>Equipos</em> y completa el campo "Voc máx. inversor".<br>
+              Sin este dato el cálculo usa el valor ingresado manualmente y no queda vinculado al equipo real.</span>
+            </div>
+           </div>`
+      : `<div class="voc-no-inversor">${icon('warning-circle', 16)}
+           <div>
+             <strong>Sin inversor registrado</strong><br>
+             <span>Agrega un inversor en la pestaña <em>Equipos</em> antes de validar el Voc.
+             Sin inversor registrado el cálculo no queda vinculado a ningún equipo y no podrás firmar la Garantía con advertencias pendientes.</span>
+           </div>
+         </div>`
     }
     <div class="form-row">
       <div class="form-group">
@@ -242,9 +256,36 @@ window.calcVoc = function() {
 
 window.guardarVoc = async function(projectId) {
   if (!window._vocTemp) { toast('Primero calcula el Voc', 'warn'); return; }
+
+  // ── Critical #3: Validar consistencia con el inversor registrado ───────────
+  const proj     = await projects.getById(projectId);
+  const inversor = (proj?.garantia?.equipos || []).find(e => e.tipo === 'inversor');
+  const savedVocMax = window._vocTemp.vocMaxInversor;
+
+  if (!inversor) {
+    // No hay inversor — advertir y pedir confirmación
+    const ok = await confirmDialog(
+      '⚠️ Sin inversor registrado. El Voc máximo fue ingresado manualmente y no quedará vinculado a ningún equipo real. ¿Guardar de todas formas?'
+    );
+    if (!ok) return;
+  } else if (!inversor.vocMax || inversor.vocMax === 0) {
+    // Hay inversor pero sin vocMax — bloquear
+    toast('El inversor no tiene Voc máx registrado. Edítalo en la pestaña Equipos antes de guardar.', 'warn', 6000);
+    return;
+  } else if (Math.abs(inversor.vocMax - savedVocMax) > 0.5) {
+    // El valor ingresado difiere del registrado en el equipo
+    const ok = await confirmDialog(
+      `⚠️ El inversor registrado tiene Voc máx = ${inversor.vocMax} V, pero se calculó con ${savedVocMax} V. ¿Guardar con el valor ingresado manualmente?`
+    );
+    if (!ok) return;
+  }
+
   const data = { ...window._vocTemp, savedAt: isoNow(), savedBy: getSession()?.uid || '' };
   await projects.setField(projectId, 'garantia.validacionVoc', data);
-  toast(`✅ Voc guardado — ${data.resultado === 'seguro' ? 'configuración segura' : data.resultado === 'excede' ? '⚠️ excede el límite' : 'en el límite'}`);
+  const resMsg = data.resultado === 'seguro' ? 'configuración segura'
+               : data.resultado === 'excede' ? '⚠️ excede el límite'
+               : 'en el límite';
+  toast(`✅ Voc guardado — ${resMsg}`);
   sessionStorage.setItem('garantia-tab-target', 'g-voc');
   navigate(`#proyecto/${projectId}/garantia`);
 };

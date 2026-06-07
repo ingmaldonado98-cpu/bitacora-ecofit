@@ -5,6 +5,23 @@ import { esc, fmtFecha, fmtRelativa, fmtProjectId, ESTADOS, PRIORIDADES, TIPOS_S
 import { isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
 
+// ── Helper: opciones de mes para el filtro de fecha ──────────────────────────
+function _buildMonthOptions(proyectos) {
+  const meses = new Map();
+  for (const p of proyectos) {
+    const d = p.fechaInicio || p.createdAt;
+    if (!d) continue;
+    const key  = d.slice(0, 7);              // 'YYYY-MM'
+    if (!meses.has(key)) {
+      const dt = new Date(key + '-01');
+      const lbl = dt.toLocaleDateString('es-MX', { year:'numeric', month:'long' });
+      meses.set(key, lbl.charAt(0).toUpperCase() + lbl.slice(1));
+    }
+  }
+  return [...meses.entries()].sort((a,b) => b[0].localeCompare(a[0]))
+    .map(([k,lbl]) => `<option value="${k}">${lbl}</option>`).join('');
+}
+
 // ── Badge del nav ─────────────────────────────────────────────────────────────
 export function updateNavBadge(count) {
   const badge = document.getElementById('nav-badge-revision');
@@ -77,6 +94,13 @@ export async function renderDashboard(session) {
       <option value="">Todos los tipos</option>
       ${Object.entries(TIPOS_SISTEMA).filter(([,v]) => !v.legacy).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
     </select>
+    <select id="dash-filter-tecnico" class="filter-select" onchange="window._dashFilter()">
+      <option value="">Todos los técnicos</option>
+    </select>
+    <select id="dash-filter-mes" class="filter-select" onchange="window._dashFilter()" title="Filtrar por mes de inicio">
+      <option value="">Cualquier fecha</option>
+      ${_buildMonthOptions(all)}
+    </select>
     <button class="dash-toggle-conc" id="btn-toggle-conc" onclick="window._toggleConcluidos()"
             title="Ver proyectos cerrados y cancelados">
       ${icon('seal-check', 16)} Concluidos
@@ -99,12 +123,27 @@ export async function renderDashboard(session) {
 
 // ── Filtros interactivos ───────────────────────────────────────────────────────
 let _allProjects = [];
+let _allUsers    = [];   // cache de usuarios para el filtro de técnico
 
 let _showConcluidos = false;
 
-export function initDashboardFilters(all) {
+export function initDashboardFilters(all, allUsers = []) {
   _showConcluidos = false;
   _allProjects = all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
+  _allUsers    = allUsers;
+  // populateTecnicoFilter() se llama desde app.js después de render (cuando el DOM existe)
+}
+
+export function populateTecnicoFilter(allUsers) {
+  const sel = document.getElementById('dash-filter-tecnico');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Todos los técnicos</option>' +
+    (allUsers || _allUsers)
+      .filter(u => u.activo && ['lider','admin'].includes(u.rol))
+      .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||''))
+      .map(u => `<option value="${u.id}" ${u.id===prev?'selected':''}>${esc(u.nombre)}</option>`)
+      .join('');
 }
 
 window._toggleConcluidos = async function() {
@@ -151,15 +190,21 @@ window._dashPage   = function(dir) {
 };
 
 function applyFilters() {
-  const estado = document.getElementById('dash-filter-estado')?.value;
-  const tipo   = document.getElementById('dash-filter-tipo')?.value;
+  const estado   = document.getElementById('dash-filter-estado')?.value;
+  const tipo     = document.getElementById('dash-filter-tipo')?.value;
+  const tecnico  = document.getElementById('dash-filter-tecnico')?.value || _tecnicoFilter;
+  const mes      = document.getElementById('dash-filter-mes')?.value;
   let list = _allProjects;
-  if (estado) list = list.filter(p => p.estado === estado);
-  if (tipo)   list = list.filter(p => p.tipoSistema === tipo);
-  if (_tecnicoFilter) list = list.filter(p =>
-    p.tecnicoLiderId === _tecnicoFilter ||
-    (p.tecnicosApoyo || []).includes(_tecnicoFilter)
+  if (estado)  list = list.filter(p => p.estado === estado);
+  if (tipo)    list = list.filter(p => p.tipoSistema === tipo);
+  if (tecnico) list = list.filter(p =>
+    p.tecnicoLiderId === tecnico ||
+    (p.tecnicosApoyo || []).includes(tecnico)
   );
+  if (mes) list = list.filter(p => {
+    const d = p.fechaInicio || p.createdAt;
+    return d && d.startsWith(mes);
+  });
   const el = document.getElementById('projects-list');
   if (el) el.innerHTML = renderProjectList(list);
 }
