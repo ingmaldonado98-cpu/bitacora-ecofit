@@ -36,5 +36,36 @@ export async function importBackup(data) {
 // ── seedIfEmpty — manejado por firebase.js ─────────────────────────────────
 export { seedAdminIfEmpty as seedIfEmpty } from './firebase.js';
 
+// ── Change log — registro ligero de quién guardó qué ──────────────────────
+// Mantiene las últimas MAX_LOG entradas en project.changeLog
+const MAX_LOG = 50;
+
+/**
+ * logChange(projectId, { modulo, accion, detalle, quien })
+ * modulo: 'Levantamiento' | 'Garantía-Equipos' | 'Auditoría' | etc.
+ * accion: 'guardado' | 'firmado' | 'eliminado' | etc.
+ * detalle: string descriptivo (ej: 'Inversor SMA SB3.0 editado')
+ * quien: { uid, nombre } — del resultado de getSession()
+ */
+export async function logChange(projectId, { modulo, accion, detalle, quien }) {
+  try {
+    const p = await fbProjects.getById(projectId);
+    if (!p) return;
+    const entry = {
+      ts:      new Date().toISOString(),
+      modulo:  modulo || '—',
+      accion:  accion || 'guardado',
+      detalle: detalle || '',
+      uid:     quien?.uid || '',
+      nombre:  quien?.nombre || quien?.email || '—',
+    };
+    const log = Array.isArray(p.changeLog) ? p.changeLog : [];
+    const newLog = [entry, ...log].slice(0, MAX_LOG); // más recientes primero
+    await fbProjects.setField(projectId, 'changeLog', newLog);
+  } catch {
+    // logChange nunca debe bloquear la operación principal
+  }
+}
+
 // ── openDB — ya no se usa, mantenido por compatibilidad ───────────────────
 export function openDB() { return Promise.resolve(null); }

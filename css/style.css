@@ -2495,10 +2495,23 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .lb-fecha { font-size: .72rem; color: var(--text-muted); margin-top: 6px; }
 .lb-edit-btn { margin-left: auto; }
 
+/* ── Historial de cambios ─────────────────────────────────────────────────── */
+.changelog-card { padding: 12px 16px; }
+.changelog-list { display: flex; flex-direction: column; gap: 0; }
+.changelog-entry {
+  display: grid; grid-template-columns: auto 1fr auto;
+  align-items: baseline; gap: 6px; padding: 6px 0;
+  border-bottom: 1px solid var(--border2); font-size: .8rem;
+}
+.changelog-entry:last-child { border-bottom: none; }
+.changelog-who  { font-weight: 600; color: var(--g500); white-space: nowrap; }
+.changelog-what { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.changelog-when { color: var(--text-muted); font-size: .72rem; white-space: nowrap; padding-left: 4px; }
+
 /* ── Firmar fase ──────────────────────────────────────────────────────────── */
 .fase-firma-wrap {
   margin: 16px 16px 8px;
-  display: flex; justify-content: center;
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px;
 }
 .btn-firma-fase {
   display: flex; align-items: center; gap: 8px;
@@ -2515,6 +2528,10 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
   padding: 9px 14px; width: 100%; justify-content: center;
 }
 .fase-firma-fecha { font-size: .75rem; color: var(--text-muted); margin-left: 4px; }
+.fase-firma-hint {
+  font-size: .78rem; color: var(--text-muted); text-align: center;
+  margin: 4px 0 0; display: flex; align-items: center; justify-content: center; gap: 4px;
+}
 
 /* ── Photo preview overlay (capturePhoto confirm step) ───────────────────── */
 .photo-preview-ov {

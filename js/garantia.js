@@ -1,6 +1,6 @@
 // garantia.js — Módulo 1: Garantía (fotos técnicas, equipos, estructura, paneles)
 
-import { projects } from './db.js';
+import { projects, logChange } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
          uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION,
          openScannerOverlay } from './utils.js';
@@ -701,15 +701,24 @@ window.guardarEquipo = async function(projectId) {
     updatedAt:   isoNow(),
   };
 
+  let newEquipos;
   if (isEdit) {
-    p.garantia.equipos[editIdx] = equipo;
+    newEquipos = [...p.garantia.equipos];
+    newEquipos[editIdx] = equipo;
     toast('✅ Equipo actualizado');
   } else {
-    p.garantia.equipos = [...p.garantia.equipos, equipo];
+    newEquipos = [...p.garantia.equipos, equipo];
     toast('✅ Equipo registrado');
   }
 
-  await projects.update(projectId, { garantia: p.garantia });
+  // setField en lugar de update() — escribe solo garantia.equipos, no el doc completo
+  await projects.setField(projectId, 'garantia.equipos', newEquipos);
+  logChange(projectId, {
+    modulo: 'Garantía',
+    accion: isEdit ? 'equipo editado' : 'equipo agregado',
+    detalle: `${equipo.tipo}: ${equipo.marca} ${equipo.modelo}`,
+    quien: getSession(),
+  });
   _clearEqFotos();
   sessionStorage.setItem('garantia-tab-target', 'g-equipos');
   navigate(`#proyecto/${projectId}/garantia`);
@@ -718,8 +727,8 @@ window.guardarEquipo = async function(projectId) {
 window.delEquipo = async function(projectId, idx) {
   if (!await confirmDialog('¿Eliminar este equipo?')) return;
   const p = await projects.getById(projectId);
-  p.garantia.equipos = p.garantia.equipos.filter((_,i) => i !== idx);
-  await projects.update(projectId, { garantia: p.garantia });
+  const newEquipos = (p.garantia?.equipos || []).filter((_,i) => i !== idx);
+  await projects.setField(projectId, 'garantia.equipos', newEquipos);
   sessionStorage.setItem('garantia-tab-target', 'g-equipos');
   navigate(`#proyecto/${projectId}/garantia`);
 };

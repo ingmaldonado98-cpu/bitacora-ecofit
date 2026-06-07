@@ -122,6 +122,20 @@ export async function renderAuditoria(projectId, session) {
 
   ${(() => {
     const firma = project.fases?.firmas?.aud;
+    const modo  = project.auditoria?.modo || 'rapido';
+    const aud   = project.auditoria || {};
+    // Completud para habilitar firma
+    let firmaReady = false, firmaHint = '';
+    if (modo === 'formal') {
+      const fcl  = aud.formalChecklist || {};
+      const done = CHECKLIST_FORMAL.filter(i => fcl[i.id]).length;
+      firmaReady = !!aud.resultado && done === CHECKLIST_FORMAL.length;
+      if (!aud.resultado) firmaHint = 'Selecciona el dictamen (Cumple / No Cumple / Observaciones)';
+      else if (done < CHECKLIST_FORMAL.length) firmaHint = `Completa todos los ítems del checklist (${done}/${CHECKLIST_FORMAL.length})`;
+    } else {
+      firmaReady = !!aud.rapidoFecha;
+      if (!firmaReady) firmaHint = 'Completa la verificación rápida primero';
+    }
     return `
   <div class="fase-firma-wrap">
     ${firma
@@ -129,9 +143,14 @@ export async function renderAuditoria(projectId, session) {
            ${icon('seal-check', 16)} Auditoría firmada por <b>${esc(firma.nombre || firma.firmado_por)}</b>
            <span class="fase-firma-fecha">${firma.firmado_en ? firma.firmado_en.slice(0,10) : ''}</span>
          </div>`
-      : `<button class="btn-firma-fase" onclick="window._firmarFase('${projectId}','aud')">
-           ${icon('signature', 16)} Firmar Auditoría
-         </button>`
+      : firmaReady
+        ? `<button class="btn-firma-fase" onclick="window._firmarFase('${projectId}','aud')">
+             ${icon('signature', 16)} Firmar Auditoría
+           </button>`
+        : `<button class="btn-firma-fase" disabled title="${esc(firmaHint)}" style="opacity:.5;cursor:not-allowed">
+             ${icon('lock', 16)} Firmar Auditoría
+           </button>
+           <p class="fase-firma-hint">${icon('info', 13)} ${esc(firmaHint)}</p>`
     }
   </div>`;
   })()}

@@ -1,8 +1,8 @@
 // documentacion.js — Módulo 2: Levantamiento dinámico + Fases Antes/Durante/Después
 
-import { projects } from './db.js';
+import { projects, logChange } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar } from './utils.js';
-import { canEdit, isAdmin, isLider } from './auth.js';
+import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 
@@ -981,7 +981,10 @@ window.guardarLevantamiento = async function(e, projectId) {
   // Actualizar indicador de auto-guardado
   const ind = document.getElementById('lev-autosave');
   if (ind) { ind.textContent = '✓ Guardado'; ind.className = 'autosave-indicator saved'; }
-  if (!e._auto) toast('✅ Levantamiento guardado');
+  if (!e._auto) {
+    toast('✅ Levantamiento guardado');
+    logChange(projectId, { modulo: 'Documentación', accion: 'levantamiento guardado', detalle: '', quien: getSession() });
+  }
 };
 
 // Auto-guardado con debounce 3 segundos

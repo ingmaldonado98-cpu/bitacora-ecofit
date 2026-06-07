@@ -1,6 +1,6 @@
 // project.js — Creación, detalle y gestión del proyecto
 
-import { projects, users, kv } from './db.js';
+import { projects, users, kv, logChange } from './db.js';
 import { esc, fmtFecha, fmtFechaHora, fmtRelativa, fmtProjectId, genDisplayId, uuid, isoNow, toast,
          ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog, inputDialog,
          capturePhoto, fotoMini, getPendingSrc } from './utils.js';
@@ -252,6 +252,8 @@ export async function firmarFase(projectId, fase) {
     firmado_en:  isoNow(),
   };
   await projects.update(projectId, { fases });
+  const faseNombre = { doc: 'Documentación', gar: 'Garantía', aud: 'Auditoría' }[fase] || fase;
+  logChange(projectId, { modulo: faseNombre, accion: 'firmada', detalle: '', quien: session });
   toast(`✅ Fase firmada por ${session.nombre || session.email}`);
   navigate(`#proyecto/${projectId}`);
 }
@@ -384,6 +386,29 @@ function renderModulosProgreso(project, id, session, admin) {
     ${admin ? `<button class="tool-btn" onclick="navigate('#proyecto/${id}/pdf')">
       ${icon('file-arrow-down', 18)}<span>Exportar PDF</span>
     </button>` : ''}
+  </div>
+
+  <!-- Historial de cambios -->
+  ${renderChangeLog(project.changeLog)}`;
+}
+
+// ── Historial de cambios ──────────────────────────────────────────────────────
+function renderChangeLog(log) {
+  if (!Array.isArray(log) || !log.length) return '';
+  const entries = log.slice(0, 10); // solo los 10 más recientes en el resumen
+  return `
+  <div class="card changelog-card">
+    <div class="card-title-row">
+      <h3 class="card-title">${icon('clock-counter-clockwise', 16)} Historial reciente</h3>
+    </div>
+    <div class="changelog-list">
+      ${entries.map(e => `
+      <div class="changelog-entry">
+        <span class="changelog-who">${esc(e.nombre)}</span>
+        <span class="changelog-what">${esc(e.modulo)} — ${esc(e.accion)}${e.detalle ? ': ' + esc(e.detalle) : ''}</span>
+        <span class="changelog-when">${fmtRelativa(e.ts)}</span>
+      </div>`).join('')}
+    </div>
   </div>`;
 }
 
