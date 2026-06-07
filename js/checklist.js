@@ -43,6 +43,12 @@ export async function renderChecklistModule(projectId, session) {
   const doneExec     = execAllItems.filter(it => cl.exec?.[it.id]).length;
   const totalExec    = execAllItems.length;
 
+  // Torques: tabla de referencia vs. valores registrados
+  const torqueRows  = buildTorqueTable(estructura || cfg?.estructura || 'k2', techo);
+  const torqData    = cl.torques || {};
+  const torqDone    = torqueRows.filter(r => torqData[_tkey(r.comp)]?.verificado).length;
+  const torqTotal   = torqueRows.length;
+
   return `
   <div class="breadcrumb">
     <span class="bc-link" onclick="navigate('#dashboard')">Inicio</span>
@@ -86,6 +92,9 @@ export async function renderChecklistModule(projectId, session) {
     </button>
     <button class="tab-btn" data-tab="cl-exec" onclick="switchTab('cl-tabs','cl-exec',this)">
       Ejecución${doneExec === totalExec && totalExec ? '<span class="tab-badge tab-ok">✓</span>' : `<span class="tab-badge">${doneExec}/${totalExec}</span>`}
+    </button>
+    <button class="tab-btn" data-tab="cl-torq" onclick="switchTab('cl-tabs','cl-torq',this)">
+      Torques${torqDone === torqTotal && torqTotal ? '<span class="tab-badge tab-ok">✓</span>' : `<span class="tab-badge">${torqDone}/${torqTotal}</span>`}
     </button>
     <button class="tab-btn" data-tab="cl-guia" onclick="switchTab('cl-tabs','cl-guia',this)">
       Guía
@@ -217,6 +226,11 @@ export async function renderChecklistModule(projectId, session) {
     }).join('')}
   </div>
 
+  <!-- Torques de apriete -->
+  <div id="cl-torq" class="tab-panel">
+    ${renderTorqueTab(torqueRows, torqData, torqDone, torqTotal, projectId, edit)}
+  </div>
+
   <!-- Guía técnica -->
   <div id="cl-guia" class="tab-panel">
     ${renderGuiaTab(cfg, projectId)}
@@ -228,6 +242,89 @@ export async function renderChecklistModule(projectId, session) {
     </button>
   </div>
   `;
+}
+
+// ── Torques de apriete ────────────────────────────────────────────────────────
+// Convierte nombre de componente en clave segura para Firestore (sin puntos ni espacios)
+function _tkey(comp) {
+  return comp.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_').toLowerCase();
+}
+
+function renderTorqueTab(rows, torqData, done, total, projectId, edit) {
+  return `
+  <div class="card">
+    <div class="card-title-row">
+      <h3 class="card-title">Torques de apriete</h3>
+      <span class="cl-prog-lbl">${done}/${total} verificados</span>
+    </div>
+    ${renderProgress(done, total)}
+    <p class="torq-instruccion">Registra el torque aplicado con tu llave dinamométrica. La columna <b>Especificación</b> es el rango del fabricante.</p>
+    <div class="torq-table-wrap">
+      <table class="torq-table">
+        <thead>
+          <tr>
+            <th>Componente</th>
+            <th class="torq-th-spec">Especificación</th>
+            <th class="torq-th-val">Aplicado (N·m)</th>
+            <th class="torq-th-ok">✓</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => {
+            const k   = _tkey(r.comp);
+            const td  = torqData[k] || {};
+            const val = td.valor || '';
+            const vrf = !!td.verificado;
+            return `
+          <tr class="torq-row ${vrf ? 'torq-row-ok' : ''}">
+            <td class="torq-td-comp">
+              <span class="torq-comp-name">${esc(r.comp)}</span>
+              <span class="torq-comp-nota">${esc(r.nota)}</span>
+            </td>
+            <td class="torq-td-spec">${esc(r.torque)}</td>
+            <td class="torq-td-val">
+              <input type="number" step="0.5" min="0" max="100"
+                     class="torq-input" ${!edit ? 'disabled' : ''}
+                     value="${esc(val)}"
+                     placeholder="—"
+                     onchange="clSaveTorque('${projectId}','${k}','valor',this.value)"
+                     oninput="clSaveTorque('${projectId}','${k}','valor',this.value)" />
+            </td>
+            <td class="torq-td-ok">
+              <label class="torq-check-wrap">
+                <input type="checkbox" ${vrf ? 'checked' : ''} ${!edit ? 'disabled' : ''}
+                       onchange="clToggleTorque('${projectId}','${k}',this.checked);
+                                 this.closest('.torq-row').classList.toggle('torq-row-ok',this.checked)">
+                <span class="torq-check-box"></span>
+              </label>
+            </td>
+          </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${edit && done === total && total > 0 ? `
+    <div class="torq-completo-banner">
+      ${icon('seal-check', 18)} Todos los torques verificados ✓
+    </div>` : ''}
+  </div>
+  <div class="card torq-llaves-card">
+    <h3 class="card-title">Referencia rápida — Llaves dinamométricas</h3>
+    <div class="torq-llaves-grid">
+      <div class="torq-llave-item">
+        <span class="torq-llave-rango">8–12 N·m</span>
+        <span class="torq-llave-desc">Clamps y rieles (K2 / Aluminex)</span>
+      </div>
+      <div class="torq-llave-item">
+        <span class="torq-llave-rango">12–18 N·m</span>
+        <span class="torq-llave-desc">Soportes a base (varilla roscada)</span>
+      </div>
+      <div class="torq-llave-item">
+        <span class="torq-llave-rango">20–25 N·m</span>
+        <span class="torq-llave-desc">Varilla en concreto (epóxico curado)</span>
+      </div>
+    </div>
+  </div>`;
 }
 
 // ── Guía técnica ──────────────────────────────────────────────────────────────
@@ -386,6 +483,21 @@ window.clToggleCons  = (pid, idx, v) => _saveField(pid, 'cons',  String(idx), v)
 window.clToggleBOM   = (pid, idx, v) => _saveField(pid, 'bom',   String(idx), v);
 window.clToggleAdmin = (pid, id, v)  => _saveField(pid, 'admin', id,         v);
 window.clToggleExec  = (pid, id, v)  => _saveField(pid, 'exec',  id,         v);
+
+// Torques — guardar valor numérico aplicado
+let _torqSaveTimer = null;
+window.clSaveTorque = (pid, key, field, value) => {
+  // Debounce 600ms para no disparar Firestore en cada pulsación de tecla
+  clearTimeout(_torqSaveTimer);
+  _torqSaveTimer = setTimeout(() => {
+    projects.setField(pid, `checklistData.torques.${key}.${field}`, value);
+  }, 600);
+};
+// Verificar (checkbox) — inmediato
+window.clToggleTorque = (pid, key, checked) => {
+  projects.setField(pid, `checklistData.torques.${key}.verificado`, checked);
+  projects.setField(pid, `checklistData.torques.${key}.ts`, new Date().toISOString());
+};
 
 window.clPublish = async function(projectId) {
   const session = getSession();

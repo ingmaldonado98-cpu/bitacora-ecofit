@@ -1654,6 +1654,61 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 .cl-list-locked { opacity: .5; pointer-events: none; }
 .cl-footer-actions { padding: 12px 16px 80px; display: flex; justify-content: flex-end; }
 
+/* ── Registro de torques ──────────────────────────────────────────────────── */
+.torq-instruccion { font-size: .8rem; color: var(--text-muted); margin: 4px 0 12px; line-height: 1.5; }
+.torq-table-wrap  { overflow-x: auto; margin: 0 -4px; }
+.torq-table       { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.torq-table thead th {
+  padding: 6px 8px; text-align: left;
+  font-size: .72rem; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1px solid var(--border);
+}
+.torq-th-spec { width: 90px; }
+.torq-th-val  { width: 100px; }
+.torq-th-ok   { width: 42px; text-align: center; }
+.torq-row td  { padding: 8px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.torq-row:last-child td { border-bottom: none; }
+.torq-row-ok  { background: rgba(var(--g300-rgb, 109,217,122), .06); }
+.torq-td-comp { display: flex; flex-direction: column; gap: 2px; }
+.torq-comp-name { font-weight: 600; color: var(--text); font-size: .83rem; }
+.torq-comp-nota { font-size: .72rem; color: var(--text-muted); }
+.torq-td-spec   { font-family: monospace; font-size: .82rem; color: var(--solar); font-weight: 600; white-space: nowrap; }
+.torq-input {
+  width: 80px; padding: 5px 8px; font-size: .88rem; font-family: monospace;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); text-align: center;
+}
+.torq-input:focus { border-color: var(--g300); outline: none; }
+.torq-input:disabled { opacity: .5; }
+.torq-check-wrap { display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.torq-check-wrap input { display: none; }
+.torq-check-box {
+  width: 22px; height: 22px; border-radius: 6px;
+  border: 2px solid var(--border2); background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s, background .15s;
+}
+.torq-check-wrap input:checked + .torq-check-box {
+  background: var(--g500); border-color: var(--g500);
+}
+.torq-check-wrap input:checked + .torq-check-box::after {
+  content: '✓'; color: #fff; font-size: 13px; font-weight: 700;
+}
+.torq-completo-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; margin-top: 12px;
+  background: rgba(var(--g300-rgb, 109,217,122), .1);
+  border: 1px solid var(--g500); border-radius: var(--radius-sm);
+  color: var(--g500); font-weight: 600; font-size: .88rem;
+}
+.torq-llaves-card { margin-top: 0; }
+.torq-llaves-grid { display: flex; flex-direction: column; gap: 8px; }
+.torq-llave-item  { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.torq-llave-item:last-child { border-bottom: none; }
+.torq-llave-rango { font-family: monospace; font-weight: 700; color: var(--solar); font-size: .9rem; min-width: 80px; }
+.torq-llave-desc  { font-size: .82rem; color: var(--text-muted); }
+
 /* ── Checklist lista (nav view) ───────────────────────────────────────────── */
 .cl-list-grid { display: flex; flex-direction: column; gap: 10px; padding: 0 0 80px; }
 
