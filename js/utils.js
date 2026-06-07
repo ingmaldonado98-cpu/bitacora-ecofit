@@ -474,6 +474,45 @@ export function openScannerOverlay(onResult, { continuous = false, title = 'Esca
   const onKey = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
   document.addEventListener('keydown', onKey);
 
+  // Fallback manual: si el iframe no envía ningún mensaje en 9s (sin cámara / offline sin caché)
+  // mostramos un campo de texto directo sobre el iframe
+  const fallbackTimer = setTimeout(() => {
+    const iframe = document.getElementById('scanner-overlay-iframe');
+    if (!iframe || !wrap.isConnected) return;
+    const fb = document.createElement('div');
+    fb.className = 'scanner-manual-fallback';
+    fb.innerHTML = `
+      <p class="scanner-fb-hint">Escáner no disponible — ingresa el código manualmente:</p>
+      <div class="scanner-fb-row">
+        <input type="text" id="scanner-fb-input" class="scanner-fb-input"
+               placeholder="Número de serie…" autocomplete="off" />
+        <button class="btn-primary scanner-fb-btn" id="scanner-fb-ok">OK</button>
+      </div>`;
+    wrap.appendChild(fb);
+    const inp = document.getElementById('scanner-fb-input');
+    inp?.focus();
+    const submit = () => {
+      const val = inp?.value?.trim();
+      if (!val) return;
+      fb.remove();
+      clearTimeout(fallbackTimer);
+      if (continuous) { scanCount++; onResult(val, 'manual'); }
+      else { close(); onResult(val, 'manual'); }
+    };
+    document.getElementById('scanner-fb-ok')?.addEventListener('click', submit);
+    inp?.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  }, 9000);
+
+  // Cancelar fallback si el escáner responde normalmente
+  const _origOnMsg = onMsg;
+  window.removeEventListener('message', onMsg);
+  window.addEventListener('message', function onMsgWithCancel(e) {
+    if (!e.data || e.data.type !== 'ECOFIT_SCAN') return;
+    clearTimeout(fallbackTimer);
+    document.querySelector('.scanner-manual-fallback')?.remove();
+    _origOnMsg(e);
+  });
+
   return close;
 }
 
