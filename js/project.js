@@ -241,7 +241,7 @@ export function calcFaseEstado(project) {
 
 // ── Firmar fase ───────────────────────────────────────────────────────────────
 export async function firmarFase(projectId, fase) {
-  const session = getSession();
+  const session = await getSession();
   if (!session) { toast('Sesión no encontrada', 'error'); return; }
   const p = await projects.getById(projectId);
   const fases = p.fases || {};
@@ -251,7 +251,8 @@ export async function firmarFase(projectId, fase) {
     nombre:      session.nombre || session.email,
     firmado_en:  isoNow(),
   };
-  await projects.update(projectId, { fases });
+  // setField atómico — no sobreescribe el documento completo
+  await projects.setField(projectId, `fases.firmas.${fase}`, fases.firmas[fase]);
   const faseNombre = { doc: 'Documentación', gar: 'Garantía', aud: 'Auditoría' }[fase] || fase;
   logChange(projectId, { modulo: faseNombre, accion: 'firmada', detalle: '', quien: session });
   toast(`✅ Fase firmada por ${session.nombre || session.email}`);
@@ -455,7 +456,8 @@ function renderLineaBase(project, id, canWrite) {
         <input type="number" id="lb-hsp" step="0.1" min="0" placeholder="Ej: 5.5" />
       </div>
     </div>
-    ${kwp > 0 ? `<p class="lb-ref">Sistema: <b>${kwp.toFixed(2)} kWp</b> · Producción esperada: ~${(kwp * 5).toFixed(1)}–${(kwp * 6).toFixed(1)} kWh/día</p>` : ''}
+    <input type="hidden" id="lb-kwp" value="${kwp || 0}" />
+    ${kwp > 0 ? `<p class="lb-ref">Sistema: <b>${kwp.toFixed(2)} kWp</b> · Producción esperada (La Paz): ~${(kwp * 6.2 * 0.75).toFixed(1)}–${(kwp * 6.2 * 0.82).toFixed(1)} kWh/día</p>` : ''}
     <div class="form-group">
       <label>Notas</label>
       <textarea id="lb-notas" rows="2" placeholder="Condiciones del día, nubosidad, incidencias…" class="textarea-field"></textarea>
@@ -473,13 +475,30 @@ window.guardarLineaBase = async function(projectId) {
   const hsp   = parseFloat(document.getElementById('lb-hsp')?.value);
   const notas = document.getElementById('lb-notas')?.value?.trim();
   if (!kwh || kwh <= 0) { toast('Ingresa los kWh generados', 'warn'); return; }
-  const session = getSession();
-  await projects.setField(projectId, 'lineaBase', {
-    kwh, horasSol: hsp || null, notas: notas || null,
-    registradoEn: isoNow(), registradoPor: session?.uid || '',
-  });
-  toast('✅ Línea base registrada');
-  navigate(`#proyecto/${projectId}`);
+
+  // FIX-6: Validar ratio kWh/kWp (rango razonable para La Paz: 2–9 kWh/kWp/día)
+  const kwp = parseFloat(document.getElementById('lb-kwp')?.value || '0');
+  const _doSave = async () => {
+    const session = await getSession();
+    await projects.setField(projectId, 'lineaBase', {
+      kwh, horasSol: hsp || null, notas: notas || null,
+      registradoEn: isoNow(), registradoPor: session?.uid || '',
+    });
+    toast('✅ Línea base registrada');
+    navigate(`#proyecto/${projectId}`);
+  };
+
+  if (kwp > 0) {
+    const ratio = kwh / kwp;
+    if (ratio < 2 || ratio > 9) {
+      confirmDialog(
+        `El ratio kWh/kWp es ${ratio.toFixed(2)}, fuera del rango esperado (2–9) para La Paz. ¿Guardar de todas formas?`,
+        _doSave
+      );
+      return;
+    }
+  }
+  await _doSave();
 };
 
 window.editLineaBase = function(projectId) {
@@ -715,6 +734,10 @@ window._cambiarEstado = async function(id, nuevoEstado) {
 
 // ── Formulario nuevo / editar proyecto ────────────────────────────────────────
 export async function renderProjectForm(id, session) {
+  // FIX-9: Limpiar variables de foto al inicio para que no persistan entre proyectos
+  _clienteFotoB64 = null;
+  _clienteFotoUrl = null;
+
   const [project, allUsers] = await Promise.all([
     id ? projects.getById(id) : Promise.resolve(null),
     users.getAll(),
@@ -856,6 +879,13 @@ export async function renderProjectForm(id, session) {
              value="${(project?.fechaEstimada||'').split('T')[0]}" />
     </div>
 
+    <div class="form-group">
+      <label>Notas / Observaciones internas <span class="hint-opt">(opcional)</span></label>
+      <textarea name="notas" rows="3" class="textarea-field"
+                placeholder="Acceso al inmueble, condiciones especiales, acuerdos verbales…"
+      >${esc(project?.notas||'')}</textarea>
+    </div>
+
     <div class="form-actions">
       <button type="button" class="btn-outline" onclick="history.back()">Cancelar</button>
       <button type="submit" class="btn-primary">${isEditing ? 'Guardar cambios' : 'Crear proyecto'}</button>
@@ -957,6 +987,7 @@ window._submitProject = async function(e, editId) {
     fechaEstimada:   fd.get('fechaEstimada') ? new Date(fd.get('fechaEstimada')).toISOString() : null,
     coordenadas,
     clienteTelefono:  esPequeno ? (fd.get('clienteTelefono')?.trim() || null)  : null,
+    notas:            fd.get('notas')?.trim() || null,
   };
 
   // Foto del cliente: subir si hay nueva foto capturada

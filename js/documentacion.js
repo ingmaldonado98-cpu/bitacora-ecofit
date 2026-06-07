@@ -983,7 +983,7 @@ window.guardarLevantamiento = async function(e, projectId) {
   if (ind) { ind.textContent = '✓ Guardado'; ind.className = 'autosave-indicator saved'; }
   if (!e._auto) {
     toast('✅ Levantamiento guardado');
-    logChange(projectId, { modulo: 'Documentación', accion: 'levantamiento guardado', detalle: '', quien: getSession() });
+    logChange(projectId, { modulo: 'Documentación', accion: 'levantamiento guardado', detalle: '', quien: await getSession() });
   }
 };
 

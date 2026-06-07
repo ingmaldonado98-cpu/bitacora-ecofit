@@ -280,7 +280,8 @@ window.guardarVoc = async function(projectId) {
     if (!ok) return;
   }
 
-  const data = { ...window._vocTemp, savedAt: isoNow(), savedBy: getSession()?.uid || '' };
+  const session = await getSession();
+  const data = { ...window._vocTemp, savedAt: isoNow(), savedBy: session?.uid || '' };
   await projects.setField(projectId, 'garantia.validacionVoc', data);
   const resMsg = data.resultado === 'seguro' ? 'configuración segura'
                : data.resultado === 'excede' ? '⚠️ excede el límite'
@@ -713,11 +714,12 @@ window.guardarEquipo = async function(projectId) {
 
   // setField en lugar de update() — escribe solo garantia.equipos, no el doc completo
   await projects.setField(projectId, 'garantia.equipos', newEquipos);
+  const _eqSession = await getSession();
   logChange(projectId, {
     modulo: 'Garantía',
     accion: isEdit ? 'equipo editado' : 'equipo agregado',
     detalle: `${equipo.tipo}: ${equipo.marca} ${equipo.modelo}`,
-    quien: getSession(),
+    quien: _eqSession,
   });
   _clearEqFotos();
   sessionStorage.setItem('garantia-tab-target', 'g-equipos');

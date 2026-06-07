@@ -31,10 +31,15 @@ export function updateNavBadge(count) {
 }
 
 // ── Render dashboard completo ──────────────────────────────────────────────────
-export async function renderDashboard(session) {
+// FIX-8: Acepta datos pre-cargados desde app.js para evitar doble lectura Firestore.
+// Firma: renderDashboard(session, all, allUsers)
+export async function renderDashboard(session, all, allUsers) {
   _tecnicoFilter = null;
   _page = 0;
-  const [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
+  // Si app.js no pasó los datos, cargamos aquí como fallback
+  if (!all || !allUsers) {
+    [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
+  }
 
   // Proyectos activos = todo excepto cerrado y cancelado
   const activos = all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));

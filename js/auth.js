@@ -176,10 +176,26 @@ export function renderLogin() {
   </div>`;
 }
 
+// ── Rate-limit state (módulo — no persiste entre recargas) ────────────────
+let _loginAttempts = 0;
+let _loginLockedUntil = 0;
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS  = 30_000; // 30 segundos
+
 window._submitLogin = async function(e) {
   e.preventDefault();
   const btn    = document.getElementById('login-btn');
   const errEl  = document.getElementById('login-error');
+
+  // Verificar bloqueo activo
+  const now = Date.now();
+  if (_loginLockedUntil > now) {
+    const secs = Math.ceil((_loginLockedUntil - now) / 1000);
+    errEl.textContent   = `Demasiados intentos. Espera ${secs}s antes de reintentar.`;
+    errEl.style.display = 'block';
+    return;
+  }
+
   const username = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
 
@@ -189,12 +205,37 @@ window._submitLogin = async function(e) {
 
   try {
     await login(username, password);
+    _loginAttempts   = 0;   // reset en éxito
+    _loginLockedUntil = 0;
     window.location.hash = '#dashboard';
   } catch (err) {
-    errEl.textContent    = err.message;
-    errEl.style.display  = 'block';
-  } finally {
-    btn.disabled    = false;
-    btn.textContent = 'Iniciar sesión';
+    _loginAttempts++;
+    if (_loginAttempts >= LOGIN_MAX_ATTEMPTS) {
+      _loginLockedUntil = Date.now() + LOGIN_LOCKOUT_MS;
+      _loginAttempts    = 0;
+      errEl.textContent   = `Demasiados intentos fallidos. Espera 30 segundos.`;
+      // Actualizar contador en vivo
+      const _lockTimer = setInterval(() => {
+        const rem = Math.ceil((_loginLockedUntil - Date.now()) / 1000);
+        if (rem <= 0) {
+          clearInterval(_lockTimer);
+          btn.disabled    = false;
+          btn.textContent = 'Iniciar sesión';
+          errEl.style.display = 'none';
+        } else {
+          errEl.textContent = `Demasiados intentos fallidos. Espera ${rem}s.`;
+          btn.disabled    = true;
+          btn.textContent = `Bloqueado (${rem}s)`;
+        }
+      }, 1000);
+    } else {
+      errEl.textContent = err.message;
+      btn.disabled    = false;
+      btn.textContent = 'Iniciar sesión';
+    }
+    errEl.style.display = 'block';
+    return; // no llegar al finally
   }
+  btn.disabled    = false;
+  btn.textContent = 'Iniciar sesión';
 };

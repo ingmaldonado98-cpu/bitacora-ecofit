@@ -324,6 +324,16 @@ window.exportarPDFTecnico = async function(projectId) {
   y = campo(doc,'Estado', ESTADOS_LABEL[project.estado] || project.estado, 14,y);
   y = campo(doc,'Capacidad',`${totalKwp.toFixed(2)} kWp · ${totalPaneles} paneles`,14,y);
   if (project.fechaEstimada) y = campo(doc,'Fecha estimada entrega',fmtFecha(project.fechaEstimada),14,y);
+  // Notas internas del proyecto
+  if (project.notas) {
+    y += 2;
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+    doc.text('Notas internas:', 14, y); y += 5;
+    doc.setFont('helvetica','normal');
+    const notasLines = doc.splitTextToSize(project.notas, 180);
+    doc.text(notasLines, 14, y);
+    y += notasLines.length * 5 + 4;
+  }
 
   // Equipos con seriales
   if (sec('sec-equipos')) {

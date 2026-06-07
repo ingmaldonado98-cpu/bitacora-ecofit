@@ -94,16 +94,34 @@ export async function resetPassword(authEmail) {
 }
 
 // ── Seed: crear admin si no existe ningún usuario ──────────────────────────
+// Contraseña generada aleatoriamente — se imprime UNA SOLA VEZ en consola.
+// El administrador debe cambiarla desde Firebase Authentication Console
+// o desde Ajustes > Cambiar contraseña inmediatamente después del primer login.
+function _genTempPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+  let pwd = '';
+  const arr = new Uint32Array(16);
+  crypto.getRandomValues(arr);
+  arr.forEach(n => { pwd += chars[n % chars.length]; });
+  return pwd;
+}
+
 export async function seedAdminIfEmpty() {
   try {
     const snap = await getDocs(collection(fbDB, 'users'));
     if (!snap.empty) return; // Ya hay usuarios
 
-    const { uid, authEmail } = await createFbUser('admin', 'ecofit2024');
+    const tempPwd = _genTempPassword();
+    const { uid, authEmail } = await createFbUser('admin', tempPwd);
     await setDoc(doc(fbDB, 'users', uid), {
       id: uid, username: 'admin', nombre: 'Administrador',
       rol: 'admin', activo: true, authEmail, createdAt: new Date().toISOString(),
     });
+    // ⚠️ Mostrar solo en consola — nunca en la UI
+    console.warn(
+      '%c[Ecofit] Admin creado. Contraseña temporal (cámbiala YA):',
+      'color:orange;font-weight:bold', tempPwd
+    );
   } catch (err) {
     console.warn('[FB] seedAdmin:', err.message);
   }

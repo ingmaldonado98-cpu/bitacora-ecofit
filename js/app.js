@@ -159,7 +159,8 @@ async function route() {
       case '': {
         const [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
         initDashboardFilters(all, allUsers);
-        await render(renderDashboard(session), skeletonDashboard());
+        // FIX-8: Pasar datos pre-cargados para evitar doble lectura Firestore
+        await render(renderDashboard(session, all, allUsers), skeletonDashboard());
         // Poblar select de técnicos ahora que el DOM existe
         populateTecnicoFilter(allUsers);
         break;
