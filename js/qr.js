@@ -68,6 +68,10 @@ export async function renderQR(projectId, session) {
       <button class="btn-primary" onclick="descargarQR('${projectId}')">
         ${icon('download-simple')} Descargar PNG
       </button>
+      ${'share' in navigator ? `
+      <button class="btn-outline" onclick="compartirQR('${projectId}')">
+        ${icon('share-network')} Compartir
+      </button>` : ''}
     </div>
   </div>
 
@@ -90,6 +94,30 @@ export async function renderQR(projectId, session) {
   </script>
   `;
 }
+
+window.compartirQR = async function(projectId) {
+  const project = await projects.getById(projectId);
+  const wrap  = document.getElementById('qr-canvas-wrap');
+  const canvas = wrap?.querySelector('canvas');
+  const img    = wrap?.querySelector('img');
+  let blob = null;
+  if (canvas) {
+    blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+  } else if (img) {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth || 220; c.height = img.naturalHeight || 220;
+    c.getContext('2d').drawImage(img, 0, 0);
+    blob = await new Promise(res => c.toBlob(res, 'image/png'));
+  }
+  const file = blob ? new File([blob], `QR-${project.displayId}.png`, { type: 'image/png' }) : null;
+  try {
+    await navigator.share({
+      title: `QR Instalación — ${project.clientName || project.displayId}`,
+      text: `Sistema solar ${project.displayId} — Ecofit Solar Solutions`,
+      ...(file && navigator.canShare?.({ files: [file] }) ? { files: [file] } : {}),
+    });
+  } catch (e) { if (e.name !== 'AbortError') console.warn('share:', e); }
+};
 
 window.descargarQR = async function(projectId) {
   const wrap = document.getElementById('qr-canvas-wrap');

@@ -4,7 +4,7 @@ import { projects } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
          uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION,
          openScannerOverlay } from './utils.js';
-import { canEdit, isAdmin, isLider } from './auth.js';
+import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 import { scanOnce, startContinuousScan, stopScanner } from './scanner.js';
@@ -38,6 +38,9 @@ export async function renderGarantia(projectId, session) {
 
   <div class="tab-bar" id="garantia-tabs">
     <button class="tab-btn tab-active" data-tab="g-equipos"   onclick="switchTab('garantia-tabs','g-equipos',this)">Equipos</button>
+    <button class="tab-btn" data-tab="g-voc"                  onclick="switchTab('garantia-tabs','g-voc',this)">
+      Voc${(() => { const v = project.garantia?.validacionVoc; return v ? `<span class="tab-badge ${v.resultado==='seguro'?'tab-ok':v.resultado==='excede'?'tab-err':''}">${v.resultado==='seguro'?'✓':v.resultado==='excede'?'⚠':'~'}</span>` : ''; })()}
+    </button>
     <button class="tab-btn" data-tab="g-estructura"           onclick="switchTab('garantia-tabs','g-estructura',this)">Estructura</button>
     <button class="tab-btn" data-tab="g-paneles"              onclick="switchTab('garantia-tabs','g-paneles',this)">Paneles</button>
     <button class="tab-btn" data-tab="g-notas"                onclick="switchTab('garantia-tabs','g-notas',this)">
@@ -57,6 +60,11 @@ export async function renderGarantia(projectId, session) {
     <div id="form-equipo" style="display:none" class="card">
       ${formEquipo(projectId)}
     </div>
+  </div>
+
+  <!-- Validación Voc -->
+  <div id="g-voc" class="tab-panel">
+    ${renderVocTab(project, projectId, edit)}
   </div>
 
   <!-- 1D: Estructura -->
@@ -120,6 +128,126 @@ export async function renderGarantia(projectId, session) {
   </script>
   `;
 }
+
+// ── Validación Voc ────────────────────────────────────────────────────────────
+function renderVocTab(project, projectId, edit) {
+  const g       = project.garantia || {};
+  const inversor = (g.equipos || []).find(e => e.tipo === 'inversor');
+  const vd       = g.validacionVoc || {};
+
+  const vocMaxPre   = inversor?.vocMax  || vd.vocMaxInversor || '';
+  const vocPanel    = vd.vocPanel    || '';
+  const panelesSerie= vd.panelesSerie || '';
+  const tMin        = vd.tMin        ?? -5;
+  const coefVoc     = vd.coefVoc     ?? -0.29;
+  const resultado   = vd.resultado;
+
+  const semaforo = resultado === 'seguro'  ? { cls: 'voc-ok',   ico: '🟢', txt: 'Configuración segura' }
+                 : resultado === 'limite'  ? { cls: 'voc-warn', ico: '🟡', txt: 'En el límite — sin margen' }
+                 : resultado === 'excede'  ? { cls: 'voc-err',  ico: '🔴', txt: 'Excede el límite del inversor' }
+                 : null;
+
+  return `
+  <div class="card">
+    <div class="card-title-row">
+      <h3 class="card-title">Validación Voc de string</h3>
+      ${semaforo ? `<span class="voc-badge ${semaforo.cls}">${semaforo.ico} ${semaforo.txt}</span>` : ''}
+    </div>
+    ${inversor
+      ? `<p class="voc-inversor-hint">${icon('cpu', 14)} Inversor detectado: <b>${esc(inversor.marca)} ${esc(inversor.modelo)}</b>${inversor.vocMax ? ` · Voc máx: <b>${inversor.vocMax} V</b>` : ' · <em>Sin Voc máx registrado</em>'}</p>`
+      : `<p class="voc-inversor-hint warn">${icon('warning', 14)} Sin inversor registrado. Agrega uno en la pestaña Equipos primero.</p>`
+    }
+    <div class="form-row">
+      <div class="form-group">
+        <label>Voc del panel (V)</label>
+        <input type="number" id="voc-panel" step="0.1" min="0" placeholder="Ej: 41.2"
+               value="${vocPanel}" ${!edit?'disabled':''} oninput="calcVoc()" />
+      </div>
+      <div class="form-group">
+        <label>Paneles en serie</label>
+        <input type="number" id="voc-serie" step="1" min="1" max="30" placeholder="Ej: 10"
+               value="${panelesSerie}" ${!edit?'disabled':''} oninput="calcVoc()" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Temp. mínima sitio (°C)</label>
+        <input type="number" id="voc-tmin" step="1" placeholder="-5"
+               value="${tMin}" ${!edit?'disabled':''} oninput="calcVoc()" />
+      </div>
+      <div class="form-group">
+        <label>Coef. temp. Voc (%/°C)</label>
+        <input type="number" id="voc-coef" step="0.01" placeholder="-0.29"
+               value="${coefVoc}" ${!edit?'disabled':''} oninput="calcVoc()" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Voc máx. inversor (V)</label>
+      <input type="number" id="voc-max-inv" step="1" min="0"
+             placeholder="${inversor?.vocMax ? inversor.vocMax : 'Ej: 600'}"
+             value="${vocMaxPre}" ${!edit?'disabled':''} oninput="calcVoc()" />
+    </div>
+
+    <!-- Resultado en tiempo real -->
+    <div id="voc-resultado" class="voc-resultado" style="${resultado ? '' : 'display:none'}">
+      <div class="voc-res-row"><span>Voc corregido por temp.</span><strong id="voc-r-corr">${vd.vocCorregido?.toFixed(2) || '—'} V</strong></div>
+      <div class="voc-res-row"><span>Voc del string completo</span><strong id="voc-r-str">${vd.vocString?.toFixed(2) || '—'} V</strong></div>
+      <div class="voc-res-row"><span>Margen de seguridad</span><strong id="voc-r-margen">${vd.margen != null ? vd.margen.toFixed(1) + '%' : '—'}</strong></div>
+      <div id="voc-r-msg" class="voc-res-msg ${semaforo?.cls || ''}">${semaforo ? semaforo.ico + ' ' + (vd.mensaje || semaforo.txt) : ''}</div>
+    </div>
+
+    ${edit ? `
+    <div class="form-actions" style="margin-top:12px">
+      <button class="btn-outline btn-sm" onclick="calcVoc()">Calcular</button>
+      <button class="btn-primary btn-sm" onclick="guardarVoc('${projectId}')">Guardar resultado</button>
+    </div>` : ''}
+  </div>`;
+}
+
+// Clave para la calc: lee los campos y muestra el resultado en tiempo real
+window.calcVoc = function() {
+  const vocP   = parseFloat(document.getElementById('voc-panel')?.value)   || 0;
+  const serie  = parseInt(document.getElementById('voc-serie')?.value)      || 0;
+  const tMin   = parseFloat(document.getElementById('voc-tmin')?.value)     ?? -5;
+  const coef   = parseFloat(document.getElementById('voc-coef')?.value)     ?? -0.29;
+  const vocMax = parseFloat(document.getElementById('voc-max-inv')?.value)  || 0;
+
+  if (!vocP || !serie || !vocMax) return;
+
+  const vocCorr  = vocP * (1 + (coef / 100) * (tMin - 25));
+  const vocStr   = vocCorr * serie;
+  const margen   = ((vocMax - vocStr) / vocMax) * 100;
+  const maxSerie = Math.floor(vocMax * 0.90 / vocCorr);
+
+  let resultado, mensaje;
+  if (vocStr <= vocMax * 0.90)    { resultado = 'seguro'; mensaje = `✅ Seguro. Margen: ${margen.toFixed(1)}%. Máximo recomendado: ${maxSerie} paneles en serie.`; }
+  else if (vocStr <= vocMax)       { resultado = 'limite'; mensaje = `⚠️ En el límite (${margen.toFixed(1)}% de margen). Considera reducir 1 panel en serie.`; }
+  else                             { resultado = 'excede'; mensaje = `🚨 Excede el límite por ${(vocStr - vocMax).toFixed(1)} V. Máximo seguro: ${maxSerie} paneles en serie.`; }
+
+  const wrap = document.getElementById('voc-resultado');
+  if (wrap) {
+    wrap.style.display = '';
+    document.getElementById('voc-r-corr').textContent   = vocCorr.toFixed(2) + ' V';
+    document.getElementById('voc-r-str').textContent    = vocStr.toFixed(2)  + ' V';
+    document.getElementById('voc-r-margen').textContent = margen.toFixed(1)  + '%';
+    const msg = document.getElementById('voc-r-msg');
+    msg.textContent  = mensaje;
+    msg.className    = `voc-res-msg ${resultado === 'seguro' ? 'voc-ok' : resultado === 'limite' ? 'voc-warn' : 'voc-err'}`;
+  }
+
+  // Guardar en estado temporal para persistir
+  window._vocTemp = { vocPanel: vocP, panelesSerie: serie, tMin, coefVoc: coef,
+    vocMaxInversor: vocMax, vocCorregido: vocCorr, vocString: vocStr, margen, resultado, mensaje };
+};
+
+window.guardarVoc = async function(projectId) {
+  if (!window._vocTemp) { toast('Primero calcula el Voc', 'warn'); return; }
+  const data = { ...window._vocTemp, savedAt: isoNow(), savedBy: getSession()?.uid || '' };
+  await projects.setField(projectId, 'garantia.validacionVoc', data);
+  toast(`✅ Voc guardado — ${data.resultado === 'seguro' ? 'configuración segura' : data.resultado === 'excede' ? '⚠️ excede el límite' : 'en el límite'}`);
+  sessionStorage.setItem('garantia-tab-target', 'g-voc');
+  navigate(`#proyecto/${projectId}/garantia`);
+};
 
 // ── 1A Foto del sistema ────────────────────────────────────────────────────────
 window.capturarFotoSistema = function(projectId) {
@@ -369,7 +497,7 @@ function formEquipo(projectId, eq = null, editIdx = -1) {
     <div class="form-row">
       <div class="form-group">
         <label>Tipo *</label>
-        <select id="eq-tipo">
+        <select id="eq-tipo" onchange="toggleVocMaxField()">
           ${TIPOS_EQUIPO.map(t =>
             `<option value="${t.value}" ${(isEdit ? eq.tipo : '') === t.value ? 'selected' : ''}>${t.label}</option>`
           ).join('')}
@@ -385,7 +513,14 @@ function formEquipo(projectId, eq = null, editIdx = -1) {
     <div class="form-group">
       <label>Modelo *</label>
       <input type="text" id="eq-modelo" placeholder="Ej: LXP-5K-48"
-             value="${isEdit ? esc(eq.modelo) : ''}" />
+             value="${isEdit ? esc(eq.modelo) : ''}"
+             oninput="toggleVocMaxField()" />
+    </div>
+    <!-- vocMax: solo para inversores -->
+    <div class="form-group" id="eq-vocmax-wrap" style="${(isEdit ? eq.tipo : '') === 'inversor' ? '' : 'display:none'}">
+      <label>Voc máx. entrada CD (V) <span class="form-hint">Del datasheet del inversor</span></label>
+      <input type="number" id="eq-vocmax" placeholder="Ej: 600" step="1" min="0"
+             value="${isEdit ? esc(eq.vocMax || '') : ''}" />
     </div>
     <div class="form-group">
       <label>Número de serie</label>
@@ -447,6 +582,13 @@ window.capEqFoto = function(tipo, slotId) {
   });
 };
 
+// Mostrar/ocultar campo vocMax según tipo de equipo seleccionado
+window.toggleVocMaxField = function() {
+  const tipo = document.getElementById('eq-tipo')?.value;
+  const wrap = document.getElementById('eq-vocmax-wrap');
+  if (wrap) wrap.style.display = tipo === 'inversor' ? '' : 'none';
+};
+
 window.scanSerial = function() {
   openScannerOverlay(
     (code) => {
@@ -504,9 +646,11 @@ window.guardarEquipo = async function(projectId) {
   p.garantia = p.garantia || {};
   p.garantia.equipos = p.garantia.equipos || [];
 
+  const vocMaxRaw = document.getElementById('eq-vocmax')?.value?.trim();
   const equipo = {
     id:          isEdit ? (p.garantia.equipos[editIdx]?.id || uuid()) : uuid(),
     tipo, marca, modelo,
+    ...(tipo === 'inversor' && vocMaxRaw ? { vocMax: parseFloat(vocMaxRaw) } : {}),
     serial:      document.getElementById('eq-serial').value.trim(),
     fotoPlaca:   _eqFotos.placa   || (isEdit ? p.garantia.equipos[editIdx]?.fotoPlaca   : null),
     fotoFrontal: _eqFotos.frontal || (isEdit ? p.garantia.equipos[editIdx]?.fotoFrontal : null),

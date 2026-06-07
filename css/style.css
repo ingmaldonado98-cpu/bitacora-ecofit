@@ -2447,6 +2447,38 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .calc-prop-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .calc-prop-del   { background: none; border: 1px solid var(--red); color: var(--red); border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: .78rem; }
 
+/* ── Tab badge error ──────────────────────────────────────────────────────── */
+.tab-badge.tab-err { background: rgba(var(--red-rgb,220,53,69),.15); color: var(--red); }
+
+/* ── Validación Voc ───────────────────────────────────────────────────────── */
+.voc-inversor-hint { font-size: .82rem; color: var(--text-muted); margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.voc-inversor-hint.warn { color: var(--red); }
+.voc-badge { font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+.voc-badge.voc-ok   { background: rgba(109,217,122,.12); color: var(--g500); border: 1px solid var(--g500); }
+.voc-badge.voc-warn { background: rgba(240,192,0,.12);   color: #c8a000;     border: 1px solid #c8a000; }
+.voc-badge.voc-err  { background: rgba(220,53,69,.10);   color: var(--red);  border: 1px solid var(--red); }
+.voc-resultado  { margin-top: 14px; padding: 12px; background: var(--surface2); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px; }
+.voc-res-row    { display: flex; justify-content: space-between; align-items: center; font-size: .84rem; }
+.voc-res-row span { color: var(--text-muted); }
+.voc-res-row strong { font-family: monospace; font-size: .92rem; }
+.voc-res-msg    { font-size: .82rem; font-weight: 600; padding: 8px 10px; border-radius: var(--radius-sm); margin-top: 4px; }
+.voc-res-msg.voc-ok   { background: rgba(109,217,122,.10); color: var(--g500); }
+.voc-res-msg.voc-warn { background: rgba(240,192,0,.10);   color: #a88000; }
+.voc-res-msg.voc-err  { background: rgba(220,53,69,.10);   color: var(--red); }
+.form-hint { font-size: .72rem; color: var(--text-muted); margin-left: 4px; font-weight: 400; }
+
+/* ── Línea base de desempeño ──────────────────────────────────────────────── */
+.lb-card  { padding: 14px 16px; }
+.lb-hint  { font-size: .82rem; color: var(--text-muted); margin-bottom: 12px; }
+.lb-ref   { font-size: .78rem; color: var(--text-muted); margin: -4px 0 12px; }
+.lb-grid  { display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0 10px; }
+.lb-stat  { display: flex; flex-direction: column; gap: 2px; min-width: 72px; }
+.lb-val   { font-size: 1.4rem; font-weight: 700; color: var(--solar); font-family: monospace; }
+.lb-lbl   { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; }
+.lb-notas { font-size: .8rem; color: var(--text-muted); font-style: italic; margin: 4px 0 0; }
+.lb-fecha { font-size: .72rem; color: var(--text-muted); margin-top: 6px; }
+.lb-edit-btn { margin-left: auto; }
+
 /* ── Firmar fase ──────────────────────────────────────────────────────────── */
 .fase-firma-wrap {
   margin: 16px 16px 8px;

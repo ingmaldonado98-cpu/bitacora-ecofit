@@ -367,6 +367,9 @@ function renderModulosProgreso(project, id, session, admin) {
     ${puedeAuditoria ? modCard('Auditoría', 'magnifying-glass-plus', 'mpc-aud', audPct, audItems, `#proyecto/${id}/auditoria`, 'aud') : ''}
   </div>
 
+  <!-- Línea base de desempeño -->
+  ${renderLineaBase(project, id, admin || isLider(session))}
+
   <!-- Herramientas secundarias -->
   <div class="tools-row">
     <button class="tool-btn" onclick="navigate('#calculadora/${id}')">
@@ -383,6 +386,84 @@ function renderModulosProgreso(project, id, session, admin) {
     </button>` : ''}
   </div>`;
 }
+
+// ── Línea base de desempeño ───────────────────────────────────────────────────
+function renderLineaBase(project, id, canWrite) {
+  const lb = project.lineaBase || {};
+  const totalPaneles = (project.garantia?.paneles?.strings || [])
+    .reduce((s, st) => s + (st.paneles?.length || 0), 0);
+  const wp  = project.garantia?.paneles?.wp || 0;
+  const kwp = totalPaneles * wp / 1000;
+
+  if (lb.kwh != null) {
+    // Ya registrada — mostrar solo lectura
+    const irr = kwp > 0 ? (lb.kwh / kwp).toFixed(2) : '—';
+    return `
+  <div class="card lb-card">
+    <div class="card-title-row">
+      <h3 class="card-title">${icon('chart-line', 16)} Línea base</h3>
+      ${canWrite ? `<button class="btn-icon-sm lb-edit-btn" onclick="editLineaBase('${id}')" title="Editar">✎</button>` : ''}
+    </div>
+    <div class="lb-grid">
+      <div class="lb-stat"><span class="lb-val">${lb.kwh}</span><span class="lb-lbl">kWh día 1</span></div>
+      <div class="lb-stat"><span class="lb-val">${irr}</span><span class="lb-lbl">kWh/kWp</span></div>
+      ${lb.horasSol != null ? `<div class="lb-stat"><span class="lb-val">${lb.horasSol}</span><span class="lb-lbl">HSP registradas</span></div>` : ''}
+    </div>
+    ${lb.notas ? `<p class="lb-notas">${esc(lb.notas)}</p>` : ''}
+    <p class="lb-fecha">Registrado: ${fmtFecha(lb.registradoEn)}</p>
+  </div>`;
+  }
+
+  if (!canWrite) return '';   // apoyo no ve el formulario vacío
+
+  return `
+  <div class="card lb-card" id="lb-form-wrap">
+    <h3 class="card-title">${icon('chart-line', 16)} Línea base de desempeño</h3>
+    <p class="lb-hint">Registra la generación del primer día completo de operación.</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label>kWh generados (día 1)</label>
+        <input type="number" id="lb-kwh" step="0.1" min="0" placeholder="Ej: 28.5" />
+      </div>
+      <div class="form-group">
+        <label>Horas sol pico (HSP)</label>
+        <input type="number" id="lb-hsp" step="0.1" min="0" placeholder="Ej: 5.5" />
+      </div>
+    </div>
+    ${kwp > 0 ? `<p class="lb-ref">Sistema: <b>${kwp.toFixed(2)} kWp</b> · Producción esperada: ~${(kwp * 5).toFixed(1)}–${(kwp * 6).toFixed(1)} kWh/día</p>` : ''}
+    <div class="form-group">
+      <label>Notas</label>
+      <textarea id="lb-notas" rows="2" placeholder="Condiciones del día, nubosidad, incidencias…" class="textarea-field"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary btn-sm" onclick="guardarLineaBase('${id}')">
+        ${icon('chart-line', 14)} Registrar línea base
+      </button>
+    </div>
+  </div>`;
+}
+
+window.guardarLineaBase = async function(projectId) {
+  const kwh   = parseFloat(document.getElementById('lb-kwh')?.value);
+  const hsp   = parseFloat(document.getElementById('lb-hsp')?.value);
+  const notas = document.getElementById('lb-notas')?.value?.trim();
+  if (!kwh || kwh <= 0) { toast('Ingresa los kWh generados', 'warn'); return; }
+  const session = getSession();
+  await projects.setField(projectId, 'lineaBase', {
+    kwh, horasSol: hsp || null, notas: notas || null,
+    registradoEn: isoNow(), registradoPor: session?.uid || '',
+  });
+  toast('✅ Línea base registrada');
+  navigate(`#proyecto/${projectId}`);
+};
+
+window.editLineaBase = function(projectId) {
+  // Permite re-registrar borrando el existente
+  confirmDialog('¿Sobrescribir la línea base actual?', async () => {
+    await projects.setField(projectId, 'lineaBase', null);
+    navigate(`#proyecto/${projectId}`);
+  });
+};
 
 // renderChecklistProgreso eliminada — reemplazada por renderModulosProgreso
 
