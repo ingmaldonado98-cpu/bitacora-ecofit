@@ -1,13 +1,14 @@
 // checklist.js — Módulo Checklist de instalación Ecofit V6
 
 import { projects } from './db.js';
-import { esc, toast, isoNow } from './utils.js';
-import { canEdit, isAdmin } from './auth.js';
+import { esc, toast, isoNow, fmtFechaHora } from './utils.js';
+import { canEdit, isAdmin, getSession } from './auth.js';
 import { HERRAMIENTA, getConsumibles, ADMIN_REVIEW_ITEMS, getExecBlocks } from '../modules/checklist/index.js';
 import { buildDiagramSVG, buildGuiaData, buildTorqueTable } from '../modules/calculadora/index.js';
 
-let _clDiagScale = 1;
 import { icon } from './icons.js';
+
+let _clDiagScale = 1;
 
 export async function renderChecklistModule(projectId, session) {
   const project = await projects.getById(projectId);
@@ -63,7 +64,7 @@ export async function renderChecklistModule(projectId, session) {
     ${icon('check-circle', 18, 'icon-ok')}
     <div class="cl-status-text">
       <strong>Aprobado y publicado</strong>
-      <span>por ${esc(cl.publishedBy || '—')} · ${cl.publishedAt ? new Date(cl.publishedAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : ''}</span>
+      <span>por ${esc(cl.publishedBy || '—')} · ${cl.publishedAt ? fmtFechaHora(cl.publishedAt) : ''}</span>
     </div>
     ${admin ? `<button class="btn-outline btn-sm" onclick="clUnpublish('${projectId}')">Revocar</button>` : ''}
   </div>` : admin ? `
@@ -387,22 +388,17 @@ window.clToggleAdmin = (pid, id, v)  => _saveField(pid, 'admin', id,         v);
 window.clToggleExec  = (pid, id, v)  => _saveField(pid, 'exec',  id,         v);
 
 window.clPublish = async function(projectId) {
-  const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
-  const p = await projects.getById(projectId);
-  p.checklistData = p.checklistData || {};
-  p.checklistData.publishedAt = isoNow();
-  p.checklistData.publishedBy = session?.nombre || session?.username || 'Admin';
-  await projects.update(projectId, { checklistData: p.checklistData });
+  const session = getSession();
+  const nombre  = session?.nombre || session?.username || 'Admin';
+  await projects.setField(projectId, 'checklistData.publishedAt', isoNow());
+  await projects.setField(projectId, 'checklistData.publishedBy', nombre);
   toast('✅ Checklist aprobado y publicado');
   navigate(`#checklist/${projectId}`);
 };
 
 window.clUnpublish = async function(projectId) {
-  const p = await projects.getById(projectId);
-  p.checklistData = p.checklistData || {};
-  p.checklistData.publishedAt = null;
-  p.checklistData.publishedBy = null;
-  await projects.update(projectId, { checklistData: p.checklistData });
+  await projects.setField(projectId, 'checklistData.publishedAt', null);
+  await projects.setField(projectId, 'checklistData.publishedBy', null);
   toast('Aprobación revocada');
   navigate(`#checklist/${projectId}`);
 };
@@ -474,11 +470,16 @@ window.clExportPDF = async function(projectId) {
   <table>${ADMIN_REVIEW_ITEMS.map(it => checkRow(!!cl.admin?.[it.id], it.label, it.detail)).join('')}</table>
   </body></html>`;
 
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  setTimeout(() => win.print(), 400);
+  // iOS Safari bloquea window.open() — usar blob + <a download> para compatibilidad
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `checklist-${projectId}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 };
 
 // ── Lista de checklists (vista nav) ───────────────────────────────────────────
