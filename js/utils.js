@@ -576,3 +576,79 @@ export const TIPOS_FIJACION = [
   'Clamp', 'Tornillo doble rosca', 'Taquete químico',
   'Miniriel', 'Anclaje impermeabilizado', 'Otro'
 ];
+
+// ── calcFaseEstado — lógica de desbloqueo por fase ────────────────────────────
+// Retorna { doc, gar, aud } con 'disponible' | 'bloqueada' | 'completa'
+// + porcentajes docPct, garPct, audPct para dashboard y detalle de proyecto.
+export function calcFaseEstado(project) {
+  const doc = project.documentacion || {};
+  const gar = project.garantia      || {};
+  const aud = project.auditoria     || {};
+  const esPequeno = project.tipoSistema === 'sistema_pequeno';
+
+  // ── Documentación ────────────────────────────────────────────────────────────
+  const _fc = (sitio, sub) => {
+    const n = doc.fases?.[sitio]?.[sub]?.length || 0;
+    if (n > 0) return n;
+    if (sitio === 'techo') {
+      const m = { antes: 'antes', durante: 'durante', cierre: 'despues' };
+      return doc.fases?.[m[sub]]?.length || 0;
+    }
+    return 0;
+  };
+  const fTecho   = ['antes','durante','cierre'].reduce((s,f) => s + _fc('techo',f), 0);
+  const fCentros = ['antes','durante','cierre'].reduce((s,f) => s + _fc('centrosCarga',f), 0);
+  const fZona    = ['antes','durante','cierre'].reduce((s,f) => s + _fc('zonaDelSistema',f), 0);
+
+  // Sistema pequeño solo necesita levantamiento; no requiere juego completo de fotos
+  const docItems = esPequeno
+    ? [ !!(doc.levantamiento?.tipTecho) ]
+    : [ !!(doc.levantamiento?.tipTecho), fTecho > 0, fCentros > 0, fZona > 0 ];
+  const docItemsOk = docItems.filter(Boolean).length;
+  const docCompleta = docItemsOk >= 1;
+  const docPct      = Math.round(docItemsOk / docItems.length * 100);
+  const docFirmada  = !!(project.fases?.firmas?.doc);
+
+  // ── Garantía ─────────────────────────────────────────────────────────────────
+  const garDesbloqueada = docCompleta;
+  const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st) => s + (st.paneles?.length||0), 0);
+
+  // Sistema pequeño no tiene tablero AC / inversor de red
+  const garItems = esPequeno
+    ? [
+        !!gar.fotoSistema,
+        (gar.equipos?.length||0) > 0,
+        totalPaneles > 0,
+      ]
+    : [
+        !!gar.fotoSistema,
+        !!(gar.fotosTecnicas?.tableroAC || gar.fotosTecnicas?.inversorEnergizado),
+        (gar.equipos?.length||0) > 0,
+        totalPaneles > 0,
+      ];
+  const garItemsOk  = garItems.filter(Boolean).length;
+  const garCompleta = garItemsOk >= (esPequeno ? 2 : 2);
+  const garPct      = Math.round(garItemsOk / garItems.length * 100);
+  const garFirmada  = !!(project.fases?.firmas?.gar);
+
+  // ── Auditoría ─────────────────────────────────────────────────────────────────
+  // Sistema pequeño no tiene auditoría formal
+  const audDesbloqueada = !esPequeno && garDesbloqueada && garItemsOk >= 2;
+  const audItems = [
+    (aud.checklist?.length||0) >= 11,
+    !!aud.resultado,
+  ];
+  const audItemsOk  = audItems.filter(Boolean).length;
+  const audCompleta = audItemsOk >= 2;
+  const audPct      = esPequeno ? null : Math.round(audItemsOk / audItems.length * 100);
+
+  return {
+    doc: 'disponible',
+    gar: garDesbloqueada ? (garCompleta ? 'completa' : 'disponible') : 'bloqueada',
+    aud: audDesbloqueada ? (audCompleta ? 'completa' : 'disponible') : 'bloqueada',
+    docFirmada, garFirmada,
+    docPct, garPct, audPct,
+    garRequisito: 'Completa el Levantamiento en Documentación primero.',
+    audRequisito: 'Completa Garantía primero (foto del sistema + al menos un equipo o foto técnica).',
+  };
+}

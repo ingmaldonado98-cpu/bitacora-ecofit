@@ -412,6 +412,10 @@ body {
 .pc-prio { font-size: .8rem; }
 .pc-estado { font-size: .7rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
 .pc-cliente { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.pc-prog-wrap  { position:relative; height:4px; background:var(--border); border-radius:4px; margin:7px 0 2px; }
+.pc-prog-bar   { height:100%; border-radius:4px; transition:width .4s ease; }
+.pc-prog-pct   { position:absolute; right:0; top:-15px; font-size:.68rem; font-weight:700; }
+.pc-fase-chips { font-size:.71rem; color:var(--text-muted); margin-bottom:5px; letter-spacing:.01em; }
 .pc-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .pc-tag  { font-size: .72rem; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
 .pc-obs  { font-size: .78rem; color: var(--text-muted); padding: 6px 8px; border-radius: 6px; background: var(--surface2); margin-bottom: 6px; display: flex; gap: 5px; align-items: flex-start; }
@@ -963,6 +967,15 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 /* ── Paneles ──────────────────────────────────────────────────────────────── */
 .panel-stats { display: flex; gap: 16px; margin: 12px 0; font-size: .9rem; }
 .panel-stats strong { color: var(--g300); }
+.panel-sugerencia-wrap  { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.panel-sugerencia-card  { display:flex; align-items:center; gap:12px; padding:12px 14px;
+                           background:var(--surface2); border:1px solid var(--border);
+                           border-radius:10px; cursor:pointer; transition:background .15s; }
+.panel-sugerencia-card:hover { background:var(--surface3,var(--surface2)); }
+.psc-info   { flex:1; display:flex; flex-direction:column; gap:2px; }
+.psc-label  { font-size:.88rem; font-weight:600; color:var(--text); }
+.psc-origen { font-size:.75rem; color:var(--text-muted); }
+.psc-manual { color:var(--text-muted); font-size:.85rem; }
 .panel-elec-vals { display: flex; gap: 12px; margin: 6px 0 10px; flex-wrap: wrap; }
 .pe-val { font-size: .82rem; color: var(--text-muted); background: var(--surface2);
           padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border); }

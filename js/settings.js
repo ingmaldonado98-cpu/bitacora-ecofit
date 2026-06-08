@@ -219,15 +219,21 @@ export async function renderSettings(session) {
     <div id="form-nuevo-panel" style="display:none" class="form-inline-card">
       <div class="form-row">
         <div class="form-group"><label>Marca / Modelo</label>
-          <input type="text" id="np-label" placeholder="Ej: Jinko 550W" /></div>
+          <input type="text" id="np-label" placeholder="Ej: Longi/Hi-Mo 540W" /></div>
         <div class="form-group"><label>Potencia (W)</label>
-          <input type="number" id="np-wp" placeholder="550" min="1" /></div>
+          <input type="number" id="np-wp" placeholder="540" min="1" /></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>Ancho (m)</label>
           <input type="number" id="np-pw" placeholder="1.134" step="0.001" min="0.1" /></div>
         <div class="form-group"><label>Alto (m)</label>
           <input type="number" id="np-ph" placeholder="2.278" step="0.001" min="0.1" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Voc (V) <span class="hint-opt">opcional</span></label>
+          <input type="number" id="np-voc" placeholder="Ej: 49.8" step="0.1" min="0" /></div>
+        <div class="form-group"><label>Imp (A) <span class="hint-opt">opcional</span></label>
+          <input type="number" id="np-imp" placeholder="Ej: 13.95" step="0.01" min="0" /></div>
       </div>
       <div class="form-actions">
         <button class="btn-outline btn-sm" onclick="document.getElementById('form-nuevo-panel').style.display='none'">Cancelar</button>
@@ -242,10 +248,10 @@ export async function renderSettings(session) {
             <div class="panel-info">
               <span class="panel-label">${esc(p.label)}</span>
               <span class="panel-sub">${esc(p.sub||'')}</span>
-              <span class="panel-dims">${p.pW}m × ${p.pH}m</span>
+              <span class="panel-dims">${p.pW}m × ${p.pH}m${p.voc?` · Voc ${p.voc}V`:''}${p.imp?` · Imp ${p.imp}A`:''}</span>
             </div>
             <div class="panel-row-actions">
-              <button class="btn-icon-sm" onclick="editarPanel('${esc(p.id)}','${esc(p.label)}',${p.wp||''},${p.pW},${p.pH})" title="Editar">✎</button>
+              <button class="btn-icon-sm" onclick="editarPanel('${esc(p.id)}','${esc(p.label)}',${p.wp||''},${p.pW},${p.pH},${p.voc||''},${p.imp||''})" title="Editar">✎</button>
               <button class="btn-del-sm" onclick="eliminarPanel('${esc(p.id)}')" title="Eliminar">✕</button>
             </div>
           </div>
@@ -261,6 +267,12 @@ export async function renderSettings(session) {
                 <input type="number" id="ep-pw-${p.id}" value="${p.pW}" step="0.001" min="0.1" /></div>
               <div class="form-group"><label>Alto (m)</label>
                 <input type="number" id="ep-ph-${p.id}" value="${p.pH}" step="0.001" min="0.1" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Voc (V) <span class="hint-opt">opcional</span></label>
+                <input type="number" id="ep-voc-${p.id}" value="${p.voc||''}" step="0.1" min="0" /></div>
+              <div class="form-group"><label>Imp (A) <span class="hint-opt">opcional</span></label>
+                <input type="number" id="ep-imp-${p.id}" value="${p.imp||''}" step="0.01" min="0" /></div>
             </div>
             <div class="form-actions">
               <button class="btn-outline btn-sm" onclick="document.getElementById('panel-edit-${p.id}').style.display='none';document.getElementById('panel-row-${p.id}').style.display=''">Cancelar</button>
@@ -594,6 +606,8 @@ window.crearPanel = async function() {
   const wp    = parseFloat(document.getElementById('np-wp').value);
   const pW    = parseFloat(document.getElementById('np-pw').value);
   const pH    = parseFloat(document.getElementById('np-ph').value);
+  const voc   = parseFloat(document.getElementById('np-voc').value) || null;
+  const imp   = parseFloat(document.getElementById('np-imp').value) || null;
 
   if (!label)             { toast('Ingresa la marca/modelo','error'); return; }
   if (!wp || wp < 1)      { toast('Potencia inválida','error'); return; }
@@ -602,12 +616,12 @@ window.crearPanel = async function() {
 
   const existing = (await kv.get('panel_presets_custom')) || [];
   const nuevo = {
-    id:    'cp-' + Date.now(),
+    id: 'cp-' + Date.now(),
     label,
-    sub:   `${wp}W · ${pW}×${pH}m`,
-    pW,
-    pH,
-    wp,
+    sub: `${wp}W · ${pW}×${pH}m`,
+    pW, pH, wp,
+    ...(voc ? { voc } : {}),
+    ...(imp ? { imp } : {}),
     isCustom: true,
   };
   await kv.set('panel_presets_custom', [...existing, nuevo]);
@@ -626,6 +640,8 @@ window.guardarEditPanel = async function(id) {
   const wp    = parseFloat(document.getElementById('ep-wp-' + id).value);
   const pW    = parseFloat(document.getElementById('ep-pw-' + id).value);
   const pH    = parseFloat(document.getElementById('ep-ph-' + id).value);
+  const voc   = parseFloat(document.getElementById('ep-voc-' + id).value) || null;
+  const imp   = parseFloat(document.getElementById('ep-imp-' + id).value) || null;
 
   if (!label)          { toast('Ingresa la marca/modelo','error'); return; }
   if (!wp || wp < 1)   { toast('Potencia inválida','error'); return; }
@@ -634,7 +650,8 @@ window.guardarEditPanel = async function(id) {
 
   const existing = (await kv.get('panel_presets_custom')) || [];
   const updated = existing.map(p => p.id === id
-    ? { ...p, label, sub: `${wp}W · ${pW}×${pH}m`, wp, pW, pH }
+    ? { ...p, label, sub: `${wp}W · ${pW}×${pH}m`, wp, pW, pH,
+        ...(voc ? { voc } : { voc: null }), ...(imp ? { imp } : { imp: null }) }
     : p
   );
   await kv.set('panel_presets_custom', updated);

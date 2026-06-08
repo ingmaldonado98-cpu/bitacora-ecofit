@@ -33,6 +33,13 @@ const BOM_INV_MAP = {
   '4000006-H':       'K2-008',  // K2 Ground Lug (tierra)
   '4000505':         'K2-009',  // CrossRail Tilt Connector Set
   '4006042-H':       'K2-010',  // CrossRail Climber Set c/Hole
+  // ── Madera ───────────────────────────────────────────────────────────────────
+  'MAD-001':         'MAD-001', // Riel aluminio perforado 3.6 m
+  'MAD-002':         'MAD-002', // Tirafondo 3/8" × 3" galv. viga-riel
+  'MAD-003':         'MAD-003', // Tirafondo 1/4" × 2" galv. riel-panel
+  'MAD-004':         'MAD-004', // Flashing aluminio por penetración
+  'MAD-005':         'MAD-005', // Sellador impermeabilizante (puntos)
+  'MAD-006':         'MAD-006', // Cintilla aluminio lateral
 };
 
 // ── Estado del módulo ──────────────────────────────────────────────────────
@@ -50,6 +57,8 @@ const cs = {
   distMode: 'grid', cols: 1, rows: 1, irrRows: [1],
   pW: 0, pH: 0, presetId: null,
   gapH: 0.0113, gapV: 0.0113,
+  // Madera específico
+  distVigas: 40,
 };
 
 function resetCS() {
@@ -76,6 +85,7 @@ function loadFromConfig(cfg) {
   cs.pW             = cfg.panel?.width      ?? 0;
   cs.pH             = cfg.panel?.height     ?? 0;
   cs.presetId       = cfg.panel?.presetId   ?? null;
+  cs.distVigas      = cfg.madera?.distVigas ?? 40;
 }
 
 function getRowData() {
@@ -87,11 +97,12 @@ function totalPanels() { return getRowData().reduce((s,c)=>s+c,0); }
 
 // ── Paso activo del wizard ─────────────────────────────────────────────────
 function wizardStep() {
-  if (!cs.estructura)                return 1;
-  if (cs.estructura==='k2'  && !cs.subtipo) return 2;
-  if (cs.estructura==='aluminex' && !cs.base)   return 2;
-  if (!cs.techo)                     return 3;
-  if (!cs.pW || cs.pW===0)           return 4;
+  if (!cs.estructura)                                          return 1;
+  if (cs.estructura === 'k2'       && !cs.subtipo)            return 2;
+  if (cs.estructura === 'aluminex' && !cs.base)               return 2;
+  if (cs.estructura === 'madera'   && !cs.subtipo)            return 2;
+  if (cs.estructura !== 'madera'   && !cs.techo)              return 3;
+  if (!cs.pW || cs.pW === 0)                                  return 4;
   return 5;
 }
 
@@ -125,8 +136,8 @@ function renderCalc() {
   ${step>=4 ? renderDist() : ''}
   ${step>=4 ? renderPanel() : ''}
   ${step>=5 ? renderDiagrama() : ''}
-  ${step>=5 ? renderBOM() : ''}
-  ${step>=5 ? renderGuia() : ''}
+  ${step>=5 ? (cs.estructura==='madera' ? renderBOMMadera() : renderBOM()) : ''}
+  ${step>=5 ? (cs.estructura==='madera' ? '' : renderGuia()) : ''}
   ${step>=5 ? renderCTA() : ''}
   `;
 }
@@ -134,8 +145,10 @@ function renderCalc() {
 // ── Config bar ─────────────────────────────────────────────────────────────
 function renderConfigBar() {
   const parts = [];
-  if (cs.estructura) parts.push(cs.estructura==='k2' ? 'K2 Systems' : 'Aluminex');
-  if (cs.subtipo)    parts.push(cs.subtipo==='tilt_up' ? 'Tilt Up' : 'Simple Tilt');
+  if (cs.estructura) parts.push(cs.estructura==='k2' ? 'K2 Systems' : cs.estructura==='aluminex' ? 'Aluminex' : '🪵 Madera');
+  if (cs.subtipo)    parts.push(cs.estructura==='madera'
+    ? { viga_exp:'Viga expuesta', duela:'Duela', lamina_mad:'Lámina s/madera' }[cs.subtipo] || cs.subtipo
+    : (cs.subtipo==='tilt_up' ? 'Tilt Up' : 'Simple Tilt'));
   if (cs.base)       parts.push(cs.base==='lfoot' ? 'L Foot' : 'Soportes F+T');
   if (cs.techo)      parts.push(cs.techo==='cemento' ? 'Concreto' : 'Metal/PTR');
   if (cs.pW)         parts.push(`${totalPanels()} paneles`);
@@ -156,11 +169,12 @@ function renderPaso1() {
     <div class="calc-sel-grid">
       ${selCard("calcSelectE('k2')",       '🔩', 'K2 Systems', 'CrossRail + L-Foot',     cs.estructura==='k2',       './icons/k2-systems.png')}
       ${selCard("calcSelectE('aluminex')", '🪝', 'Aluminext',  'NextRail + soportes',    cs.estructura==='aluminex', './icons/aluminext.png')}
+      ${selCard("calcSelectE('madera')",   '🪵', 'Madera',     'Estructura sobre madera', cs.estructura==='madera')}
     </div>
   </div>`;
 }
 
-// ── Paso 2: Subtipo K2 o Base Aluminex ────────────────────────────────────
+// ── Paso 2: Subtipo K2 / Base Aluminex / Subtipo Madera ───────────────────
 function renderPaso2() {
   if (cs.estructura==='k2') return `
   <div class="card">
@@ -168,6 +182,16 @@ function renderPaso2() {
     <div class="calc-sel-grid">
       ${selCard("calcSelectSub('simple')",  '▬', 'Simple Tilt', 'Inclinación fija',  cs.subtipo==='simple')}
       ${selCard("calcSelectSub('tilt_up')", '◤', 'Tilt Up',     'Ajustable en campo', cs.subtipo==='tilt_up')}
+    </div>
+  </div>`;
+
+  if (cs.estructura==='madera') return `
+  <div class="card">
+    <div class="calc-step-label"><span class="calc-step-num">2</span> Tipo de madera</div>
+    <div class="calc-sel-grid">
+      ${selCard("calcSelectSub('viga_exp')",  '🏠', 'Viga expuesta',      'Vigas a la vista',       cs.subtipo==='viga_exp')}
+      ${selCard("calcSelectSub('duela')",     '📋', 'Duela',              'Tablones / duela',       cs.subtipo==='duela')}
+      ${selCard("calcSelectSub('lamina_mad')","🪵", 'Lámina s/madera',   'Lámina sobre estructura', cs.subtipo==='lamina_mad')}
     </div>
   </div>`;
 
@@ -509,6 +533,145 @@ function renderBOM() {
   </details>`;
 }
 
+// ── BOM Madera ────────────────────────────────────────────────────────────
+function calcBomMadera(rd, pW, pH, distVigas) {
+  const dv    = (distVigas || 40) / 100;  // cm → m
+  let rieles  = 0;
+  let anc38   = 0;  // MAD-002 tirafondo 3/8 viga-riel
+
+  rd.forEach(cols => {
+    const span  = cols * pW + 0.10;                  // 5 cm vuelo cada lado
+    const rPcs  = Math.ceil(span / 3.6);             // rieles de 3.6 m por línea
+    rieles     += 2 * rPcs;                          // 2 líneas de riel por fila
+    const vigs  = Math.ceil(span / dv) + 1;          // vigas bajo ese riel
+    anc38      += 2 * vigs * 2;                      // 2 tornillos/viga × 2 rieles
+  });
+
+  const totalP  = rd.reduce((s,c)=>s+c, 0);
+  const anc14   = totalP * 4;                        // 4 clips por panel
+  const flash   = Math.round(anc38 / 4);             // 1 flashing por par de anclajes
+  const maxCols = Math.max(...rd);
+  const perim   = Math.ceil(2 * (maxCols * pW + rd.length * pH));
+
+  return [
+    { partNum:'MAD-001', name:'Riel aluminio perforado 3.6 m',          qty: rieles,  unit:'pzas',        grp:'Rieles'             },
+    { partNum:'MAD-002', name:'Tirafondo 3/8" × 3" galv. (viga-riel)',  qty: anc38,   unit:'pzas',        grp:'Anclajes'           },
+    { partNum:'MAD-003', name:'Tirafondo 1/4" × 2" galv. (riel-panel)', qty: anc14,   unit:'pzas',        grp:'Anclajes'           },
+    { partNum:'MAD-004', name:'Flashing aluminio por penetración',       qty: flash,   unit:'pzas',        grp:'Impermeabilización' },
+    { partNum:'MAD-005', name:'Sellador impermeabilizante (puntos)',      qty: flash,   unit:'aplicaciones',grp:'Impermeabilización' },
+    { partNum:'MAD-006', name:'Cintilla aluminio lateral',               qty: perim,   unit:'m',           grp:'Acabado'            },
+  ];
+}
+
+function renderBOMMadera() {
+  const rd  = getRowData();
+  const bom = calcBomMadera(rd, cs.pW, cs.pH, cs.distVigas);
+
+  const groups = {};
+  bom.forEach(item => {
+    if (!groups[item.grp]) groups[item.grp] = [];
+    groups[item.grp].push(item);
+  });
+
+  const bomRows = Object.entries(groups).map(([grp, items]) => `
+    <div style="margin-bottom:10px">
+      <div style="font-size:.7rem;font-weight:700;color:var(--g300);letter-spacing:.06em;
+        padding:4px 12px;background:var(--surface2)">${grp.toUpperCase()}</div>
+      ${items.map(item => {
+        const invId = BOM_INV_MAP[item.partNum];
+        const stock = invId ? (_stockData[invId] ?? null) : null;
+        const stockBadge = stock !== null
+          ? (() => {
+              const diff = stock - item.qty;
+              const c = diff >= 0 ? 'var(--green-vivo)' : 'var(--red)';
+              const label = diff >= 0 ? `✓ Stock: ${stock}` : `⚠ Stock: ${stock} (faltan ${Math.abs(diff)})`;
+              return `<span style="font-size:.7rem;padding:2px 7px;border-radius:6px;
+                background:${diff>=0?'rgba(46,189,66,.15)':'rgba(240,112,112,.15)'};
+                color:${c};font-weight:700;white-space:nowrap">${label}</span>`;
+            })()
+          : '';
+        return `
+        <div style="display:flex;align-items:center;justify-content:space-between;
+          padding:9px 12px;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:160px">
+            <div style="font-weight:600;font-size:.86rem;color:var(--text)">${item.name}</div>
+            <div style="font-size:.7rem;color:var(--text-muted);margin-top:1px">${item.partNum}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            ${stockBadge}
+            <span style="font-family:monospace;font-size:1.1rem;font-weight:900;
+              color:var(--g300);min-width:36px;text-align:right">${item.qty}</span>
+            <span style="font-size:.75rem;color:var(--text-muted)">${item.unit}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+
+  const subtipLabel = { viga_exp:'Viga expuesta', duela:'Duela', lamina_mad:'Lámina s/madera' }[cs.subtipo] || cs.subtipo || '—';
+  const totalP = rd.reduce((s,c)=>s+c,0);
+
+  return `
+  <!-- Parámetro distancia vigas -->
+  <div class="card">
+    <div class="calc-step-label" style="margin-bottom:10px">
+      🪵 Estructura de madera — ${subtipLabel}
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label style="font-size:.78rem;color:var(--text-muted)">Distancia entre vigas (cm)</label>
+      <input type="number" id="inp-dist-vigas" class="input-field" min="10" max="150"
+        value="${cs.distVigas || 40}" placeholder="40–60 típico BCS"
+        oninput="window._madSetDistVigas(this.value)" />
+      <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
+        Medir de centro a centro. Afecta cantidad de tirafondos.
+      </div>
+    </div>
+  </div>
+
+  <!-- Resumen -->
+  <div class="card calc-bom-total">
+    <div class="cbt-title">Resumen BOM Madera</div>
+    <div class="cbt-items">
+      <div class="cbt-item">
+        <span class="cbt-num">${totalP}</span>
+        <span class="cbt-lbl">paneles</span>
+      </div>
+      <div class="cbt-sep"></div>
+      <div class="cbt-item">
+        <span class="cbt-num">${bom.length}</span>
+        <span class="cbt-lbl">tipos material</span>
+      </div>
+      <div class="cbt-sep"></div>
+      <div class="cbt-item">
+        <span class="cbt-num">${cs.distVigas} cm</span>
+        <span class="cbt-lbl">dist. vigas</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista de materiales -->
+  <details class="calc-section card" open>
+    <summary class="calc-section-hdr">
+      <span>Lista de materiales</span>
+      <span class="calc-section-badge">${bom.length} ítems · ${totalP} paneles</span>
+      <span class="calc-section-caret">▾</span>
+    </summary>
+    <div class="calc-section-body">${bomRows}</div>
+  </details>
+
+  <!-- Nota instalación madera -->
+  <div class="card" style="background:rgba(255,200,60,.07);border-color:var(--solar)">
+    <div style="font-size:.8rem;color:var(--solar);font-weight:700;margin-bottom:6px">
+      ⚠️ Consideraciones de instalación en madera
+    </div>
+    <ul style="font-size:.78rem;color:var(--text-muted);padding-left:16px;margin:0;line-height:1.6">
+      <li>Verificar estado de la madera antes de instalar (ver Documentación).</li>
+      <li>Usar flashing en <em>cada</em> penetración para evitar infiltración.</li>
+      <li>Tirafondos 3/8" con sello de silicona en la base del flashing.</li>
+      <li>Distancia mínima al borde de viga: 40 mm.</li>
+    </ul>
+  </div>`;
+}
+
 // ── Guía de instalación ────────────────────────────────────────────────────
 function renderGuia() {
   const rd  = getRowData();
@@ -708,6 +871,7 @@ window.calcSelectE = e => {
 };
 window.calcSelectSub = s => { cs.subtipo = s; calcRender(); };
 window.calcSelectBase = b => { cs.base = b; calcRender(); };
+window._madSetDistVigas = v => { const n = parseFloat(v); if (!isNaN(n) && n > 0) { cs.distVigas = n; calcRender(); } };
 window.calcSelectTecho = t => { cs.techo = t; calcRender(); };
 window.calcSetAltura = v => { cs.alturaEdificio = cs.alturaEdificio===v?null:v; calcRender(); };
 window.calcSetCond   = v => { cs.condicionTecho = cs.condicionTecho===v?null:v; calcRender(); };
@@ -765,6 +929,12 @@ window.calcGuardar = async () => {
   if (!_projectId) return;
   try {
     const cfg              = buildProjectConfig(cs);
+    // Madera: override BOM y añadir datos específicos
+    if (cs.estructura === 'madera') {
+      cfg.computed.bom  = calcBomMadera(getRowData(), cs.pW, cs.pH, cs.distVigas);
+      cfg.computed.consumibles = [];
+      cfg.madera        = { distVigas: cs.distVigas };
+    }
     const prevDeduction    = _project?.projectConfig?.inventoryDeducted;
     const bom              = cfg.computed?.bom || [];
     const bomWithMapping   = bom.filter(i => BOM_INV_MAP[i.partNum]);
@@ -807,8 +977,15 @@ window.calcGuardarPropuesta = async () => {
   try {
     const cfg        = buildProjectConfig(cs);
     const rd         = getRowData();
-    const bom        = calcBOM(rd, cs.estructura, cs.subtipo, cs.base, cs.pW);
-    const consumibles = calcConsumibles(rd, cs.estructura, cs.techo);
+    let   bom, consumibles;
+    if (cs.estructura === 'madera') {
+      bom        = calcBomMadera(rd, cs.pW, cs.pH, cs.distVigas);
+      consumibles = [];
+      cfg.madera = { distVigas: cs.distVigas };
+    } else {
+      bom        = calcBOM(rd, cs.estructura, cs.subtipo, cs.base, cs.pW);
+      consumibles = calcConsumibles(rd, cs.estructura, cs.techo);
+    }
     const nueva = {
       id:          Date.now().toString(),
       nombre,

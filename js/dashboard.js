@@ -1,7 +1,7 @@
 // dashboard.js — Lista de proyectos y estadísticas
 
 import { projects, users } from './db.js';
-import { esc, fmtFecha, fmtRelativa, fmtProjectId, ESTADOS, PRIORIDADES, TIPOS_SISTEMA, syncBadge, getPendingSrc } from './utils.js';
+import { esc, fmtFecha, fmtRelativa, fmtProjectId, ESTADOS, PRIORIDADES, TIPOS_SISTEMA, syncBadge, getPendingSrc, calcFaseEstado } from './utils.js';
 import { isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
 
@@ -214,6 +214,16 @@ function applyFilters() {
   if (el) el.innerHTML = renderProjectList(list);
 }
 
+// ── Progreso por proyecto (puro JS, sin reads Firestore) ──────────────────────
+function _calcProgress(p) {
+  const e = calcFaseEstado(p);
+  const { docPct, garPct, audPct } = e;
+  const base = audPct !== null ? 300 : 200;
+  const sum  = docPct + garPct + (audPct ?? 0);
+  const pct  = Math.round(sum / base * 100);
+  return { pct, docPct, garPct, audPct, garEstado: e.gar, audEstado: e.aud };
+}
+
 // ── Tarjetas de proyecto ───────────────────────────────────────────────────────
 function renderProjectList(list) {
   if (!list.length) return `
@@ -239,10 +249,23 @@ function renderProjectList(list) {
 }
 
 function projectCard(p) {
-  const est  = ESTADOS[p.estado] || ESTADOS.borrador;
-  const prio = PRIORIDADES[p.prioridad] || PRIORIDADES.normal;
-  const tipo = TIPOS_SISTEMA[p.tipoSistema];
+  const est   = ESTADOS[p.estado] || ESTADOS.borrador;
+  const prio  = PRIORIDADES[p.prioridad] || PRIORIDADES.normal;
+  const tipo  = TIPOS_SISTEMA[p.tipoSistema];
+  const prog  = _calcProgress(p);
   const lastObs = p.observaciones?.slice(-1)[0];
+
+  const barColor = prog.pct < 33 ? 'var(--text-muted)'
+                 : prog.pct < 67 ? 'var(--solar)'
+                 : prog.pct < 100 ? 'var(--g300)' : 'var(--accent)';
+
+  const faseDoc = prog.docPct === 100 ? 'Doc ✓' : `Doc ${prog.docPct}%`;
+  const faseGar = prog.garEstado === 'bloqueada' ? 'Gar —'
+                : prog.garPct === 100 ? 'Gar ✓' : `Gar ${prog.garPct}%`;
+  const faseAud = prog.audPct === null ? null
+                : prog.audEstado === 'bloqueada' ? 'Aud —'
+                : prog.audPct === 100 ? 'Aud ✓' : `Aud ${prog.audPct}%`;
+  const faseChips = [faseDoc, faseGar, faseAud].filter(Boolean).join(' · ');
 
   return `
   <div class="project-card" onclick="navigate('#proyecto/${p.id}')">
@@ -260,8 +283,16 @@ function projectCard(p) {
     <div class="pc-cliente-row">
       ${p.clienteFoto ? `<img class="pc-cliente-foto" src="${esc(getPendingSrc({url: p.clienteFoto}) || p.clienteFoto)}" alt="Foto cliente" />` : ''}
       <h3 class="pc-cliente">${esc(p.clientName || '—')}</h3>
+      ${p.nombreProyecto ? `<span class="meta-tag">${esc(p.nombreProyecto)}</span>` : ''}
       ${p.clienteTelefono ? `<span class="pc-tel" title="${esc(p.clienteTelefono)}">${icon('phone',12)}</span>` : ''}
     </div>
+
+    ${prog.pct < 100 ? `
+    <div class="pc-prog-wrap">
+      <div class="pc-prog-bar" style="width:${prog.pct}%;background:${barColor}"></div>
+      <span class="pc-prog-pct" style="color:${barColor}">${prog.pct}%</span>
+    </div>
+    <div class="pc-fase-chips">${esc(faseChips)}</div>` : ''}
 
     <div class="pc-meta">
       ${tipo ? `<span class="pc-tag"><ph-icon name="${tipo.icon}" size="12"></ph-icon> ${tipo.label}</span>` : ''}

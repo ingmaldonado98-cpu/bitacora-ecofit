@@ -426,8 +426,8 @@ function renderLevantamiento(project, tipo, edit) {
     ${acc('sitio', 'Datos del techo y sitio', '🏠', true, `
       <div class="form-row">
         <div class="form-group"><label>Tipo de techo</label>
-          <select name="tipTecho" ${dis}>
-            ${['Losa de concreto','Lámina','Metálico','Otro'].map(t=>
+          <select name="tipTecho" ${dis} onchange="window._onTipTechoChange(this)">
+            ${['Losa de concreto','Lámina','Metálico','Madera','Otro'].map(t=>
               `<option ${lev.tipTecho===t?'selected':''}>${t}</option>`).join('')}
           </select>
         </div>
@@ -436,6 +436,21 @@ function renderLevantamiento(project, tipo, edit) {
             ${['Concreto','Lámina galvanizada','IMSA','Policarbonato','Otro'].map(t=>
               `<option ${lev.materialCubierta===t?'selected':''}>${t}</option>`).join('')}
           </select>
+        </div>
+      </div>
+      <!-- Estado del techo — solo visible cuando tipo = Madera -->
+      <div id="madera-fields" style="display:${lev.tipTecho==='Madera'?'':'none'}">
+        <div class="form-row">
+          <div class="form-group"><label>Estado de la madera</label>
+            <select name="estadoMadera" ${dis}>
+              ${['Nueva (< 2 años)','Buena (2–10 años)','Regular (10–20 años)','Deteriorada (requiere revisión)'].map(t=>
+                `<option ${lev.estadoMadera===t?'selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Distancia entre vigas (cm)</label>
+            <input type="number" name="distVigas" value="${lev.distVigas||''}"
+                   placeholder="40–60 típico BCS" min="10" max="150" ${dis}/>
+          </div>
         </div>
       </div>
       <div class="form-row">
@@ -927,6 +942,8 @@ window.guardarLevantamiento = async function(e, projectId) {
     ...lev,
     tipTecho:            fd.get('tipTecho'),
     materialCubierta:    fd.get('materialCubierta') || null,
+    estadoMadera:        fd.get('tipTecho') === 'Madera' ? (fd.get('estadoMadera') || null) : null,
+    distVigas:           fd.get('tipTecho') === 'Madera' ? (parseFloat(fd.get('distVigas')) || null) : null,
     orientacion:         fd.get('orientacion'),
     numPisos:            parseInt(fd.get('numPisos')) || null,
     inclinacion:         parseFloat(fd.get('inclinacion')) || null,
@@ -1303,4 +1320,10 @@ window._delNotaDoc = async function(projectId, idx) {
   if (tabBtn) tabBtn.innerHTML = p.documentacion.notas.length
     ? `Notas<span class="tab-badge tab-ok">${p.documentacion.notas.length}</span>` : 'Notas';
   toast('Nota eliminada');
+};
+
+// ── Mostrar / ocultar campos de madera al cambiar tipo de techo ──────────────
+window._onTipTechoChange = function(sel) {
+  const maderaFields = document.getElementById('madera-fields');
+  if (maderaFields) maderaFields.style.display = sel.value === 'Madera' ? '' : 'none';
 };

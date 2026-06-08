@@ -20,6 +20,15 @@ export async function renderGarantia(projectId, session) {
   const g = project.garantia || {};
   _clearEqFotos(); // limpiar fotos temporales de sesiones anteriores
 
+  // ── Detectar fuente de pre-llenado para la sección Paneles ───────────────────
+  const panelYaCapturado = !!(g.paneles?.marca && g.paneles?.wp);
+  const panelCalcConfig  = project.projectConfig?.panel;
+  let fuenteCalcPanel    = null;
+  if (!panelYaCapturado && panelCalcConfig?.presetId && (customPanels||[]).length > 0) {
+    const found = customPanels.find(p => p.id === panelCalcConfig.presetId);
+    if (found) fuenteCalcPanel = found;
+  }
+
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
@@ -80,7 +89,7 @@ export async function renderGarantia(projectId, session) {
 
   <!-- 1E: Paneles -->
   <div id="g-paneles" class="tab-panel">
-    ${renderPaneles(g.paneles || { marca:'', modelo:'', wp:0, strings:[] }, projectId, edit, customPanels || [])}
+    ${renderPaneles(g.paneles || { marca:'', modelo:'', wp:0, strings:[] }, projectId, edit, customPanels || [], fuenteCalcPanel)}
   </div>
 
   <!-- Notas de garantía -->
@@ -127,6 +136,8 @@ export async function renderGarantia(projectId, session) {
         const btn = bar?.querySelector('[data-tab="' + target + '"]');
         if (btn) btn.click();
       }
+      // Auto-calcular Voc si hay datos pre-cargados
+      setTimeout(() => { if (typeof calcVoc === 'function') calcVoc(); }, 50);
     })();
   </script>
   `;
@@ -139,9 +150,12 @@ function renderVocTab(project, projectId, edit) {
   const vd       = g.validacionVoc || {};
 
   const vocMaxPre   = inversor?.vocMax  || vd.vocMaxInversor || '';
-  const vocPanel    = vd.vocPanel    || '';
-  const panelesSerie= vd.panelesSerie || '';
-  const tMin        = vd.tMin        ?? -5;
+  // Pre-fill Voc from panel data if no saved validation
+  const vocPanel    = vd.vocPanel    || g.paneles?.voc    || '';
+  // Pre-fill paneles en serie from projectConfig layout if available
+  const panelesSerie= vd.panelesSerie || project.projectConfig?.layout?.totalPanels || '';
+  // La Paz, BCS mínima histórica ≈ 3°C; default más conservador que -5
+  const tMin        = vd.tMin        ?? 3;
   const coefVoc     = vd.coefVoc     ?? -0.29;
   const resultado   = vd.resultado;
 
@@ -227,21 +241,31 @@ window.seleccionarPanelCatalogo = function(sel) {
   if (!id) return;
   const p = (window._panelCatalogData || []).find(x => x.id === id);
   if (!p) return;
-  // Intenta separar Marca / Modelo en el campo label (dividido por "/" o primer espacio)
-  const slashIdx = p.label.indexOf('/');
-  let marca  = '';
-  let modelo = p.label;
-  if (slashIdx > 0) {
-    marca  = p.label.slice(0, slashIdx).trim();
-    modelo = p.label.slice(slashIdx + 1).trim();
-  }
-  const m = document.getElementById('panel-marca');
-  const mo = document.getElementById('panel-modelo');
-  const wp = document.getElementById('panel-wp');
-  if (m)  m.value  = marca;
-  if (mo) mo.value = modelo;
-  if (wp) wp.value = p.wp || '';
+  _aplicarPanelCatalogo(p);
 };
+
+window.usarFuentePanel = function(presetId) {
+  const p = (window._panelCatalogData || []).find(x => x.id === presetId);
+  if (!p) return;
+  _aplicarPanelCatalogo(p);
+  document.getElementById('panel-form-campos').style.display = '';
+  const wrap = document.querySelector('.panel-sugerencia-wrap');
+  if (wrap) wrap.style.display = 'none';
+  toast('✅ Datos del catálogo aplicados');
+};
+
+function _aplicarPanelCatalogo(p) {
+  // Separar Marca / Modelo (dividido por "/" si existe)
+  const slashIdx = p.label.indexOf('/');
+  const marca  = slashIdx > 0 ? p.label.slice(0, slashIdx).trim() : '';
+  const modelo = slashIdx > 0 ? p.label.slice(slashIdx + 1).trim() : p.label;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+  set('panel-marca',  marca);
+  set('panel-modelo', modelo);
+  set('panel-wp',     p.wp || '');
+  if (p.voc) { set('panel-voc', p.voc); syncVocFromPanel(); }
+  if (p.imp) set('panel-imp', p.imp);
+}
 
 // Sincroniza el Voc del panel (pestaña Paneles → pestaña Voc) automáticamente
 window.syncVocFromPanel = function() {
@@ -926,15 +950,36 @@ window.guardarEstructura = async function(e, projectId) {
 };
 
 // ── 1E Paneles + escaneo continuo ────────────────────────────────────────────
-function renderPaneles(paneles, projectId, edit, catalog = []) {
+function renderPaneles(paneles, projectId, edit, catalog = [], fuenteCalc = null) {
   const totalPaneles = (paneles.strings||[]).reduce((s,str)=>s+(str.paneles?.length||0),0);
   const totalKwp     = totalPaneles * ((paneles.wp||0)/1000);
 
+  // Tarjeta de sugerencia desde calculadora (solo cuando edit y hay fuente y no hay datos)
+  const sugerenciaCard = edit && fuenteCalc ? `
+  <div class="panel-sugerencia-wrap">
+    <div class="panel-sugerencia-card" onclick="usarFuentePanel('${esc(fuenteCalc.id)}')">
+      <span style="font-size:1.3rem">☀️</span>
+      <div class="psc-info">
+        <span class="psc-label">${esc(fuenteCalc.label)}</span>
+        <span class="psc-origen">${fuenteCalc.wp}W · Registrado en Calculadora</span>
+      </div>
+      <button class="btn-primary btn-sm">Usar estos datos</button>
+    </div>
+    <div class="panel-sugerencia-card psc-manual" onclick="document.getElementById('panel-form-campos').style.display=''">
+      <span style="font-size:1.1rem">✏️</span>
+      <span>Ingresar datos manualmente</span>
+    </div>
+  </div>
+  <div id="panel-form-campos" style="display:none">` : '';
+
+  const cierreSugerencia = edit && fuenteCalc ? `</div>` : '';
+
   return `
-  <script>window._panelCatalogData = ${JSON.stringify(catalog)};<\/script>
+  <script>window._panelCatalogData = ${JSON.stringify(catalog).replace(/<\//g, '<\\/')};<\/script>
   <div class="card">
     <h3 class="card-title">Paneles solares</h3>
-    ${edit && catalog.length > 0 ? `
+    ${sugerenciaCard}
+    ${edit && catalog.length > 0 && !fuenteCalc ? `
     <div class="form-group" style="margin-bottom:14px">
       <label>Seleccionar del catálogo</label>
       <select id="panel-catalogo-sel" class="select-field" onchange="seleccionarPanelCatalogo(this)">
@@ -973,6 +1018,7 @@ function renderPaneles(paneles, projectId, edit, catalog = []) {
       ${paneles.imp ? `<span class="pe-val">Imp <strong>${paneles.imp} A</strong></span>` : ''}
     </div>` : ''}
     ${edit ? `<button class="btn-outline btn-sm" onclick="guardarInfoPanel('${projectId}')">Guardar info del panel</button>` : ''}
+    ${cierreSugerencia}
 
     <div class="panel-stats">
       <span><strong>${totalPaneles}</strong> paneles registrados</span>

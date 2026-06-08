@@ -3,7 +3,7 @@
 import { projects, users, kv, logChange } from './db.js';
 import { esc, fmtFecha, fmtFechaHora, fmtRelativa, fmtProjectId, genDisplayId, uuid, isoNow, toast,
          ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog, inputDialog,
-         capturePhoto, fotoMini, getPendingSrc } from './utils.js';
+         capturePhoto, fotoMini, getPendingSrc, calcFaseEstado } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } from './auth.js';
 import { icon } from './icons.js';
 import { uploadPhotoQueued } from './firebase.js';
@@ -181,63 +181,9 @@ export async function renderProjectDetail(id, session) {
 }
 
 // ── Estado secuencial de fases ────────────────────────────────────────────────
-// Retorna { doc, gar, aud } con valores: 'disponible' | 'bloqueada' | 'completa'
-export function calcFaseEstado(project) {
-  const doc = project.documentacion || {};
-  const gar = project.garantia    || {};
-  const aud = project.auditoria   || {};
-
-  // Documentación: siempre disponible
-  const _fc = (sitio, sub) => {
-    const n = doc.fases?.[sitio]?.[sub]?.length || 0;
-    if (n > 0) return n;
-    if (sitio === 'techo') { const m={antes:'antes',durante:'durante',cierre:'despues'}; return doc.fases?.[m[sub]]?.length||0; }
-    return 0;
-  };
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('techo',f),0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('centrosCarga',f),0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('zonaDelSistema',f),0);
-  const docItemsOk = [
-    !!(doc.levantamiento?.tipTecho),
-    fTecho > 0,
-    fCentros > 0,
-    fZona > 0,
-  ].filter(Boolean).length;
-
-  const docCompleta  = docItemsOk >= 1; // al menos levantamiento iniciado
-  const docFirmada   = !!(project.fases?.firmas?.doc);
-
-  // Garantía: disponible cuando Documentación tiene al menos levantamiento
-  const garDesbloqueada = docCompleta;
-  const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
-  const garItemsOk = [
-    !!gar.fotoSistema,
-    !!(gar.fotosTecnicas?.tableroAC || gar.fotosTecnicas?.inversorEnergizado),
-    (gar.equipos?.length||0) > 0,
-    totalPaneles > 0,
-  ].filter(Boolean).length;
-  const garCompleta  = garItemsOk >= 2;
-  const garFirmada   = !!(project.fases?.firmas?.gar);
-
-  // Auditoría: disponible cuando Garantía tiene >= 2 ítems completados
-  const audDesbloqueada = garDesbloqueada && garItemsOk >= 2;
-  const audItemsOk = [
-    (aud.checklist?.length||0) >= 11,
-    !!aud.resultado,
-  ].filter(Boolean).length;
-  const audCompleta = audItemsOk >= 2;
-
-  return {
-    doc: 'disponible',
-    gar: garDesbloqueada  ? (garCompleta  ? 'completa' : 'disponible') : 'bloqueada',
-    aud: audDesbloqueada  ? (audCompleta  ? 'completa' : 'disponible') : 'bloqueada',
-    // Firmas para mostrar en UI
-    docFirmada, garFirmada,
-    // Textos de requisito para el tooltip del candado
-    garRequisito: 'Completa el Levantamiento en Documentación primero.',
-    audRequisito: `Completa Garantía primero (foto del sistema + al menos un equipo o foto técnica).`,
-  };
-}
+// calcFaseEstado vive en utils.js (función pura, sin deps de módulo)
+// Re-exportada aquí para retrocompatibilidad con los imports existentes
+export { calcFaseEstado };
 
 // ── Firmar fase ───────────────────────────────────────────────────────────────
 export async function firmarFase(projectId, fase) {
