@@ -386,6 +386,8 @@ function renderLevantamiento(project, tipo, edit) {
   const lev = project.documentacion?.levantamiento || {};
   const dis = edit ? '' : 'disabled';
   const pid = project.id;
+  // Sincronizar state de áreas del techo
+  _areasTecho = (lev.areasTecho || []).map(a => ({ ...a }));
 
   // Reinicializar estado de módulo con datos del proyecto (evita estado stale entre navegaciones)
   _camposLibres = [...(lev.camposLibres || [])];
@@ -431,11 +433,11 @@ function renderLevantamiento(project, tipo, edit) {
               `<option ${lev.tipTecho===t?'selected':''}>${t}</option>`).join('')}
           </select>
         </div>
-        <div class="form-group"><label>Material de cubierta</label>
-          <select name="materialCubierta" ${dis}>
-            ${['Concreto','Lámina galvanizada','IMSA','Policarbonato','Otro'].map(t=>
-              `<option ${lev.materialCubierta===t?'selected':''}>${t}</option>`).join('')}
-          </select>
+        <div class="form-group">
+          <label>Sujeción / anclaje</label>
+          <div id="sujecion-label" class="input-info-badge">
+            ${_sujecionPorTecho(lev.tipTecho)}
+          </div>
         </div>
       </div>
       <!-- Estado del techo — solo visible cuando tipo = Madera -->
@@ -467,30 +469,19 @@ function renderLevantamiento(project, tipo, edit) {
       <div class="form-row">
         <div class="form-group"><label>Inclinación del techo (°)</label>
           <input type="number" name="inclinacion" value="${lev.inclinacion||''}" placeholder="15" ${dis}/></div>
-        <div class="form-group"><label>Tipo de sujeción recomendada</label>
-          <select name="tipoSujecion" ${dis}>
-            ${['Tornillo autoperforante','Ancla química','Perfil flotante (ballast)','Abrazadera estructural','Por definir'].map(t=>
-              `<option ${lev.tipoSujecion===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Ancho del área disponible (m)</label>
-          <input type="number" name="anchoTecho" value="${lev.anchoTecho||''}" step="0.5" placeholder="4.5" ${dis}
-                 oninput="_calcAreaTecho()"/>
+
+      <!-- Áreas del techo — repetibles -->
+      <div class="lev-areas-wrap">
+        <div class="lev-areas-hdr">
+          <span class="lev-areas-title">Áreas del techo</span>
+          ${edit ? `<button type="button" class="btn-sm btn-outline" onclick="window._addAreaTecho()">+ Área</button>` : ''}
         </div>
-        <div class="form-group">
-          <label>Largo del área disponible (m)</label>
-          <input type="number" name="largoTecho" value="${lev.largoTecho||''}" step="0.5" placeholder="8.0" ${dis}
-                 oninput="_calcAreaTecho()"/>
+        <div id="lev-areas-list">
+          ${_renderAreasTecho(lev.areasTecho || [], edit)}
         </div>
+        ${(lev.areasTecho||[]).length === 0 && !edit ? `<p style="font-size:.78rem;color:var(--text-muted);padding:8px 0">Sin áreas registradas</p>` : ''}
       </div>
-      <p id="lev-area-calc" class="lev-area-hint">
-        ${lev.anchoTecho && lev.largoTecho
-          ? `Área calculada: <strong>${(parseFloat(lev.anchoTecho)*parseFloat(lev.largoTecho)).toFixed(1)} m²</strong>`
-          : ''}
-      </p>
       <div class="form-row">
         <div class="form-group"><label>Dist. tablero→inversor (m)</label>
           <input type="number" name="distTableroInversor" value="${lev.distTableroInversor||''}" step="0.5" ${dis}/></div>
@@ -935,22 +926,29 @@ window.guardarLevantamiento = async function(e, projectId) {
   const condiciones = Array.from(e.target.querySelectorAll('[name^="cond_"]:checked')).map(cb=>cb.value);
   const modoConsumo = e.target.dataset.modoConsumo || (lev.modoConsumo||'recibo');
 
-  const anchoT = parseFloat(fd.get('anchoTecho')) || null;
-  const largoT = parseFloat(fd.get('largoTecho')) || null;
+  const tipTechoVal = fd.get('tipTecho');
+  // Áreas: leer del state en memoria (ya actualizadas vía _updateAreaTecho)
+  const areasTechoVal = _areasTecho
+    .filter(a => a.nombre || a.ancho || a.largo)
+    .map(a => ({
+      nombre: a.nombre || `Área ${_areasTecho.indexOf(a)+1}`,
+      ancho:  a.ancho  || null,
+      largo:  a.largo  || null,
+      area:   (a.ancho && a.largo) ? parseFloat((a.ancho*a.largo).toFixed(2)) : null,
+    }));
+  const areaTotal = areasTechoVal.reduce((s,a)=>s+(a.area||0), 0) || null;
 
   const newLev = {
     ...lev,
-    tipTecho:            fd.get('tipTecho'),
-    materialCubierta:    fd.get('materialCubierta') || null,
-    estadoMadera:        fd.get('tipTecho') === 'Madera' ? (fd.get('estadoMadera') || null) : null,
-    distVigas:           fd.get('tipTecho') === 'Madera' ? (parseFloat(fd.get('distVigas')) || null) : null,
+    tipTecho:            tipTechoVal,
+    tipoSujecion:        _sujecionPorTecho(tipTechoVal),  // auto, no editable
+    areasTecho:          areasTechoVal,
+    areaDisponible:      areaTotal ? parseFloat(areaTotal.toFixed(2)) : (lev.areaDisponible || null),
+    estadoMadera:        tipTechoVal === 'Madera' ? (fd.get('estadoMadera') || null) : null,
+    distVigas:           tipTechoVal === 'Madera' ? (parseFloat(fd.get('distVigas')) || null) : null,
     orientacion:         fd.get('orientacion'),
     numPisos:            parseInt(fd.get('numPisos')) || null,
     inclinacion:         parseFloat(fd.get('inclinacion')) || null,
-    tipoSujecion:        fd.get('tipoSujecion') || null,
-    anchoTecho:          anchoT,
-    largoTecho:          largoT,
-    areaDisponible:      (anchoT && largoT) ? parseFloat((anchoT * largoT).toFixed(2)) : (parseFloat(fd.get('areaDisponible')) || null),
     distTableroInversor: parseFloat(fd.get('distTableroInversor')) || null,
     distInversorPaneles: parseFloat(fd.get('distInversorPaneles')) || null,
     tipoServicioCFE:     fd.get('tipoServicioCFE'),
@@ -1045,18 +1043,8 @@ window.delSombraFoto = async function(pid) {
   navigate(`#proyecto/${pid}/documentacion`);
 };
 
-// ── Área techo: calcular en tiempo real ──────────────────────────────────────
-window._calcAreaTecho = function() {
-  const ancho = parseFloat(document.querySelector('[name="anchoTecho"]')?.value) || 0;
-  const largo = parseFloat(document.querySelector('[name="largoTecho"]')?.value) || 0;
-  const hint  = document.getElementById('lev-area-calc');
-  if (!hint) return;
-  if (ancho > 0 && largo > 0) {
-    hint.innerHTML = `Área calculada: <strong>${(ancho * largo).toFixed(1)} m²</strong>`;
-  } else {
-    hint.innerHTML = '';
-  }
-};
+// ── _calcAreaTecho: obsoleto — reemplazado por _calcAreaItem ─────────────────
+window._calcAreaTecho = function() {}; // compat shim
 
 // ── Fotos del levantamiento ───────────────────────────────────────────────────
 window.capFotoLev = function(pid) {
@@ -1322,8 +1310,81 @@ window._delNotaDoc = async function(projectId, idx) {
   toast('Nota eliminada');
 };
 
+// ── Sujeción automática según tipo de techo ───────────────────────────────────
+const _SUJECION_MAP = {
+  'Losa de concreto': 'Anclaje químico (epóxico + taquete)',
+  'Lámina':           'Tornillo autoperforante',
+  'Metálico':         'Abrazadera estructural / varilla roscada',
+  'Madera':           'Tirafondo 3/8" + flashing impermeable',
+  'Otro':             'Por definir',
+};
+function _sujecionPorTecho(tipTecho) {
+  return _SUJECION_MAP[tipTecho] || 'Selecciona tipo de techo';
+}
+
 // ── Mostrar / ocultar campos de madera al cambiar tipo de techo ──────────────
 window._onTipTechoChange = function(sel) {
   const maderaFields = document.getElementById('madera-fields');
   if (maderaFields) maderaFields.style.display = sel.value === 'Madera' ? '' : 'none';
+  // Actualizar badge de sujeción
+  const badge = document.getElementById('sujecion-label');
+  if (badge) badge.textContent = _sujecionPorTecho(sel.value);
+};
+
+// ── Áreas del techo — state y render ─────────────────────────────────────────
+let _areasTecho = [];  // array de {nombre, ancho, largo}
+
+function _renderAreasTecho(areas, edit) {
+  if (!areas.length && !edit) return '';
+  return areas.map((a, i) => `
+  <div class="lev-area-item" id="lev-area-${i}">
+    <div class="form-row" style="align-items:flex-end">
+      <div class="form-group" style="flex:2">
+        <label>Nombre del área</label>
+        <input type="text" class="input-field" value="${esc(a.nombre||'')}"
+               placeholder="Ej: Área 1, Techo sur, Bodega…"
+               ${edit?`oninput="window._updateAreaTecho(${i},'nombre',this.value)"`:''} ${edit?'':'disabled'} />
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Ancho (m)</label>
+        <input type="number" class="input-field" value="${a.ancho||''}" step="0.5" placeholder="4.5"
+               ${edit?`oninput="window._updateAreaTecho(${i},'ancho',this.value)"`:''} ${edit?'':'disabled'} />
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Largo (m)</label>
+        <input type="number" class="input-field" value="${a.largo||''}" step="0.5" placeholder="8.0"
+               ${edit?`oninput="window._updateAreaTecho(${i},'largo',this.value)"`:''} ${edit?'':'disabled'} />
+      </div>
+      <div class="form-group lev-area-result" style="flex:1">
+        <label>Área</label>
+        <div class="input-info-badge" id="lev-area-res-${i}">
+          ${a.ancho && a.largo ? `<strong>${(a.ancho*a.largo).toFixed(1)} m²</strong>` : '—'}
+        </div>
+      </div>
+      ${edit ? `<button type="button" class="btn-icon-sm" style="margin-bottom:4px;color:var(--red)"
+        onclick="window._removeAreaTecho(${i})" title="Eliminar área">✕</button>` : ''}
+    </div>
+  </div>`).join('');
+}
+
+window._addAreaTecho = function() {
+  const n = _areasTecho.length + 1;
+  _areasTecho.push({ nombre: `Área ${n}`, ancho: null, largo: null });
+  const list = document.getElementById('lev-areas-list');
+  if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true);
+};
+
+window._removeAreaTecho = function(idx) {
+  _areasTecho.splice(idx, 1);
+  const list = document.getElementById('lev-areas-list');
+  if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true);
+};
+
+window._updateAreaTecho = function(idx, campo, val) {
+  if (!_areasTecho[idx]) return;
+  _areasTecho[idx][campo] = campo === 'nombre' ? val : (parseFloat(val) || null);
+  const a = _areasTecho[idx];
+  const res = document.getElementById(`lev-area-res-${idx}`);
+  if (res) res.innerHTML = (a.ancho && a.largo)
+    ? `<strong>${(a.ancho * a.largo).toFixed(1)} m²</strong>` : '—';
 };

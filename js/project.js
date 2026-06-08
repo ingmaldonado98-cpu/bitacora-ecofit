@@ -257,7 +257,7 @@ function renderModulosProgreso(project, id, session, admin) {
   const audPct  = Math.round(audDone / audItems.length * 100);
 
   const esPequeno      = project.tipoSistema === 'sistema_pequeno';
-  const puedeAuditoria = !esPequeno && (admin || isLider(session));
+  const puedeAuditoria = !esPequeno && admin;  // solo administradores
   const estado = calcFaseEstado(project);
 
   const totalDone    = docDone + garDone + (puedeAuditoria ? audDone : 0);

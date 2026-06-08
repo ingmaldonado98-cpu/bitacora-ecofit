@@ -144,25 +144,38 @@ export async function renderGarantia(projectId, session) {
 }
 
 // ── Validación Voc ────────────────────────────────────────────────────────────
+// Temperatura mínima fija para La Paz, BCS (valor histórico conservador)
+const VOC_T_MIN  = 3;    // °C
+const VOC_COEF   = -0.29; // %/°C  coeficiente típico monocristalino
+
 function renderVocTab(project, projectId, edit) {
-  const g       = project.garantia || {};
+  const g        = project.garantia || {};
   const inversor = (g.equipos || []).find(e => e.tipo === 'inversor');
   const vd       = g.validacionVoc || {};
 
-  const vocMaxPre   = inversor?.vocMax  || vd.vocMaxInversor || '';
-  // Pre-fill Voc from panel data if no saved validation
-  const vocPanel    = vd.vocPanel    || g.paneles?.voc    || '';
-  // Pre-fill paneles en serie from projectConfig layout if available
-  const panelesSerie= vd.panelesSerie || project.projectConfig?.layout?.totalPanels || '';
-  // La Paz, BCS mínima histórica ≈ 3°C; default más conservador que -5
-  const tMin        = vd.tMin        ?? 3;
-  const coefVoc     = vd.coefVoc     ?? -0.29;
-  const resultado   = vd.resultado;
+  // Datos tomados directo de los registros — sin campos manuales
+  const vocPanel     = g.paneles?.voc    || vd.vocPanel    || null;
+  const panelesSerie = project.projectConfig?.layout?.totalPanels || vd.panelesSerie || null;
+  const vocMax       = inversor?.vocMax  || vd.vocMaxInversor || null;
+  const resultado    = vd.resultado;
 
   const semaforo = resultado === 'seguro'  ? { cls: 'voc-ok',   ico: '🟢', txt: 'Configuración segura' }
                  : resultado === 'limite'  ? { cls: 'voc-warn', ico: '🟡', txt: 'En el límite — sin margen' }
                  : resultado === 'excede'  ? { cls: 'voc-err',  ico: '🔴', txt: 'Excede el límite del inversor' }
                  : null;
+
+  // Determinar qué falta para calcular
+  const missingVoc    = !vocPanel;
+  const missingSerie  = !panelesSerie;
+  const missingInv    = !vocMax;
+
+  const alertas = [
+    missingVoc   && `Voc del panel — registra el panel en la pestaña <em>Paneles</em>`,
+    missingSerie && `Paneles en serie — guarda el BOM en la Calculadora`,
+    missingInv   && (inversor
+      ? `Voc máx del inversor — edita el equipo en <em>Equipos</em>`
+      : `Inversor — registra el inversor en <em>Equipos</em>`),
+  ].filter(Boolean);
 
   return `
   <div class="card">
@@ -170,67 +183,59 @@ function renderVocTab(project, projectId, edit) {
       <h3 class="card-title">Validación Voc de string</h3>
       ${semaforo ? `<span class="voc-badge ${semaforo.cls}">${semaforo.ico} ${semaforo.txt}</span>` : ''}
     </div>
-    ${inversor
-      ? inversor.vocMax
-        ? `<p class="voc-inversor-hint">${icon('cpu', 14)} Inversor detectado: <b>${esc(inversor.marca)} ${esc(inversor.modelo)}</b> · Voc máx: <b>${inversor.vocMax} V</b></p>`
-        : `<div class="voc-no-inversor">${icon('warning-circle', 16)}
-            <div>
-              <strong>Inversor sin Voc máx registrado</strong><br>
-              <span>Edita el inversor en la pestaña <em>Equipos</em> y completa el campo "Voc máx. inversor".<br>
-              Sin este dato el cálculo usa el valor ingresado manualmente y no queda vinculado al equipo real.</span>
-            </div>
-           </div>`
-      : `<div class="voc-no-inversor">${icon('warning-circle', 16)}
-           <div>
-             <strong>Sin inversor registrado</strong><br>
-             <span>Agrega un inversor en la pestaña <em>Equipos</em> antes de validar el Voc.
-             Sin inversor registrado el cálculo no queda vinculado a ningún equipo y no podrás firmar la Garantía con advertencias pendientes.</span>
-           </div>
-         </div>`
-    }
-    <div class="form-row">
-      <div class="form-group">
-        <label>Voc del panel (V)</label>
-        <input type="number" id="voc-panel" step="0.1" min="0" placeholder="Ej: 41.2"
-               value="${vocPanel}" ${!edit?'disabled':''} oninput="calcVoc()" />
+
+    <!-- Datos automáticos -->
+    <div class="voc-datos-auto">
+      <div class="vda-item">
+        <span class="vda-lbl">${icon('sun', 14)} Voc del panel</span>
+        <span class="vda-val ${vocPanel ? '' : 'vda-missing'}">${vocPanel ? vocPanel + ' V' : '—'}</span>
       </div>
-      <div class="form-group">
-        <label>Paneles en serie</label>
-        <input type="number" id="voc-serie" step="1" min="1" max="30" placeholder="Ej: 10"
-               value="${panelesSerie}" ${!edit?'disabled':''} oninput="calcVoc()" />
+      <div class="vda-item">
+        <span class="vda-lbl">${icon('stack', 14)} Paneles en serie</span>
+        <span class="vda-val ${panelesSerie ? '' : 'vda-missing'}">${panelesSerie || '—'}</span>
       </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Temp. mínima sitio (°C)</label>
-        <input type="number" id="voc-tmin" step="1" placeholder="-5"
-               value="${tMin}" ${!edit?'disabled':''} oninput="calcVoc()" />
+      <div class="vda-item">
+        <span class="vda-lbl">${icon('cpu', 14)} Voc máx inversor</span>
+        <span class="vda-val ${vocMax ? '' : 'vda-missing'}">${vocMax ? vocMax + ' V' : '—'}</span>
       </div>
-      <div class="form-group">
-        <label>Coef. temp. Voc (%/°C)</label>
-        <input type="number" id="voc-coef" step="0.01" placeholder="-0.29"
-               value="${coefVoc}" ${!edit?'disabled':''} oninput="calcVoc()" />
+      <div class="vda-item">
+        <span class="vda-lbl">${icon('thermometer', 14)} T mín sitio</span>
+        <span class="vda-val">${VOC_T_MIN}°C <span style="font-size:.7rem;color:var(--text-muted)">(La Paz, BCS)</span></span>
       </div>
-    </div>
-    <div class="form-group">
-      <label>Voc máx. inversor (V)</label>
-      <input type="number" id="voc-max-inv" step="1" min="0"
-             placeholder="${inversor?.vocMax ? inversor.vocMax : 'Ej: 600'}"
-             value="${vocMaxPre}" ${!edit?'disabled':''} oninput="calcVoc()" />
     </div>
 
-    <!-- Resultado en tiempo real -->
-    <div id="voc-resultado" class="voc-resultado" style="${resultado ? '' : 'display:none'}">
-      <div class="voc-res-row"><span>Voc corregido por temp.</span><strong id="voc-r-corr">${vd.vocCorregido?.toFixed(2) || '—'} V</strong></div>
-      <div class="voc-res-row"><span>Voc del string completo</span><strong id="voc-r-str">${vd.vocString?.toFixed(2) || '—'} V</strong></div>
+    <!-- Alertas si faltan datos -->
+    ${alertas.length ? `
+    <div class="voc-no-inversor" style="margin-top:10px">
+      ${icon('warning-circle', 16)}
+      <div>
+        <strong>Datos pendientes para calcular:</strong>
+        <ul style="margin:4px 0 0;padding-left:16px;font-size:.8rem">
+          ${alertas.map(a=>`<li>${a}</li>`).join('')}
+        </ul>
+      </div>
+    </div>` : ''}
+
+    <!-- Inputs ocultos para la lógica de calcVoc -->
+    <input type="hidden" id="voc-panel"   value="${vocPanel    || ''}" />
+    <input type="hidden" id="voc-serie"   value="${panelesSerie|| ''}" />
+    <input type="hidden" id="voc-max-inv" value="${vocMax      || ''}" />
+    <input type="hidden" id="voc-tmin"    value="${VOC_T_MIN}" />
+    <input type="hidden" id="voc-coef"    value="${VOC_COEF}" />
+
+    <!-- Resultado -->
+    <div id="voc-resultado" class="voc-resultado" style="${resultado && !alertas.length ? '' : 'display:none'}">
+      <div class="voc-res-row"><span>Voc corregido (${VOC_T_MIN}°C)</span><strong id="voc-r-corr">${vd.vocCorregido?.toFixed(2) || '—'} V</strong></div>
+      <div class="voc-res-row"><span>Voc string completo</span><strong id="voc-r-str">${vd.vocString?.toFixed(2) || '—'} V</strong></div>
       <div class="voc-res-row"><span>Margen de seguridad</span><strong id="voc-r-margen">${vd.margen != null ? vd.margen.toFixed(1) + '%' : '—'}</strong></div>
       <div id="voc-r-msg" class="voc-res-msg ${semaforo?.cls || ''}">${semaforo ? semaforo.ico + ' ' + (vd.mensaje || semaforo.txt) : ''}</div>
     </div>
 
-    ${edit ? `
+    ${edit && !alertas.length ? `
     <div class="form-actions" style="margin-top:12px">
-      <button class="btn-outline btn-sm" onclick="calcVoc()">Calcular</button>
-      <button class="btn-primary btn-sm" onclick="guardarVoc('${projectId}')">Guardar resultado</button>
+      <button class="btn-primary btn-sm" onclick="calcVocYGuardar('${projectId}')">
+        ${icon('check', 14)} Calcular y guardar
+      </button>
     </div>` : ''}
   </div>`;
 }
@@ -277,15 +282,15 @@ window.syncVocFromPanel = function() {
   }
 };
 
-// Clave para la calc: lee los campos y muestra el resultado en tiempo real
-window.calcVoc = function() {
+// Cálculo Voc — usa constantes fijas para T_min y coef (no campos manuales)
+function _calcVocData() {
   const vocP   = parseFloat(document.getElementById('voc-panel')?.value)   || 0;
   const serie  = parseInt(document.getElementById('voc-serie')?.value)      || 0;
-  const tMin   = parseFloat(document.getElementById('voc-tmin')?.value)     ?? -5;
-  const coef   = parseFloat(document.getElementById('voc-coef')?.value)     ?? -0.29;
   const vocMax = parseFloat(document.getElementById('voc-max-inv')?.value)  || 0;
+  const tMin   = VOC_T_MIN;   // 3°C constante La Paz
+  const coef   = VOC_COEF;    // -0.29 %/°C constante
 
-  if (!vocP || !serie || !vocMax) return;
+  if (!vocP || !serie || !vocMax) return null;
 
   const vocCorr  = vocP * (1 + (coef / 100) * (tMin - 25));
   const vocStr   = vocCorr * serie;
@@ -293,24 +298,35 @@ window.calcVoc = function() {
   const maxSerie = Math.floor(vocMax * 0.90 / vocCorr);
 
   let resultado, mensaje;
-  if (vocStr <= vocMax * 0.90)    { resultado = 'seguro'; mensaje = `✅ Seguro. Margen: ${margen.toFixed(1)}%. Máximo recomendado: ${maxSerie} paneles en serie.`; }
-  else if (vocStr <= vocMax)       { resultado = 'limite'; mensaje = `⚠️ En el límite (${margen.toFixed(1)}% de margen). Considera reducir 1 panel en serie.`; }
-  else                             { resultado = 'excede'; mensaje = `🚨 Excede el límite por ${(vocStr - vocMax).toFixed(1)} V. Máximo seguro: ${maxSerie} paneles en serie.`; }
+  if (vocStr <= vocMax * 0.90)  { resultado = 'seguro'; mensaje = `✅ Seguro. Margen: ${margen.toFixed(1)}%. Máximo recomendado: ${maxSerie} paneles en serie.`; }
+  else if (vocStr <= vocMax)    { resultado = 'limite'; mensaje = `⚠️ En el límite (${margen.toFixed(1)}% de margen). Considera reducir a ${maxSerie} paneles en serie.`; }
+  else                          { resultado = 'excede'; mensaje = `🚨 Excede el límite por ${(vocStr-vocMax).toFixed(1)} V. Máximo seguro: ${maxSerie} paneles en serie.`; }
 
+  return { vocPanel:vocP, panelesSerie:serie, tMin, coefVoc:coef,
+    vocMaxInversor:vocMax, vocCorregido:vocCorr, vocString:vocStr, margen, resultado, mensaje };
+}
+
+window.calcVoc = function() {
+  const d = _calcVocData();
+  if (!d) return;
   const wrap = document.getElementById('voc-resultado');
   if (wrap) {
     wrap.style.display = '';
-    document.getElementById('voc-r-corr').textContent   = vocCorr.toFixed(2) + ' V';
-    document.getElementById('voc-r-str').textContent    = vocStr.toFixed(2)  + ' V';
-    document.getElementById('voc-r-margen').textContent = margen.toFixed(1)  + '%';
+    document.getElementById('voc-r-corr').textContent   = d.vocCorregido.toFixed(2) + ' V';
+    document.getElementById('voc-r-str').textContent    = d.vocString.toFixed(2)    + ' V';
+    document.getElementById('voc-r-margen').textContent = d.margen.toFixed(1)       + '%';
     const msg = document.getElementById('voc-r-msg');
-    msg.textContent  = mensaje;
-    msg.className    = `voc-res-msg ${resultado === 'seguro' ? 'voc-ok' : resultado === 'limite' ? 'voc-warn' : 'voc-err'}`;
+    msg.textContent = d.mensaje;
+    msg.className   = `voc-res-msg ${d.resultado==='seguro'?'voc-ok':d.resultado==='limite'?'voc-warn':'voc-err'}`;
   }
+  window._vocTemp = d;
+};
 
-  // Guardar en estado temporal para persistir
-  window._vocTemp = { vocPanel: vocP, panelesSerie: serie, tMin, coefVoc: coef,
-    vocMaxInversor: vocMax, vocCorregido: vocCorr, vocString: vocStr, margen, resultado, mensaje };
+// Calcular y guardar en un solo clic
+window.calcVocYGuardar = async function(projectId) {
+  calcVoc();
+  if (!window._vocTemp) { toast('Faltan datos para calcular el Voc', 'warn'); return; }
+  await guardarVoc(projectId);
 };
 
 window.guardarVoc = async function(projectId) {

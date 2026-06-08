@@ -2514,6 +2514,31 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .voc-res-msg.voc-err  { background: rgba(220,53,69,.10);   color: var(--red); }
 .form-hint { font-size: .72rem; color: var(--text-muted); margin-left: 4px; font-weight: 400; }
 
+/* ── Voc datos automáticos ───────────────────────────────────────────────── */
+.voc-datos-auto { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+.vda-item  { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;
+             background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.vda-lbl   { font-size: .72rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+.vda-val   { font-size: .92rem; font-weight: 700; color: var(--g300); font-family: monospace; }
+.vda-missing { color: var(--text-muted) !important; font-style: italic; font-family: inherit; }
+
+/* ── Levantamiento: input-info-badge ─────────────────────────────────────── */
+.input-info-badge { padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border);
+                    border-radius: var(--radius-sm); font-size: .84rem; color: var(--text);
+                    min-height: 38px; display: flex; align-items: center; }
+
+/* ── Levantamiento: áreas del techo ──────────────────────────────────────── */
+.lev-areas-wrap  { margin-top: 14px; }
+.lev-areas-hdr   { display: flex; justify-content: space-between; align-items: center;
+                   margin-bottom: 8px; }
+.lev-areas-title { font-size: .78rem; font-weight: 700; color: var(--text-muted);
+                   text-transform: uppercase; letter-spacing: .05em; }
+.lev-area-item   { margin-bottom: 8px; padding: 10px 12px;
+                   background: var(--surface2); border-radius: var(--radius-sm);
+                   border: 1px solid var(--border); }
+.lev-area-result .input-info-badge { background: rgba(46,189,66,.08); border-color: var(--g500);
+                                      color: var(--g300); font-weight: 700; }
+
 /* ── Línea base de desempeño ──────────────────────────────────────────────── */
 .lb-card  { padding: 14px 16px; }
 .lb-hint  { font-size: .82rem; color: var(--text-muted); margin-bottom: 12px; }
