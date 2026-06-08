@@ -310,7 +310,8 @@ function renderModulosProgreso(project, id, session, admin) {
   const audDone = audItems.filter(i=>i.ok).length;
   const audPct  = Math.round(audDone / audItems.length * 100);
 
-  const puedeAuditoria = admin || isLider(session);
+  const esPequeno      = project.tipoSistema === 'sistema_pequeno';
+  const puedeAuditoria = !esPequeno && (admin || isLider(session));
   const estado = calcFaseEstado(project);
 
   const totalDone    = docDone + garDone + (puedeAuditoria ? audDone : 0);
@@ -318,7 +319,7 @@ function renderModulosProgreso(project, id, session, admin) {
   const generalPct   = totalPosible > 0 ? Math.round(totalDone / totalPosible * 100) : 0;
 
   const modCard = (title, iconName, colorClass, pct, items, link, faseKey) => {
-    const locked = estado[faseKey] === 'bloqueada';
+    const locked = !admin && estado[faseKey] === 'bloqueada';
     const firmada = estado[`${faseKey}Firmada`];
     const clickHandler = locked
       ? `toast('${faseKey === 'gar' ? estado.garRequisito : estado.audRequisito}', 'warn', 4000)`

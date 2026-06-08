@@ -1,6 +1,6 @@
 // garantia.js — Módulo 1: Garantía (fotos técnicas, equipos, estructura, paneles)
 
-import { projects, logChange } from './db.js';
+import { projects, logChange, kv } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
          uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION,
          openScannerOverlay } from './utils.js';
@@ -11,7 +11,10 @@ import { scanOnce, startContinuousScan, stopScanner } from './scanner.js';
 
 // ── Vista principal del módulo ─────────────────────────────────────────────────
 export async function renderGarantia(projectId, session) {
-  const project = await projects.getById(projectId);
+  const [project, customPanels] = await Promise.all([
+    projects.getById(projectId),
+    kv.get('panel_presets_custom').catch(() => []),
+  ]);
   if (!project) return '<p class="empty-msg">Proyecto no encontrado.</p>';
   const edit = canEdit(session, project);
   const g = project.garantia || {};
@@ -77,7 +80,7 @@ export async function renderGarantia(projectId, session) {
 
   <!-- 1E: Paneles -->
   <div id="g-paneles" class="tab-panel">
-    ${renderPaneles(g.paneles || { marca:'', modelo:'', wp:0, strings:[] }, projectId, edit)}
+    ${renderPaneles(g.paneles || { marca:'', modelo:'', wp:0, strings:[] }, projectId, edit, customPanels || [])}
   </div>
 
   <!-- Notas de garantía -->
@@ -217,6 +220,28 @@ function renderVocTab(project, projectId, edit) {
     </div>` : ''}
   </div>`;
 }
+
+// Rellena los campos de panel al seleccionar del catálogo
+window.seleccionarPanelCatalogo = function(sel) {
+  const id = sel.value;
+  if (!id) return;
+  const p = (window._panelCatalogData || []).find(x => x.id === id);
+  if (!p) return;
+  // Intenta separar Marca / Modelo en el campo label (dividido por "/" o primer espacio)
+  const slashIdx = p.label.indexOf('/');
+  let marca  = '';
+  let modelo = p.label;
+  if (slashIdx > 0) {
+    marca  = p.label.slice(0, slashIdx).trim();
+    modelo = p.label.slice(slashIdx + 1).trim();
+  }
+  const m = document.getElementById('panel-marca');
+  const mo = document.getElementById('panel-modelo');
+  const wp = document.getElementById('panel-wp');
+  if (m)  m.value  = marca;
+  if (mo) mo.value = modelo;
+  if (wp) wp.value = p.wp || '';
+};
 
 // Sincroniza el Voc del panel (pestaña Paneles → pestaña Voc) automáticamente
 window.syncVocFromPanel = function() {
@@ -901,13 +926,22 @@ window.guardarEstructura = async function(e, projectId) {
 };
 
 // ── 1E Paneles + escaneo continuo ────────────────────────────────────────────
-function renderPaneles(paneles, projectId, edit) {
+function renderPaneles(paneles, projectId, edit, catalog = []) {
   const totalPaneles = (paneles.strings||[]).reduce((s,str)=>s+(str.paneles?.length||0),0);
   const totalKwp     = totalPaneles * ((paneles.wp||0)/1000);
 
   return `
+  <script>window._panelCatalogData = ${JSON.stringify(catalog)};<\/script>
   <div class="card">
     <h3 class="card-title">Paneles solares</h3>
+    ${edit && catalog.length > 0 ? `
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Seleccionar del catálogo</label>
+      <select id="panel-catalogo-sel" class="select-field" onchange="seleccionarPanelCatalogo(this)">
+        <option value="">— Elige un modelo para rellenar automáticamente —</option>
+        ${catalog.map(p => `<option value="${esc(p.id)}">${esc(p.label)} — ${p.wp}W</option>`).join('')}
+      </select>
+    </div>` : ''}
     <div class="form-row">
       <div class="form-group">
         <label>Marca</label>
