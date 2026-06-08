@@ -56,7 +56,7 @@ export async function renderDocumentacion(projectId, session) {
     </button>
     <button class="tab-btn" data-tab="d-cierre"
             onclick="switchTab('doc-tabs','d-cierre',this)">
-      ${icon('seal-check', 14)} Cierre
+      ${icon('seal-check', 14)} Verificación de cierre
       ${cCierre > 0 ? `<span class="tab-badge tab-ok">${cCierre}</span>` : ''}
     </button>
     <button class="tab-btn" data-tab="d-notas"
@@ -88,8 +88,8 @@ export async function renderDocumentacion(projectId, session) {
       </button>
       <button class="sitio-btn" id="sitio-btn-zonaDelSistema"
               onclick="switchSitio('zonaDelSistema',this)">
-        <span class="sitio-ico">☀️</span>
-        <span class="sitio-lbl">Zona del sistema</span>
+        <span class="sitio-ico">🔌</span>
+        <span class="sitio-lbl">Zona del inversor</span>
         ${cZona ? `<span class="sitio-count">${cZona}</span>` : ''}
       </button>
     </div>
@@ -427,13 +427,13 @@ function renderLevantamiento(project, tipo, edit) {
       <div class="form-row">
         <div class="form-group"><label>Tipo de techo</label>
           <select name="tipTecho" ${dis}>
-            ${['Losa de concreto','Teja','Lámina','Metálico','Otro'].map(t=>
+            ${['Losa de concreto','Lámina','Metálico','Otro'].map(t=>
               `<option ${lev.tipTecho===t?'selected':''}>${t}</option>`).join('')}
           </select>
         </div>
         <div class="form-group"><label>Material de cubierta</label>
           <select name="materialCubierta" ${dis}>
-            ${['Concreto','Lámina galvanizada','Teja barro','IMSA','Policarbonato','Otro'].map(t=>
+            ${['Concreto','Lámina galvanizada','IMSA','Policarbonato','Otro'].map(t=>
               `<option ${lev.materialCubierta===t?'selected':''}>${t}</option>`).join('')}
           </select>
         </div>

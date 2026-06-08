@@ -218,6 +218,16 @@ function renderVocTab(project, projectId, edit) {
   </div>`;
 }
 
+// Sincroniza el Voc del panel (pestaña Paneles → pestaña Voc) automáticamente
+window.syncVocFromPanel = function() {
+  const vocVal = document.getElementById('panel-voc')?.value;
+  const vocField = document.getElementById('voc-panel');
+  if (vocField && vocVal && !vocField.value) {
+    vocField.value = vocVal;
+    calcVoc();
+  }
+};
+
 // Clave para la calc: lee los campos y muestra el resultado en tiempo real
 window.calcVoc = function() {
   const vocP   = parseFloat(document.getElementById('voc-panel')?.value)   || 0;
@@ -907,11 +917,27 @@ function renderPaneles(paneles, projectId, edit) {
         <label>Modelo</label>
         <input type="text" id="panel-modelo" value="${esc(paneles.modelo||'')}" placeholder="Ej: Tiger Neo" ${!edit?'disabled':''} />
       </div>
+    </div>
+    <div class="form-row">
       <div class="form-group">
         <label>Potencia (Wp)</label>
-        <input type="number" id="panel-wp" value="${paneles.wp||''}" min="1" ${!edit?'disabled':''} />
+        <input type="number" id="panel-wp" value="${paneles.wp||''}" min="1" placeholder="Ej: 580" ${!edit?'disabled':''} />
+      </div>
+      <div class="form-group">
+        <label>Voc — Voltaje circuito abierto (V)</label>
+        <input type="number" id="panel-voc" value="${paneles.voc||''}" min="0" step="0.1" placeholder="Ej: 49.8"
+               ${!edit?'disabled':''} oninput="syncVocFromPanel()" />
+      </div>
+      <div class="form-group">
+        <label>Imp — Corriente punto máximo (A)</label>
+        <input type="number" id="panel-imp" value="${paneles.imp||''}" min="0" step="0.01" placeholder="Ej: 13.95" ${!edit?'disabled':''} />
       </div>
     </div>
+    ${!edit && (paneles.voc || paneles.imp) ? `
+    <div class="panel-elec-vals">
+      ${paneles.voc ? `<span class="pe-val">Voc <strong>${paneles.voc} V</strong></span>` : ''}
+      ${paneles.imp ? `<span class="pe-val">Imp <strong>${paneles.imp} A</strong></span>` : ''}
+    </div>` : ''}
     ${edit ? `<button class="btn-outline btn-sm" onclick="guardarInfoPanel('${projectId}')">Guardar info del panel</button>` : ''}
 
     <div class="panel-stats">
@@ -968,7 +994,9 @@ window.guardarInfoPanel = async function(projectId) {
   const p = await projects.getById(projectId);
   p.garantia.paneles.marca  = document.getElementById('panel-marca').value.trim();
   p.garantia.paneles.modelo = document.getElementById('panel-modelo').value.trim();
-  p.garantia.paneles.wp     = parseFloat(document.getElementById('panel-wp').value)||0;
+  p.garantia.paneles.wp     = parseFloat(document.getElementById('panel-wp').value)  || 0;
+  p.garantia.paneles.voc    = parseFloat(document.getElementById('panel-voc').value)  || null;
+  p.garantia.paneles.imp    = parseFloat(document.getElementById('panel-imp').value)  || null;
   await projects.update(projectId, { garantia: p.garantia });
   toast('✅ Info del panel guardada');
 };

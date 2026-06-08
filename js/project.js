@@ -58,7 +58,7 @@ export async function renderProjectDetail(id, session) {
     <div class="card-row">
       <div class="meta-item">
         <span class="meta-lbl">Cliente</span>
-        <span class="meta-val">${esc(project.clientName || '—')}</span>
+        <span class="meta-val">${esc(project.clientName || '—')}${project.nombreProyecto ? `<span class="meta-tag">${esc(project.nombreProyecto)}</span>` : ''}</span>
       </div>
       <div class="meta-item">
         <span class="meta-lbl">Prioridad</span>
@@ -759,6 +759,12 @@ export async function renderProjectForm(id, session) {
     </div>
 
     <div class="form-group">
+      <label>Nombre del proyecto <span class="hint-opt">(opcional — para identificar entre proyectos del mismo cliente)</span></label>
+      <input type="text" name="nombreProyecto" placeholder="Ej: Casa Lomas, Bodega norte, Local 2…"
+             value="${esc(project?.nombreProyecto||'')}" />
+    </div>
+
+    <div class="form-group">
       <label>Teléfono / WhatsApp <span class="hint-opt">(opcional)</span></label>
       <div class="input-icon-wrap">
         ${icon('phone', 16, 'input-icon')}
@@ -781,15 +787,6 @@ export async function renderProjectForm(id, session) {
               : k === 'interconectado';
             return `<option value="${k}" ${selected?'selected':''}>${v.label}</option>`;
           }).join('')}
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>Tipo de conexión</label>
-      <select name="tipoConexion">
-        <option value="interconectado" ${(project?.tipoConexion||'interconectado')==='interconectado'?'selected':''}>Interconectado a CFE</option>
-        <option value="aislado"        ${project?.tipoConexion==='aislado'       ?'selected':''}>Aislado (off-grid)</option>
-        <option value="hibrido"        ${project?.tipoConexion==='hibrido'       ?'selected':''}>Híbrido (con batería)</option>
       </select>
     </div>
 
@@ -977,8 +974,8 @@ window._submitProject = async function(e, editId) {
 
   const data = {
     clientName:      fd.get('clientName').trim(),
+    nombreProyecto:  fd.get('nombreProyecto')?.trim() || null,
     tipoSistema,
-    tipoConexion:    fd.get('tipoConexion') || 'interconectado',
     prioridad:       fd.get('prioridad'),
     tecnicoLiderId:  fd.get('tecnicoLiderId') || null,
     tecnicosApoyo:   JSON.parse(fd.get('tecnicosApoyo') || '[]'),
@@ -986,7 +983,7 @@ window._submitProject = async function(e, editId) {
     fechaInicio:     fd.get('fechaInicio')    ? new Date(fd.get('fechaInicio')).toISOString()    : null,
     fechaEstimada:   fd.get('fechaEstimada') ? new Date(fd.get('fechaEstimada')).toISOString() : null,
     coordenadas,
-    clienteTelefono:  esPequeno ? (fd.get('clienteTelefono')?.trim() || null)  : null,
+    clienteTelefono:  fd.get('clienteTelefono')?.trim() || null,
     notas:            fd.get('notas')?.trim() || null,
   };
 

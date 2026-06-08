@@ -310,6 +310,9 @@ body {
 .meta-item { display: flex; flex-direction: column; gap: 2px; }
 .meta-lbl  { font-size: .68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing:.04em; font-weight:600; }
 .meta-val  { font-size: .9rem; color: var(--text); }
+.meta-tag  { display: inline-block; margin-left: 6px; font-size: .72rem; font-weight: 600;
+             background: var(--g600,#1a6e35); color: #fff; padding: 1px 8px;
+             border-radius: 20px; vertical-align: middle; }
 
 /* ── Para revisar (admin) ────────────────────────────────────────────────── */
 .para-revisar-card {
@@ -960,6 +963,10 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 /* ── Paneles ──────────────────────────────────────────────────────────────── */
 .panel-stats { display: flex; gap: 16px; margin: 12px 0; font-size: .9rem; }
 .panel-stats strong { color: var(--g300); }
+.panel-elec-vals { display: flex; gap: 12px; margin: 6px 0 10px; flex-wrap: wrap; }
+.pe-val { font-size: .82rem; color: var(--text-muted); background: var(--surface2);
+          padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border); }
+.pe-val strong { color: var(--g300); }
 .string-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
 .string-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .string-nombre { font-weight: 600; color: var(--g100); }
