@@ -1085,7 +1085,7 @@ body.scanner-native-active > *:not(.scanner-native-ui) { visibility: hidden; }
 .aparato-row { display: grid; grid-template-columns: 2fr 1fr 1fr 0.6fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
 .kwh-total { font-size: .9rem; color: var(--g300); margin-top: 10px; font-weight: 600; }
 
-.carga-row { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+.carga-row { display: grid; grid-template-columns: 2fr 1fr 1fr 0.6fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
 .campo-libre-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 8px; }
 
 /* ── Auditoría ────────────────────────────────────────────────────────────── */
@@ -1778,7 +1778,7 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 @media (max-width: 380px) {
   .card-row, .form-row { grid-template-columns: 1fr; }
   .modules-grid { grid-template-columns: 1fr; }
-  .aparato-row { grid-template-columns: 1fr 1fr; }
+  .aparato-row, .carga-row { grid-template-columns: 1fr 1fr; }
 }
 
 /* ── Tablet: centrar como columna angosta ─────────────────────────────────── */

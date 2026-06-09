@@ -674,11 +674,9 @@ function renderCamposDinamicos(tipo, lev, edit, pid) {
         <input type="number" name="autonomia" value="${lev.autonomia||''}" min="0" step="0.5" ${dis}/></div>
       <div class="form-group"><label>Cargas críticas (Alta prioridad)</label>
         <div id="cargas-criticas">${renderCargas(lev.cargasCriticas||[],edit,'critica')}</div>
-        ${edit?`<button type="button" class="btn-outline btn-sm" onclick="addCarga('critica')">+ Carga crítica</button>`:''}
       </div>
       <div class="form-group"><label>Cargas secundarias (Baja prioridad)</label>
         <div id="cargas-secundarias">${renderCargas(lev.cargasSecundarias||[],edit,'secundaria')}</div>
-        ${edit?`<button type="button" class="btn-outline btn-sm" onclick="addCarga('secundaria')">+ Carga secundaria</button>`:''}
       </div>
       <div class="form-group"><label>Generador de respaldo</label>
         <select name="generador" ${dis} onchange="toggleGenerador(this.value)">
@@ -749,7 +747,6 @@ function renderCamposDinamicos(tipo, lev, edit, pid) {
         <input type="number" name="tiempoRespaldo" value="${lev.tiempoRespaldo||''}" min="0" step="0.5" ${dis}/></div>
       <div class="form-group"><label>Cargas a respaldar</label>
         <div id="cargas-criticas">${renderCargas(lev.cargasRespaldo||[],edit,'critica')}</div>
-        ${edit?`<button type="button" class="btn-outline btn-sm" onclick="addCarga('critica')">+ Carga</button>`:''}
       </div>
     </div>`;
   }
@@ -941,19 +938,53 @@ window.setModoConsumo = function(modo) {
 
 // ── Cargas (off-grid/respaldo) ────────────────────────────────────────────────
 let _cargas = { critica: [], secundaria: [] };
+
+const CARGAS_RAPIDAS = [
+  {nombre:'Minisplit 1 ton',    potencia:900,  horas:8 },
+  {nombre:'Minisplit 1.5 ton',  potencia:1350, horas:8 },
+  {nombre:'Refrigerador',       potencia:150,  horas:24},
+  {nombre:'Bomba de agua',      potencia:750,  horas:4 },
+  {nombre:'Televisor',          potencia:100,  horas:6 },
+  {nombre:'Foco LED',           potencia:10,   horas:8 },
+  {nombre:'Lavadora',           potencia:500,  horas:1 },
+];
+
 function renderCargas(cargas, edit, tipo) {
   _cargas[tipo] = [...cargas];
-  const id = `cargas-${tipo}`;
-  return _cargas[tipo].map((c,i)=>`
-    <div class="carga-row">
-      <input type="text" value="${esc(c.nombre)}" placeholder="Nombre" ${edit?`oninput="_cargas['${tipo}'][${i}].nombre=this.value"`:'disabled'}/>
-      <input type="number" value="${c.potencia}" placeholder="W" ${edit?`oninput="_cargas['${tipo}'][${i}].potencia=parseFloat(this.value)||0"`:'disabled'}/>
-      <input type="number" value="${c.horas}" placeholder="h/día" step="0.5" ${edit?`oninput="_cargas['${tipo}'][${i}].horas=parseFloat(this.value)||0"`:'disabled'}/>
-      ${edit?`<button type="button" class="btn-del-sm" onclick="delCarga('${tipo}',${i})">✕</button>`:''}
-    </div>`).join('');
+  const totalW   = _cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
+  const totalWh  = _cargas[tipo].reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1), 0);
+  const labelBtn = tipo === 'critica' ? '+ Carga crítica' : tipo === 'secundaria' ? '+ Carga secundaria' : '+ Carga';
+  return `
+    ${edit ? `<div class="aparatos-rapidos">
+      <p class="hint">Acceso rápido:</p>
+      <div class="chip-group">
+        ${CARGAS_RAPIDAS.map(a=>`<button type="button" class="chip chip-sm" onclick="addCargaRapida('${tipo}',${JSON.stringify(a).replace(/"/g,'&quot;')})">${a.nombre}</button>`).join('')}
+      </div>
+    </div>` : ''}
+    <div id="lista-cargas-${tipo}">
+      ${_cargas[tipo].map((c,i)=>`
+        <div class="carga-row">
+          <input type="text" value="${esc(c.nombre)}" placeholder="Nombre" ${edit?`oninput="_cargas['${tipo}'][${i}].nombre=this.value"`:'disabled'}/>
+          <input type="number" value="${c.potencia}" placeholder="W" min="0" ${edit?`oninput="_cargas['${tipo}'][${i}].potencia=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
+          <input type="number" value="${c.horas}" placeholder="h/día" min="0" step="0.5" ${edit?`oninput="_cargas['${tipo}'][${i}].horas=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
+          <input type="number" value="${c.cantidad||1}" placeholder="Cant." min="1" ${edit?`oninput="_cargas['${tipo}'][${i}].cantidad=parseInt(this.value)||1;refreshCargasTotales('${tipo}')"`:'disabled'}/>
+          ${edit?`<button type="button" class="btn-del-sm" onclick="delCarga('${tipo}',${i})">✕</button>`:''}
+        </div>`).join('')}
+    </div>
+    ${edit?`<button type="button" class="btn-outline btn-sm" style="margin-top:6px" onclick="addCarga('${tipo}')">${labelBtn}</button>`:''}
+    <p class="kwh-total" id="cargas-total-${tipo}">Total: <strong>${totalW} W</strong> — <strong>${(totalWh/1000).toFixed(2)} kWh/día</strong></p>
+  `;
 }
-window.addCarga = function(tipo) { _cargas[tipo].push({nombre:'',potencia:0,horas:0}); refreshCargas(tipo); };
+window.addCargaRapida = function(tipo, a) { _cargas[tipo].push({...a, cantidad:1}); refreshCargas(tipo); };
+window.addCarga = function(tipo) { _cargas[tipo].push({nombre:'',potencia:0,horas:0,cantidad:1}); refreshCargas(tipo); };
 window.delCarga = function(tipo,i) { _cargas[tipo].splice(i,1); refreshCargas(tipo); };
+window.refreshCargasTotales = function(tipo) {
+  const el = document.getElementById(`cargas-total-${tipo}`);
+  if (!el) return;
+  const totalW  = _cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
+  const totalWh = _cargas[tipo].reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1), 0);
+  el.innerHTML = `Total: <strong>${totalW} W</strong> — <strong>${(totalWh/1000).toFixed(2)} kWh/día</strong>`;
+};
 function refreshCargas(tipo) { const el=document.getElementById(`cargas-${tipo}`); if(el) el.innerHTML=renderCargas(_cargas[tipo],true,tipo); }
 
 window.toggleGenerador = function(val) {
