@@ -156,7 +156,8 @@ function renderVocTab(project, projectId, edit) {
 
   // T_min: primero del levantamiento, fallback constante La Paz
   const tMin        = (lev.tMin != null) ? lev.tMin : VOC_T_MIN;
-  const tMinCiudad  = lev.tMinCiudad || (lev.tMin != null ? 'manual' : null);
+  // compatibilidad: tMinCiudad era el nombre anterior del campo
+  const tMinCiudad  = lev.tMinCiudad || lev.tMinEstado || (lev.tMin != null ? 'manual' : null);
   const tMinZona    = lev.tMinZona || 'valle';
   // Etiqueta de zona para el tile
   const _ZONA_LABELS = { costa:'🌊 Costa', valle:'🏜️ Valle', rural:'🌿 Campo', sierra1:'⛰️ Pie de sierra', sierra2:'🏔️ Sierra' };
@@ -246,7 +247,7 @@ function renderVocTab(project, projectId, edit) {
         <span style="font-size:.68rem;color:var(--text-muted);line-height:1.3">
           ${tMinCiudad && tMinCiudad !== 'otro' && tMinCiudad !== 'manual'
             ? `${esc(tMinCiudad)}<br>${tMinZonaLabel}`
-            : tMinCiudad === 'otro' ? 'manual' : '⚠ La Paz, BCS (default)'}
+            : tMinCiudad === 'otro' ? 'manual' : '⚠ BCS (default)'}
         </span>
         ${!lev.tMin && lev.tMin !== 0
           ? `<span style="font-size:.65rem;color:#c8a000">Configura en Levantamiento</span>` : ''}

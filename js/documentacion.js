@@ -458,14 +458,14 @@ function renderLevantamiento(project, tipo, edit) {
       <!-- Temperatura mínima del sitio -->
       <div class="form-row">
         <div class="form-group">
-          <label>Ciudad de referencia (T mín)</label>
+          <label>Estado de referencia (T mín)</label>
           <select name="tMinCiudad" ${dis} onchange="window._onTMinRecalc()">
-            <option value="">— Seleccionar ciudad —</option>
+            <option value="">— Seleccionar estado —</option>
             ${_TMIN_CIUDADES.map(c=>
               `<option value="${esc(c.nombre)}" data-tmin="${c.tMin}"
-                ${lev.tMinCiudad===c.nombre?'selected':''}>${esc(c.nombre)} (${c.tMin}°C)</option>`
+                ${(lev.tMinCiudad||lev.tMinEstado)===c.nombre?'selected':''}>${esc(c.nombre)} (${c.tMin}°C)</option>`
             ).join('')}
-            <option value="otro" ${lev.tMinCiudad==='otro'?'selected':''}>Otro (manual)</option>
+            <option value="otro" ${(lev.tMinCiudad||lev.tMinEstado)==='otro'?'selected':''}>Otro (manual)</option>
           </select>
         </div>
         <div class="form-group">
@@ -502,9 +502,9 @@ function renderLevantamiento(project, tipo, edit) {
           ${icon('info', 13)} Referencia de zonas — ¿cómo afecta al T mín? <span class="tmin-ref-caret">▸</span>
         </button>
         <div class="tmin-ref-body">
-          <p class="tmin-ref-intro">El T mín se calcula como: <strong>ciudad base + ajuste por zona</strong>. Ejemplo con La Paz, BCS (3°C):</p>
+          <p class="tmin-ref-intro">El T mín se calcula como: <strong>estado base + ajuste por zona</strong>. Ejemplo con BCS (3°C):</p>
           <table class="tmin-ref-table">
-            <thead><tr><th>Zona</th><th>Ajuste</th><th>T mín (La Paz)</th><th>Descripción</th></tr></thead>
+            <thead><tr><th>Zona</th><th>Ajuste</th><th>T mín (BCS)</th><th>Descripción</th></tr></thead>
             <tbody>
               ${_TMIN_ZONAS.map(z => {
                 const ej = 3 + z.offset;
@@ -1379,39 +1379,43 @@ window._delNotaDoc = async function(projectId, idx) {
   toast('Nota eliminada');
 };
 
-// ── Temperatura mínima por ciudad ────────────────────────────────────────────
-// Valores históricos típicos de T_min para cálculo de Voc (NOM-001-SEDE / ASHRAE)
-const _TMIN_CIUDADES = [
-  { nombre: 'La Paz, BCS',            tMin:  3 },
-  { nombre: 'Los Cabos, BCS',         tMin:  5 },
-  { nombre: 'Tijuana, BC',            tMin:  3 },
-  { nombre: 'Mexicali, BC',           tMin: -2 },
-  { nombre: 'Ensenada, BC',           tMin:  3 },
-  { nombre: 'Hermosillo, Son',        tMin:  0 },
-  { nombre: 'Ciudad Obregón, Son',    tMin:  2 },
-  { nombre: 'Culiacán, Sin',          tMin:  5 },
-  { nombre: 'Mazatlán, Sin',          tMin:  8 },
-  { nombre: 'Los Mochis, Sin',        tMin:  5 },
-  { nombre: 'Chihuahua, Chih',        tMin: -8 },
-  { nombre: 'Ciudad Juárez, Chih',    tMin:-10 },
-  { nombre: 'Torreón, Coah',          tMin: -3 },
-  { nombre: 'Saltillo, Coah',         tMin: -5 },
-  { nombre: 'Monterrey, NL',          tMin:  0 },
-  { nombre: 'San Luis Potosí, SLP',   tMin: -2 },
-  { nombre: 'Zacatecas, Zac',         tMin: -3 },
-  { nombre: 'Durango, Dgo',           tMin: -5 },
-  { nombre: 'Guadalajara, Jal',       tMin:  3 },
-  { nombre: 'Puerto Vallarta, Jal',   tMin: 12 },
-  { nombre: 'Ciudad de México, CDMX', tMin:  2 },
-  { nombre: 'Puebla, Pue',            tMin:  0 },
-  { nombre: 'Querétaro, Qro',         tMin:  2 },
-  { nombre: 'Mérida, Yuc',            tMin: 12 },
-  { nombre: 'Cancún, Q. Roo',         tMin: 15 },
-  { nombre: 'Veracruz, Ver',          tMin: 10 },
-  { nombre: 'Oaxaca, Oax',            tMin:  3 },
-  { nombre: 'Morelia, Mich',          tMin:  1 },
-  { nombre: 'León, Gto',              tMin:  1 },
-  { nombre: 'Aguascalientes, Ags',    tMin: -1 },
+// ── Temperatura mínima por estado ────────────────────────────────────────────
+// Valor de referencia = planicie/valle del estado (capital o zona urbana principal)
+// La zona climática aplica el ajuste fino dentro del estado
+// Fuente: registros históricos SMN / ASHRAE 99% design temp
+const _TMIN_CIUDADES = [  // nombre interno conservado para compatibilidad con datos guardados
+  { nombre: 'Aguascalientes',      tMin: -1 },
+  { nombre: 'Baja California',     tMin: -2 },  // Mexicali como referencia (más fría)
+  { nombre: 'Baja California Sur', tMin:  3 },  // La Paz
+  { nombre: 'Campeche',            tMin: 12 },
+  { nombre: 'Chiapas',             tMin:  5 },
+  { nombre: 'Chihuahua',           tMin: -8 },
+  { nombre: 'Ciudad de México',    tMin:  2 },
+  { nombre: 'Coahuila',            tMin: -5 },  // Saltillo
+  { nombre: 'Colima',              tMin:  8 },
+  { nombre: 'Durango',             tMin: -5 },
+  { nombre: 'Guanajuato',          tMin:  1 },
+  { nombre: 'Guerrero',            tMin:  8 },
+  { nombre: 'Hidalgo',             tMin:  0 },
+  { nombre: 'Jalisco',             tMin:  3 },  // Guadalajara
+  { nombre: 'México (Estado)',     tMin:  1 },
+  { nombre: 'Michoacán',           tMin:  1 },
+  { nombre: 'Morelos',             tMin:  5 },
+  { nombre: 'Nayarit',             tMin:  8 },
+  { nombre: 'Nuevo León',          tMin:  0 },  // Monterrey
+  { nombre: 'Oaxaca',              tMin:  3 },
+  { nombre: 'Puebla',              tMin:  0 },
+  { nombre: 'Querétaro',           tMin:  2 },
+  { nombre: 'Quintana Roo',        tMin: 15 },
+  { nombre: 'San Luis Potosí',     tMin: -2 },
+  { nombre: 'Sinaloa',             tMin:  5 },  // Culiacán
+  { nombre: 'Sonora',              tMin:  0 },  // Hermosillo
+  { nombre: 'Tabasco',             tMin: 12 },
+  { nombre: 'Tamaulipas',          tMin:  2 },
+  { nombre: 'Tlaxcala',            tMin: -1 },
+  { nombre: 'Veracruz',            tMin:  8 },
+  { nombre: 'Yucatán',             tMin: 12 },
+  { nombre: 'Zacatecas',           tMin: -3 },
 ];
 
 // Zonas climáticas con offset sobre T_min de ciudad de referencia
@@ -1430,15 +1434,15 @@ const _TMIN_ZONA_DESC = {
   sierra2: 'Alta montaña, cañadas y sierras. Heladas frecuentes en invierno. Ej: Sierra de la Laguna, sierras de Chihuahua/Durango.',
 };
 
-function _tminDescripcion(ciudad, zona, tMinFinal) {
-  if (!ciudad || ciudad === 'otro') return '';
-  const c = _TMIN_CIUDADES.find(x => x.nombre === ciudad);
+function _tminDescripcion(estado, zona, tMinFinal) {
+  if (!estado || estado === 'otro') return '';
+  const c = _TMIN_CIUDADES.find(x => x.nombre === estado);
   const z = _TMIN_ZONAS.find(x => x.key === (zona || 'valle'));
   if (!c || !z) return '';
   const base   = c.tMin;
   const offset = z.offset;
   const signo  = offset >= 0 ? `+${offset}` : `${offset}`;
-  return `${base}°C (ciudad) ${signo}°C (zona) = ${tMinFinal ?? (base + offset)}°C`;
+  return `${base}°C (estado) ${signo}°C (zona) = ${tMinFinal ?? (base + offset)}°C`;
 }
 
 window._onTMinRecalc = function() {
