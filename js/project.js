@@ -302,23 +302,35 @@ function renderModulosProgreso(project, id, session, admin) {
   const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('centrosCarga',f),0);
   const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('zonaDelSistema',f),0);
 
-  const docItems = [
-    { label: 'Levantamiento',                    ok: !!(doc.levantamiento?.tipTecho) },
-    { label: `Techo (${fTecho})`,                ok: fTecho > 0 },
-    { label: `Centros de carga (${fCentros})`,   ok: fCentros > 0 },
-    { label: `Zona del sistema (${fZona})`,      ok: fZona > 0 },
-  ];
+  const esPequenoTipo = project.tipoSistema === 'sistema_pequeno';
+
+  // Mismos ítems que calcFaseEstado — mantener en sincronía para que
+  // dashboard y detalle muestren el mismo porcentaje.
+  const docItems = esPequenoTipo
+    ? [ { label: 'Levantamiento', ok: !!(doc.levantamiento?.tipTecho) } ]
+    : [
+        { label: 'Levantamiento',                    ok: !!(doc.levantamiento?.tipTecho) },
+        { label: `Techo (${fTecho})`,                ok: fTecho > 0 },
+        { label: `Centros de carga (${fCentros})`,   ok: fCentros > 0 },
+        { label: `Zona del sistema (${fZona})`,      ok: fZona > 0 },
+      ];
   const docDone = docItems.filter(i=>i.ok).length;
   const docPct  = Math.round(docDone / docItems.length * 100);
 
   // Garantía: foto sistema + fotos técnicas + equipos + paneles
   const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
-  const garItems = [
-    { label: 'Foto del sistema',        ok: !!gar.fotoSistema },
-    { label: 'Fotos técnicas',          ok: !!(ft.tableroAC || ft.inversorEnergizado) },
-    { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
-    { label: `Paneles (${totalPaneles})`,           ok: totalPaneles > 0 },
-  ];
+  const garItems = esPequenoTipo
+    ? [
+        { label: 'Foto del sistema',                    ok: !!gar.fotoSistema },
+        { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
+        { label: `Paneles (${totalPaneles})`,           ok: totalPaneles > 0 },
+      ]
+    : [
+        { label: 'Foto del sistema',        ok: !!gar.fotoSistema },
+        { label: 'Fotos técnicas',          ok: !!(ft.tableroAC || ft.inversorEnergizado) },
+        { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
+        { label: `Paneles (${totalPaneles})`,           ok: totalPaneles > 0 },
+      ];
   const garDone = garItems.filter(i=>i.ok).length;
   const garPct  = Math.round(garDone / garItems.length * 100);
 
@@ -332,13 +344,15 @@ function renderModulosProgreso(project, id, session, admin) {
   const audDone = audItems.filter(i=>i.ok).length;
   const audPct  = Math.round(audDone / audItems.length * 100);
 
-  const esPequeno      = project.tipoSistema === 'sistema_pequeno';
-  const puedeAuditoria = !esPequeno && admin;  // solo administradores
+  const esPequeno      = esPequenoTipo;
+  const puedeAuditoria = !esPequeno && admin;  // solo administradores ven la tarjeta
+
   const estado = calcFaseEstado(project);
 
-  const totalDone    = docDone + garDone + (puedeAuditoria ? audDone : 0);
-  const totalPosible = docItems.length + garItems.length + (puedeAuditoria ? audItems.length : 0);
-  const generalPct   = totalPosible > 0 ? Math.round(totalDone / totalPosible * 100) : 0;
+  // Progreso general: misma fórmula que el dashboard (fases con peso igual,
+  // independiente del rol de quien lo ve)
+  const base       = esPequeno ? 200 : 300;
+  const generalPct = Math.round((docPct + garPct + (esPequeno ? 0 : audPct)) / base * 100);
 
   const modCard = (title, iconName, colorClass, pct, items, link, faseKey) => {
     const locked = !admin && estado[faseKey] === 'bloqueada';
@@ -928,6 +942,13 @@ window._submitProject = async function(e, editId) {
 
   try {
     if (editId) {
+      // Regenerar displayId si cambió el nombre del cliente o el tipo de sistema
+      const prev = await projects.getById(editId);
+      if (prev && (prev.clientName !== data.clientName || prev.tipoSistema !== data.tipoSistema)) {
+        const all = await projects.getAll();
+        const otherIds = all.filter(x => x.id !== editId).map(x => x.displayId).filter(Boolean);
+        data.displayId = genDisplayId(data.clientName, prev.createdAt, data.tipoSistema, otherIds);
+      }
       await projects.update(editId, data);
       toast('Proyecto actualizado');
       navigate(`#proyecto/${editId}`);

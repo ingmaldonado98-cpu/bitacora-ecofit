@@ -1,7 +1,7 @@
 // documentacion.js — Módulo 2: Levantamiento dinámico + Fases Antes/Durante/Después
 
 import { projects, logChange } from './db.js';
-import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar, calcFaseEstado } from './utils.js';
+import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar, calcFaseEstado, genDisplayId } from './utils.js';
 import { renderFirmaBlock } from './project.js';
 import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
@@ -1111,7 +1111,13 @@ window.guardarLevantamiento = async function(e, projectId) {
   const rootUpdate = { documentacion: p.documentacion };
   const newClientName = fd.get('lev_clientName')?.trim();
   const newNombreProyecto = fd.get('lev_nombreProyecto')?.trim() || null;
-  if (newClientName && newClientName !== p.clientName) rootUpdate.clientName = newClientName;
+  if (newClientName && newClientName !== p.clientName) {
+    rootUpdate.clientName = newClientName;
+    // Regenerar displayId para que la "carpeta" refleje el nombre actual
+    const all = await projects.getAll();
+    const otherIds = all.filter(x => x.id !== projectId).map(x => x.displayId).filter(Boolean);
+    rootUpdate.displayId = genDisplayId(newClientName, p.createdAt, p.tipoSistema, otherIds);
+  }
   if (newNombreProyecto !== (p.nombreProyecto || null)) rootUpdate.nombreProyecto = newNombreProyecto;
   await projects.update(projectId, rootUpdate);
   // Actualizar indicador de auto-guardado
