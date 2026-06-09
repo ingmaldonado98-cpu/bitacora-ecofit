@@ -154,10 +154,25 @@ function renderVocTab(project, projectId, edit) {
   const vd       = g.validacionVoc || {};
 
   // Datos tomados directo de los registros — sin campos manuales
-  const vocPanel     = g.paneles?.voc    || vd.vocPanel    || null;
-  const panelesSerie = project.projectConfig?.layout?.totalPanels || vd.panelesSerie || null;
-  const vocMax       = inversor?.vocMax  || vd.vocMaxInversor || null;
-  const resultado    = vd.resultado;
+  const vocPanel     = g.paneles?.voc || vd.vocPanel || null;
+  const vocMax       = inversor?.vocMax || vd.vocMaxInversor || null;
+
+  // Paneles en serie: fuente primaria = max(paneles por string registrado)
+  // Fallback: calculadora layout. NO usar el valor guardado en vd — puede estar desactualizado.
+  const strings       = g.paneles?.strings || [];
+  const maxPorString  = strings.length > 0
+    ? Math.max(...strings.map(s => (s.paneles?.length || 0)))
+    : null;
+  const panelesSerie  = maxPorString || project.projectConfig?.layout?.totalPanels || null;
+
+  const resultado = vd.resultado;
+
+  // Detectar si el resultado guardado está desactualizado respecto a los datos actuales
+  const stale = resultado && (
+    (vd.panelesSerie != null && panelesSerie != null && vd.panelesSerie !== panelesSerie) ||
+    (vd.vocPanel     != null && vocPanel     != null && Math.abs(vd.vocPanel - vocPanel) > 0.01) ||
+    (vd.vocMaxInversor != null && vocMax     != null && vd.vocMaxInversor !== vocMax)
+  );
 
   const semaforo = resultado === 'seguro'  ? { cls: 'voc-ok',   ico: '🟢', txt: 'Configuración segura' }
                  : resultado === 'limite'  ? { cls: 'voc-warn', ico: '🟡', txt: 'En el límite — sin margen' }
@@ -177,12 +192,26 @@ function renderVocTab(project, projectId, edit) {
       : `Inversor — registra el inversor en <em>Equipos</em>`),
   ].filter(Boolean);
 
+  // Fuente de paneles en serie para tooltip
+  const serieOrigen = maxPorString
+    ? `${strings.length} string${strings.length>1?'s':''} registrado${strings.length>1?'s':''}`
+    : 'Calculadora';
+
   return `
   <div class="card">
     <div class="card-title-row">
       <h3 class="card-title">Validación Voc de string</h3>
-      ${semaforo ? `<span class="voc-badge ${semaforo.cls}">${semaforo.ico} ${semaforo.txt}</span>` : ''}
+      ${semaforo && !stale ? `<span class="voc-badge ${semaforo.cls}">${semaforo.ico} ${semaforo.txt}</span>` : ''}
+      ${stale ? `<span class="voc-badge voc-warn">⚠️ Desactualizado</span>` : ''}
     </div>
+
+    <!-- Alerta de datos desactualizados -->
+    ${stale && edit ? `
+    <div class="voc-stale-banner">
+      ${icon('arrow-clockwise', 15)}
+      <span>Los strings o el panel cambiaron desde el último cálculo.</span>
+      <button class="btn-primary btn-sm" onclick="calcVocYGuardar('${projectId}')">Recalcular</button>
+    </div>` : ''}
 
     <!-- Datos automáticos -->
     <div class="voc-datos-auto">
@@ -191,7 +220,9 @@ function renderVocTab(project, projectId, edit) {
         <span class="vda-val ${vocPanel ? '' : 'vda-missing'}">${vocPanel ? vocPanel + ' V' : '—'}</span>
       </div>
       <div class="vda-item">
-        <span class="vda-lbl">${icon('stack', 14)} Paneles en serie</span>
+        <span class="vda-lbl">${icon('stack', 14)} Paneles en serie
+          <span style="font-size:.65rem;opacity:.7">(${serieOrigen})</span>
+        </span>
         <span class="vda-val ${panelesSerie ? '' : 'vda-missing'}">${panelesSerie || '—'}</span>
       </div>
       <div class="vda-item">
@@ -224,14 +255,14 @@ function renderVocTab(project, projectId, edit) {
     <input type="hidden" id="voc-coef"    value="${VOC_COEF}" />
 
     <!-- Resultado -->
-    <div id="voc-resultado" class="voc-resultado" style="${resultado && !alertas.length ? '' : 'display:none'}">
+    <div id="voc-resultado" class="voc-resultado" style="${resultado && !alertas.length && !stale ? '' : 'display:none'}">
       <div class="voc-res-row"><span>Voc corregido (${VOC_T_MIN}°C)</span><strong id="voc-r-corr">${vd.vocCorregido?.toFixed(2) || '—'} V</strong></div>
       <div class="voc-res-row"><span>Voc string completo</span><strong id="voc-r-str">${vd.vocString?.toFixed(2) || '—'} V</strong></div>
       <div class="voc-res-row"><span>Margen de seguridad</span><strong id="voc-r-margen">${vd.margen != null ? vd.margen.toFixed(1) + '%' : '—'}</strong></div>
       <div id="voc-r-msg" class="voc-res-msg ${semaforo?.cls || ''}">${semaforo ? semaforo.ico + ' ' + (vd.mensaje || semaforo.txt) : ''}</div>
     </div>
 
-    ${edit && !alertas.length ? `
+    ${edit && !alertas.length && !stale ? `
     <div class="form-actions" style="margin-top:12px">
       <button class="btn-primary btn-sm" onclick="calcVocYGuardar('${projectId}')">
         ${icon('check', 14)} Calcular y guardar

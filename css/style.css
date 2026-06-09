@@ -2514,6 +2514,14 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .voc-res-msg.voc-err  { background: rgba(220,53,69,.10);   color: var(--red); }
 .form-hint { font-size: .72rem; color: var(--text-muted); margin-left: 4px; font-weight: 400; }
 
+/* ── Voc stale banner ────────────────────────────────────────────────────── */
+.voc-stale-banner { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+                    background: rgba(240,192,0,.10); border: 1px solid #c8a000;
+                    border-radius: var(--radius-sm); padding: 8px 12px;
+                    font-size: .82rem; color: #a88000; margin: 8px 0; }
+.voc-stale-banner span { flex: 1; }
+.voc-stale-banner .btn-primary { padding: 4px 12px; font-size: .78rem; white-space: nowrap; }
+
 /* ── Voc datos automáticos ───────────────────────────────────────────────── */
 .voc-datos-auto { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
 .vda-item  { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;
