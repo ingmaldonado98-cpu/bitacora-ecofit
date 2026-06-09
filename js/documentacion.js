@@ -24,17 +24,15 @@ export async function renderDocumentacion(projectId, session) {
     }
     return 0;
   };
-  const cTecho   = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('techo',f), 0);
-  const cCentros = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('centrosCarga',f), 0);
-  const cZona    = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('zonaDelSistema',f), 0);
+  // Fotos de cierre (garantia.*) repartidas por sitio
+  const cTecho   = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('techo',f), 0)
+    + _countCierreExtra(project, 'techo');
+  const cCentros = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('centrosCarga',f), 0)
+    + _countCierreExtra(project, 'centrosCarga');
+  const cZona    = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('zonaDelSistema',f), 0)
+    + _countCierreExtra(project, 'zonaDelSistema');
   const cNotas   = (project.documentacion?.notas || []).length;
   const totalFases = cTecho + cCentros + cZona;
-
-  // Badge para "Cierre del proyecto" (fotos de garantia General)
-  const g = project.garantia || {};
-  const cCierre = (g.fotoSistema ? 1 : 0)
-    + Object.values(g.fotosTecnicas || {}).flat().length
-    + (g.fotosAdicionales || []).length;
 
   return `
   <div class="view-header">
@@ -52,10 +50,6 @@ export async function renderDocumentacion(projectId, session) {
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-fases"  tabindex="-1" data-tab="d-fases"  onclick="switchTab('doc-tabs','d-fases',this)">
       ${icon('camera', 14)} Fases
       ${totalFases > 0 ? `<span class="tab-badge tab-ok">${totalFases}</span>` : ''}
-    </button>
-    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-cierre" tabindex="-1" data-tab="d-cierre" onclick="switchTab('doc-tabs','d-cierre',this)">
-      ${icon('seal-check', 14)} Verificación de cierre
-      ${cCierre > 0 ? `<span class="tab-badge tab-ok">${cCierre}</span>` : ''}
     </button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-notas"  tabindex="-1" data-tab="d-notas"  onclick="switchTab('doc-tabs','d-notas',this)">
       ${icon('note', 14)} Notas
@@ -102,12 +96,7 @@ export async function renderDocumentacion(projectId, session) {
     </div>
   </div>
 
-  <!-- Tab 3: Cierre del proyecto (contenido movido de Garantía > General) -->
-  <div id="d-cierre" class="tab-panel">
-    ${renderCierreProyecto(project, edit, projectId)}
-  </div>
-
-  <!-- Tab 4: Notas -->
+  <!-- Tab 3: Notas -->
   <div id="d-notas" class="tab-panel">
     <div class="card">
       <div class="card-title-row">
@@ -170,50 +159,91 @@ export async function renderDocumentacion(projectId, session) {
   `;
 }
 
-// ── Cierre del proyecto (data en garantia.*, UI en Documentación) ─────────────
-function renderCierreProyecto(project, edit, projectId) {
-  const g  = project.garantia || {};
-  const ft = g.fotosTecnicas || {};
+// ── Verificación de cierre (data en garantia.*, UI dentro de Fases → Cierre) ──
+// Slots técnicos repartidos por sitio
+const SLOTS_CIERRE_SITIO = {
+  centrosCarga: [
+    { key:'tableroAC',          label:'Tablero AC terminado',    req:true  },
+    { key:'tableroDC',          label:'Tablero DC terminado',    req:true  },
+    { key:'protecciones',       label:'Protecciones instaladas', req:false },
+    { key:'puestaATierra',      label:'Puesta a tierra',         req:false },
+  ],
+  zonaDelSistema: [
+    { key:'inversorEnergizado', label:'Inversor energizado',     req:true  },
+    { key:'etiquetado',         label:'Etiquetado',              req:false },
+  ],
+};
 
-  const SLOTS_TECNICOS = [
-    { key:'tableroAC',          label:'Tablero AC terminado',       req:true  },
-    { key:'tableroDC',          label:'Tablero DC terminado',       req:true  },
-    { key:'protecciones',       label:'Protecciones instaladas',    req:false },
-    { key:'inversorEnergizado', label:'Inversor energizado',        req:true  },
-    { key:'puestaATierra',      label:'Puesta a tierra',            req:false },
-    { key:'etiquetado',         label:'Etiquetado',                 req:false },
-  ];
+// Obtener fotos técnicas (soporta legacy string y nuevo array)
+function _getFT(g, key) {
+  const v = (g.fotosTecnicas || {})[key];
+  if (!v) return [];
+  if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
+  return Array.isArray(v) ? v : [];
+}
 
-  // Obtener fotos técnicas (soporta legacy string y nuevo array)
-  const getFT = (key) => {
-    const v = ft[key];
-    if (!v) return [];
-    if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
-    return Array.isArray(v) ? v : [];
-  };
+// Sitio al que pertenece cada slot técnico (para navegar de regreso)
+function _sitioForFTKey(key) {
+  return SLOTS_CIERRE_SITIO.centrosCarga.some(s => s.key === key) ? 'centrosCarga' : 'zonaDelSistema';
+}
 
-  return `
-  <!-- Foto general del sistema -->
-  <div class="card">
-    <h3 class="card-title">Foto general del sistema <span class="req-badge">OBLIGATORIA</span></h3>
-    <div class="foto-slot" id="slot-foto-sistema-doc">
-      ${g.fotoSistema
-        ? `${fotoMini(g.fotoSistema,'Foto general')}
-           ${edit ? `<button class="btn-del-foto" onclick="delFotoSistemaDoc('${projectId}')">✕</button>` : ''}`
-        : (edit ? `<div class="empty-state">
-            <div class="empty-state-icon">📷</div>
-            <p class="empty-state-msg">Foto general del sistema terminado.</p>
-            <button class="empty-state-cta" onclick="capFotoSistemaDoc('${projectId}')">
-              ${icon('camera')} Tomar foto</button>
-           </div>` : '<p class="empty-msg-sm">Sin foto.</p>')}
+// Conteo de fotos de cierre (garantia.*) que se muestran en cada sitio
+function _countCierreExtra(project, sitio) {
+  const g = project.garantia || {};
+  if (sitio === 'techo') {
+    return (g.fotoSistema ? 1 : 0) + (g.fotosAdicionales || []).length;
+  }
+  return (SLOTS_CIERRE_SITIO[sitio] || []).reduce((s, slot) => s + _getFT(g, slot.key).length, 0);
+}
+
+// Bloque de cierre específico del sitio (se muestra arriba del grid de fotos libres)
+function renderCierreSitio(project, sitio, edit, projectId) {
+  const g = project.garantia || {};
+
+  if (sitio === 'techo') {
+    return `
+    <div class="card">
+      <h3 class="card-title">Foto general del sistema <span class="req-badge">OBLIGATORIA</span></h3>
+      <div class="foto-slot" id="slot-foto-sistema-doc">
+        ${g.fotoSistema
+          ? `${fotoMini(g.fotoSistema,'Foto general')}
+             ${edit ? `<button class="btn-del-foto" onclick="delFotoSistemaDoc('${projectId}')">✕</button>` : ''}`
+          : (edit ? `<div class="empty-state">
+              <div class="empty-state-icon">📷</div>
+              <p class="empty-state-msg">Foto general del sistema terminado.</p>
+              <button class="empty-state-cta" onclick="capFotoSistemaDoc('${projectId}')">
+                ${icon('camera')} Tomar foto</button>
+             </div>` : '<p class="empty-msg-sm">Sin foto.</p>')}
+      </div>
     </div>
-  </div>
+    ${(g.fotosAdicionales || []).length ? `
+    <div class="card">
+      <div class="card-title-row">
+        <h3 class="card-title">Fotos adicionales de cierre</h3>
+        ${edit ? `<button class="btn-primary btn-sm" onclick="capFotoAdicionalDoc('${projectId}')">
+          ${icon('camera')} Agregar</button>` : ''}
+      </div>
+      <div class="fotos-grid">
+        ${(g.fotosAdicionales || []).map((f, i) => `
+          <div class="foto-card">
+            ${fotoMini(f.data, 'Foto '+(i+1))}
+            ${f.nota ? `<p class="foto-nota">${esc(f.nota)}</p>` : ''}
+            ${edit ? `
+              <button class="btn-del-foto-abs" onclick="editFotoAdicionalDoc('${projectId}',${i})">✎</button>
+              <button class="btn-del-foto" onclick="delFotoAdicionalDoc('${projectId}',${i})">✕</button>
+            ` : ''}
+          </div>`).join('')}
+      </div>
+    </div>` : ''}`;
+  }
 
-  <!-- Fotos técnicas de cierre -->
+  const slots = SLOTS_CIERRE_SITIO[sitio] || [];
+  if (!slots.length) return '';
+  return `
   <div class="card">
     <h3 class="card-title">Fotos técnicas de cierre</h3>
-    ${SLOTS_TECNICOS.map(s => {
-      const fotos = getFT(s.key);
+    ${slots.map(s => {
+      const fotos = _getFT(g, s.key);
       const tiene = fotos.length > 0;
       return `
       <div class="foto-tecnica-row">
@@ -235,36 +265,16 @@ function renderCierreProyecto(project, edit, projectId) {
         </div>
       </div>`;
     }).join('')}
-  </div>
-
-  <!-- Fotos adicionales de cierre -->
-  <div class="card">
-    <div class="card-title-row">
-      <h3 class="card-title">Fotos adicionales de cierre</h3>
-      ${edit ? `<button class="btn-primary btn-sm" onclick="capFotoAdicionalDoc('${projectId}')">
-        ${icon('camera')} Agregar</button>` : ''}
-    </div>
-    ${(g.fotosAdicionales || []).length === 0
-      ? (edit ? `<div class="empty-state">
-           <div class="empty-state-icon">📷</div>
-           <p class="empty-state-msg">Sin fotos adicionales aún.</p>
-           <button class="empty-state-cta" onclick="capFotoAdicionalDoc('${projectId}')">Agregar fotos</button>
-         </div>` : '<p class="empty-msg-sm">Sin fotos adicionales.</p>')
-      : `<div class="fotos-grid">
-          ${(g.fotosAdicionales || []).map((f, i) => `
-            <div class="foto-card">
-              ${fotoMini(f.data, 'Foto '+(i+1))}
-              ${f.nota ? `<p class="foto-nota">${esc(f.nota)}</p>` : ''}
-              ${edit ? `
-                <button class="btn-del-foto-abs" onclick="editFotoAdicionalDoc('${projectId}',${i})">✎</button>
-                <button class="btn-del-foto" onclick="delFotoAdicionalDoc('${projectId}',${i})">✕</button>
-              ` : ''}
-            </div>`).join('')}
-         </div>`}
   </div>`;
 }
 
-// Handlers del Cierre — guardan en garantia.* y regresan a documentacion
+// Handlers del Cierre — guardan en garantia.* y regresan a Fases → sitio → Cierre
+function _gotoCierre(sitio) {
+  sessionStorage.setItem('doc-tab-target',   'd-fases');
+  sessionStorage.setItem('doc-sitio-target',  sitio);
+  sessionStorage.setItem('doc-subfa-target', 'cierre');
+}
+
 window.capFotoSistemaDoc = function(projectId) {
   capturePhoto(async (b64) => {
     toast('Subiendo foto…');
@@ -274,7 +284,7 @@ window.capFotoSistemaDoc = function(projectId) {
     p.garantia.fotoSistema = result.url || null;
     if (result.pending) p.garantia._fotoSistemaPending = result.pendingId;
     await projects.update(projectId, { garantia: p.garantia });
-    sessionStorage.setItem('doc-tab-target', 'd-cierre');
+    _gotoCierre('techo');
     navigate(`#proyecto/${projectId}/documentacion`);
     if (!result.pending) toast('✅ Foto guardada');
   });
@@ -285,7 +295,7 @@ window.delFotoSistemaDoc = async function(projectId) {
   const p = await projects.getById(projectId);
   p.garantia.fotoSistema = null;
   await projects.update(projectId, { garantia: p.garantia });
-  sessionStorage.setItem('doc-tab-target', 'd-cierre');
+  _gotoCierre('techo');
   navigate(`#proyecto/${projectId}/documentacion`);
 };
 
@@ -313,7 +323,7 @@ window.capFotoTecnicaDoc = function(projectId, key) {
     prog.done();
     p.garantia.fotosTecnicas[key] = existentes;
     await projects.update(projectId, { garantia: p.garantia });
-    sessionStorage.setItem('doc-tab-target', 'd-cierre');
+    _gotoCierre(_sitioForFTKey(key));
     navigate(`#proyecto/${projectId}/documentacion`);
     toast(`✅ ${total} foto${total > 1 ? 's' : ''} guardada${total > 1 ? 's' : ''}`);
   }, { multiple: true });
@@ -327,7 +337,7 @@ window.delFotoTecnicaDoc = async function(projectId, key, idx) {
   fotos.splice(idx, 1);
   p.garantia.fotosTecnicas[key] = fotos.length ? fotos : null;
   await projects.update(projectId, { garantia: p.garantia });
-  sessionStorage.setItem('doc-tab-target', 'd-cierre');
+  _gotoCierre(_sitioForFTKey(key));
   navigate(`#proyecto/${projectId}/documentacion`);
 };
 
@@ -352,7 +362,7 @@ window.capFotoAdicionalDoc = function(projectId) {
     p.garantia = p.garantia || {};
     p.garantia.fotosAdicionales = [...(p.garantia.fotosAdicionales || []), ...nuevas];
     await projects.update(projectId, { garantia: p.garantia });
-    sessionStorage.setItem('doc-tab-target', 'd-cierre');
+    _gotoCierre('techo');
     navigate(`#proyecto/${projectId}/documentacion`);
     toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
   }, { multiple: true });
@@ -363,7 +373,7 @@ window.delFotoAdicionalDoc = async function(projectId, idx) {
   const p = await projects.getById(projectId);
   p.garantia.fotosAdicionales.splice(idx, 1);
   await projects.update(projectId, { garantia: p.garantia });
-  sessionStorage.setItem('doc-tab-target', 'd-cierre');
+  _gotoCierre('techo');
   navigate(`#proyecto/${projectId}/documentacion`);
 };
 
@@ -374,7 +384,7 @@ window.editFotoAdicionalDoc = async function(projectId, idx) {
   if (nueva === null) return;
   p.garantia.fotosAdicionales[idx].nota = nueva;
   await projects.update(projectId, { garantia: p.garantia });
-  sessionStorage.setItem('doc-tab-target', 'd-cierre');
+  _gotoCierre('techo');
   navigate(`#proyecto/${projectId}/documentacion`);
 };
 
@@ -1220,10 +1230,12 @@ function renderSitio(project, sitio, edit, projectId) {
     return [];
   };
 
+  const cierreExtra = _countCierreExtra(project, sitio);
+
   return `
   <div class="subfase-bar" id="sfbar-${sitio}">
     ${SUBFASES.map((sf, idx) => {
-      const cnt = getFotos(sf.id).length;
+      const cnt = getFotos(sf.id).length + (sf.id === 'cierre' ? cierreExtra : 0);
       return `<button class="subfase-btn ${idx===0?'sf-active':''}"
                       id="sf-btn-${sitio}-${sf.id}"
                       onclick="switchSubfase('${sitio}','${sf.id}',this)"
@@ -1237,6 +1249,7 @@ function renderSitio(project, sitio, edit, projectId) {
     const fotos = getFotos(sf.id);
     return `
     <div id="sf-panel-${sitio}-${sf.id}" class="subfase-panel ${idx===0?'sf-active':''}">
+      ${sf.id === 'cierre' ? renderCierreSitio(project, sitio, edit, projectId) : ''}
       ${renderFotosGrid(fotos, sitio, sf.id, sf.label, projectId, edit)}
     </div>`;
   }).join('')}`;
