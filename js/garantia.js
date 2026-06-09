@@ -3,11 +3,12 @@
 import { projects, logChange, kv } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
          uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION,
-         openScannerOverlay } from './utils.js';
+         openScannerOverlay, calcFaseEstado } from './utils.js';
 import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
-import { scanOnce, startContinuousScan, stopScanner } from './scanner.js';
+import { stopScanner } from './scanner.js';
+import { renderFirmaBlock } from './project.js';
 import { TMIN_ZONA_LABELS } from './clima.js';
 
 // ── Vista principal del módulo ─────────────────────────────────────────────────
@@ -112,21 +113,13 @@ export async function renderGarantia(projectId, session) {
       </div>
     </div>
   </div>
-  ${(isAdmin(session) || isLider(session)) ? (() => {
-    const firma = project.fases?.firmas?.gar;
-    return `
-  <div class="fase-firma-wrap">
-    ${firma
-      ? `<div class="fase-firma-ok">
-           ${icon('seal-check', 16)} Garantía firmada por <b>${esc(firma.nombre || firma.firmado_por)}</b>
-           <span class="fase-firma-fecha">${fmtFechaHora(firma.firmado_en)}</span>
-         </div>`
-      : `<button class="btn-firma-fase" onclick="window._firmarFase('${projectId}','gar')">
-           ${icon('signature', 16)} Firmar Garantía
-         </button>`
-    }
-  </div>`;
-  })() : ''}
+  ${(() => {
+    const fe = calcFaseEstado(project);
+    return renderFirmaBlock(project, projectId, 'gar', session, {
+      ready: fe.garPct === 100,
+      hint:  `Faltan: ${fe.garFaltantes.join(', ')}`,
+    });
+  })()}
 
   <script>
     (function() {
@@ -715,7 +708,7 @@ function formEquipo(projectId, eq = null, editIdx = -1) {
       <div class="serial-row">
         <input type="text" id="eq-serial" placeholder="Escribe o escanea el serial"
                value="${isEdit ? esc(eq.serial || '') : ''}" />
-        <button type="button" class="btn-icon" onclick="scanSerial()" title="Escanear con cámara">
+        <button type="button" class="btn-icon" onclick="scanSerial('${projectId}')" title="Escanear con cámara">
           ${icon('barcode')}
         </button>
       </div>
@@ -777,12 +770,28 @@ window.toggleVocMaxField = function() {
   if (wrap) wrap.style.display = tipo === 'inversor' ? '' : 'none';
 };
 
-window.scanSerial = function() {
+// ¿Dónde existe ya este serial en el proyecto? → nombre de la ubicación o null
+function _serialUbicacion(p, serial) {
+  const s = (serial || '').trim();
+  if (!s) return null;
+  const strings = p?.garantia?.paneles?.strings || [];
+  for (let i = 0; i < strings.length; i++) {
+    if ((strings[i].paneles || []).some(pan => pan.serial === s)) {
+      return strings[i].nombre || `String ${i + 1}`;
+    }
+  }
+  if ((p?.garantia?.equipos || []).some(eq => eq.serial === s)) return 'Equipos';
+  return null;
+}
+
+window.scanSerial = function(projectId) {
   openScannerOverlay(
-    (code) => {
+    async (code) => {
       const inp = document.getElementById('eq-serial');
       if (inp) { inp.value = code; inp.focus(); }
-      toast(`✅ Serial escaneado: ${code}`);
+      const dup = projectId ? _serialUbicacion(await projects.getById(projectId), code) : null;
+      if (dup) toast(`⚠ Este serial ya está registrado en ${dup}`, 'warning', 4000);
+      else toast(`✅ Serial escaneado: ${code}`);
     },
     { continuous: false, title: 'Escanear serial del equipo' }
   );
@@ -1207,11 +1216,11 @@ window.startScanString = async function(projectId, stringIdx) {
 
   openScannerOverlay(
     async (serial) => {
-      // Deduplicar: no agregar si el serial ya existe en este string
+      // Deduplicar contra TODO el proyecto (todos los strings + equipos)
       const pCheck = await projects.getById(projectId);
-      const strCheck = pCheck?.garantia?.paneles?.strings?.[stringIdx];
-      if (strCheck?.paneles?.some(pan => pan.serial === serial)) {
-        toast(`⚠ Serial ya registrado: ${serial}`, 'warning', 3000);
+      const dup = _serialUbicacion(pCheck, serial);
+      if (dup) {
+        toast(`⚠ Serial ya registrado en ${dup}: ${serial}`, 'warning', 3500);
         return;
       }
 
@@ -1288,10 +1297,11 @@ window.addPanelManual = async function(projectId, stringIdx) {
       ?.garantia?.paneles?.strings?.[stringIdx]?.nombre || `String ${stringIdx + 1}`;
     openScannerOverlay(
       async (serial) => {
-        // Deduplicar
+        // Deduplicar contra TODO el proyecto
         const pCheck = await projects.getById(projectId);
-        if (pCheck?.garantia?.paneles?.strings?.[stringIdx]?.paneles?.some(p => p.serial === serial)) {
-          toast(`⚠ Serial ya registrado: ${serial}`, 'warning', 3000);
+        const dup = _serialUbicacion(pCheck, serial);
+        if (dup) {
+          toast(`⚠ Serial ya registrado en ${dup}: ${serial}`, 'warning', 3500);
           return;
         }
         const p = await projects.getById(projectId);
@@ -1307,6 +1317,11 @@ window.addPanelManual = async function(projectId, stringIdx) {
     const serial = await inputDialog('Número de serie del panel:');
     if (!serial?.trim()) return;
     const p = await projects.getById(projectId);
+    const dup = _serialUbicacion(p, serial);
+    if (dup) {
+      toast(`⚠ Serial ya registrado en ${dup}: ${serial.trim()}`, 'warning', 3500);
+      return;
+    }
     const str = p.garantia.paneles.strings[stringIdx];
     const nextLetra = letras[str.paneles.length] || `P${str.paneles.length+1}`;
     str.paneles.push({ letra: nextLetra, serial: serial.trim(), fotoRespaldo: null, createdAt: isoNow() });

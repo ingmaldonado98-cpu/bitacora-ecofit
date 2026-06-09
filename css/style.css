@@ -1968,15 +1968,13 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
   display: block;
 }
 
-/* Fallback manual del escáner (offline / sin cámara) */
-.scanner-manual-fallback {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  background: var(--surface); border-top: 1px solid var(--border);
-  padding: 16px; display: flex; flex-direction: column; gap: 10px;
-  z-index: 10;
+/* Barra de entrada manual del escáner — siempre visible */
+.scanner-manual-bar {
+  flex-shrink: 0;
+  display: flex; gap: 8px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: #111318; border-top: 1px solid rgba(232,100,10,0.25);
 }
-.scanner-fb-hint { font-size: .82rem; color: var(--text-muted); text-align: center; }
-.scanner-fb-row  { display: flex; gap: 8px; }
 .scanner-fb-input { flex: 1; }
 .scanner-fb-btn   { flex-shrink: 0; padding: 0 18px; }
 
@@ -2632,6 +2630,17 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
   opacity: .75;
 }
 .aud-override-btn:hover { opacity: 1; background: rgba(239,68,68,.07); }
+/* Aviso: hubo cambios después de la firma */
+.fase-firma-warn {
+  font-size: .78rem; color: var(--amber, #fbbf24); text-align: center;
+  margin: 4px 0 0; display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+/* Retirar firma — solo admin */
+.fase-firma-quitar {
+  margin-top: 6px; font-size: .77rem; align-self: center;
+  border-color: var(--border2); color: var(--text-muted);
+}
+.fase-firma-quitar:hover { border-color: var(--red); color: var(--red); }
 
 /* ── Photo preview overlay (capturePhoto confirm step) ───────────────────── */
 .photo-preview-ov {

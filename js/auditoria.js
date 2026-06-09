@@ -6,6 +6,7 @@ import { esc, fotoMini, capturePhoto, toast, isoNow, confirmDialog } from './uti
 import { uploadPhotoQueued } from './firebase.js';
 import { canEdit, isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
+import { renderFirmaBlock } from './project.js';
 
 // ── Checklist RÁPIDO — 20 ítems en 6 secciones ────────────────────────────────
 const CHECKLIST_RAPIDO = [
@@ -121,10 +122,8 @@ export async function renderAuditoria(projectId, session) {
   </div>
 
   ${(() => {
-    const firma = project.fases?.firmas?.aud;
-    const modo  = project.auditoria?.modo || 'rapido';
-    const aud   = project.auditoria || {};
-    const admin = isAdmin(session);
+    const modo = project.auditoria?.modo || 'rapido';
+    const aud  = project.auditoria || {};
 
     // Completud para habilitar firma
     let firmaReady = false, firmaHint = '';
@@ -139,39 +138,7 @@ export async function renderAuditoria(projectId, session) {
       if (!firmaReady) firmaHint = 'Guarda la verificación rápida primero';
     }
 
-    if (firma) {
-      return `
-  <div class="fase-firma-wrap">
-    <div class="fase-firma-ok">
-      ${icon('seal-check', 16)} Auditoría firmada por <b>${esc(firma.nombre || firma.firmado_por)}</b>
-      <span class="fase-firma-fecha">${firma.firmado_en ? firma.firmado_en.slice(0,10) : ''}</span>
-    </div>
-  </div>`;
-    }
-
-    if (firmaReady) {
-      return `
-  <div class="fase-firma-wrap">
-    <button class="btn-firma-fase" onclick="window._firmarFase('${projectId}','aud')">
-      ${icon('signature', 16)} Firmar Auditoría
-    </button>
-  </div>`;
-    }
-
-    // No cumple requisitos — admin puede forzar con advertencia
-    return `
-  <div class="fase-firma-wrap">
-    <button class="btn-firma-fase" disabled title="${esc(firmaHint)}"
-            style="opacity:.45;cursor:not-allowed">
-      ${icon('lock', 16)} Firmar Auditoría
-    </button>
-    <p class="fase-firma-hint">${icon('info', 13)} ${esc(firmaHint)}</p>
-    ${admin ? `
-    <button class="btn-outline btn-sm aud-override-btn"
-            onclick="window._firmarAuditoriaOverride('${projectId}')">
-      ${icon('warning', 13)} Admin: firmar de todas formas
-    </button>` : ''}
-  </div>`;
+    return renderFirmaBlock(project, projectId, 'aud', session, { ready: firmaReady, hint: firmaHint });
   })()}
   `;
 }
@@ -647,13 +614,4 @@ window.delDocFirmado = async function(projectId) {
   if (p.auditoria) p.auditoria.docFirmado = null;
   await projects.update(projectId, { auditoria: p.auditoria });
   navigate(`#proyecto/${projectId}/auditoria`);
-};
-
-// ── Override admin: firmar aunque falten requisitos ────────────────────────────
-window._firmarAuditoriaOverride = async function(projectId) {
-  const ok = await confirmDialog(
-    '⚠️ La auditoría está incompleta. Al firmar como admin se marcará como revisada aunque falten ítems. ¿Continuar?'
-  );
-  if (!ok) return;
-  window._firmarFase(projectId, 'aud');
 };

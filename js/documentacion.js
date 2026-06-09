@@ -1,7 +1,8 @@
 // documentacion.js — Módulo 2: Levantamiento dinámico + Fases Antes/Durante/Después
 
 import { projects, logChange } from './db.js';
-import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar } from './utils.js';
+import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar, calcFaseEstado } from './utils.js';
+import { renderFirmaBlock } from './project.js';
 import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
@@ -115,21 +116,13 @@ export async function renderDocumentacion(projectId, session) {
       </div>
     </div>
   </div>
-  ${(isAdmin(session) || isLider(session)) ? (() => {
-    const firma = project.fases?.firmas?.doc;
-    return `
-  <div class="fase-firma-wrap">
-    ${firma
-      ? `<div class="fase-firma-ok">
-           ${icon('seal-check', 16)} Documentación firmada por <b>${esc(firma.nombre || firma.firmado_por)}</b>
-           <span class="fase-firma-fecha">${fmtFechaHora(firma.firmado_en)}</span>
-         </div>`
-      : `<button class="btn-firma-fase" onclick="window._firmarFase('${projectId}','doc')">
-           ${icon('signature', 16)} Firmar Documentación
-         </button>`
-    }
-  </div>`;
-  })() : ''}
+  ${(() => {
+    const fe = calcFaseEstado(project);
+    return renderFirmaBlock(project, projectId, 'doc', session, {
+      ready: fe.docPct === 100,
+      hint:  `Faltan: ${fe.docFaltantes.join(', ')}`,
+    });
+  })()}
 
   <script>
     (function() {

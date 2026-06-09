@@ -461,11 +461,17 @@ export function openScannerOverlay(onResult, { continuous = false, title = 'Esca
       <span id="scanner-count-num">0</span> escaneados en esta sesión</div>` : ''}
     <iframe
       id="scanner-overlay-iframe"
-      src="./ecofit-scanner.html"
+      src="./ecofit-scanner.html?autostart=1${continuous ? '&continuous=1' : ''}"
       class="scanner-overlay-iframe"
       allow="camera;microphone"
       loading="lazy">
-    </iframe>`;
+    </iframe>
+    <div class="scanner-manual-bar">
+      <input type="text" id="scanner-manual-input" class="scanner-fb-input"
+             placeholder="…o escribe el serial manualmente" autocomplete="off"
+             aria-label="Serial manual" />
+      <button class="btn-primary scanner-fb-btn" id="scanner-manual-ok">OK</button>
+    </div>`;
 
   document.body.appendChild(wrap);
   // Animar entrada
@@ -477,71 +483,48 @@ export function openScannerOverlay(onResult, { continuous = false, title = 'Esca
     wrap.classList.remove('scanner-overlay-visible');
     setTimeout(() => wrap.remove(), 250);
     window.removeEventListener('message', onMsg);
+    document.removeEventListener('keydown', onKey);
     if (onClose) onClose();
   }
 
-  function onMsg(e) {
-    if (!e.data || e.data.type !== 'ECOFIT_SCAN') return;
-    const code = e.data.code?.trim();
-    if (!code) return;
-
+  function handleCode(code, format) {
     if (continuous) {
       scanCount++;
       const counter = document.getElementById('scanner-count-num');
       if (counter) counter.textContent = scanCount;
-      onResult(code, e.data.format);
+      onResult(code, format);
       // NO cerramos — el técnico sigue escaneando y pulsa ✕ cuando termina
     } else {
       close();
-      onResult(code, e.data.format);
+      onResult(code, format);
     }
+  }
+
+  function onMsg(e) {
+    if (e.origin !== location.origin) return; // solo nuestro iframe
+    if (!e.data || e.data.type !== 'ECOFIT_SCAN') return;
+    const code = e.data.code?.trim();
+    if (!code) return;
+    handleCode(code, e.data.format);
   }
 
   window.addEventListener('message', onMsg);
   document.getElementById('scanner-overlay-close-btn').addEventListener('click', close);
 
   // Cerrar con Escape
-  const onKey = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
+  const onKey = e => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', onKey);
 
-  // Fallback manual: si el iframe no envía ningún mensaje en 9s (sin cámara / offline sin caché)
-  // mostramos un campo de texto directo sobre el iframe
-  const fallbackTimer = setTimeout(() => {
-    const iframe = document.getElementById('scanner-overlay-iframe');
-    if (!iframe || !wrap.isConnected) return;
-    const fb = document.createElement('div');
-    fb.className = 'scanner-manual-fallback';
-    fb.innerHTML = `
-      <p class="scanner-fb-hint">Escáner no disponible — ingresa el código manualmente:</p>
-      <div class="scanner-fb-row">
-        <input type="text" id="scanner-fb-input" class="scanner-fb-input"
-               placeholder="Número de serie…" autocomplete="off" />
-        <button class="btn-primary scanner-fb-btn" id="scanner-fb-ok">OK</button>
-      </div>`;
-    wrap.appendChild(fb);
-    const inp = document.getElementById('scanner-fb-input');
-    inp?.focus();
-    const submit = () => {
-      const val = inp?.value?.trim();
-      if (!val) return;
-      fb.remove();
-      clearTimeout(fallbackTimer);
-      if (continuous) { scanCount++; onResult(val, 'manual'); }
-      else { close(); onResult(val, 'manual'); }
-    };
-    document.getElementById('scanner-fb-ok')?.addEventListener('click', submit);
-    inp?.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
-  }, 9000);
-
-  // Cancelar fallback si el escáner responde normalmente
-  const _origOnMsg = onMsg;
-  window.removeEventListener('message', onMsg);
-  window.addEventListener('message', function onMsgWithCancel(e) {
-    if (!e.data || e.data.type !== 'ECOFIT_SCAN') return;
-    clearTimeout(fallbackTimer);
-    document.querySelector('.scanner-manual-fallback')?.remove();
-    _origOnMsg(e);
-  });
+  // Entrada manual siempre visible (sin cámara, código ilegible, guante puesto…)
+  const manualInp = document.getElementById('scanner-manual-input');
+  const manualSubmit = () => {
+    const val = manualInp?.value?.trim();
+    if (!val) return;
+    if (manualInp) manualInp.value = '';
+    handleCode(val, 'manual');
+  };
+  document.getElementById('scanner-manual-ok')?.addEventListener('click', manualSubmit);
+  manualInp?.addEventListener('keydown', e => { if (e.key === 'Enter') manualSubmit(); });
 
   return close;
 }
@@ -607,6 +590,24 @@ export const TIPOS_FIJACION = [
   'Miniriel', 'Anclaje impermeabilizado', 'Otro'
 ];
 
+// ── firmaModificada — ¿hubo cambios en el módulo después de firmarlo? ─────────
+// Revisa el changeLog: cualquier entrada del módulo posterior a la firma
+// (que no sea la firma misma) invalida la certeza de lo firmado.
+export function firmaModificada(project, fase) {
+  const firma = project.fases?.firmas?.[fase];
+  if (!firma?.firmado_en) return false;
+  const prefijos = {
+    doc: ['documentación', 'levantamiento'],
+    gar: ['garantía'],
+    aud: ['auditoría'],
+  }[fase] || [];
+  return (project.changeLog || []).some(e =>
+    e.ts > firma.firmado_en &&
+    e.accion !== 'firmada' && e.accion !== 'firma retirada' &&
+    prefijos.some(pre => (e.modulo || '').toLowerCase().startsWith(pre))
+  );
+}
+
 // ── calcFaseEstado — lógica de desbloqueo por fase ────────────────────────────
 // Retorna { doc, gar, aud } con 'disponible' | 'bloqueada' | 'completa'
 // + porcentajes docPct, garPct, audPct para dashboard y detalle de proyecto.
@@ -631,9 +632,14 @@ export function calcFaseEstado(project) {
   const fZona    = ['antes','durante','cierre'].reduce((s,f) => s + _fc('zonaDelSistema',f), 0);
 
   // Sistema pequeño solo necesita levantamiento; no requiere juego completo de fotos
-  const docItems = esPequeno
-    ? [ !!(doc.levantamiento?.tipTecho) ]
-    : [ !!(doc.levantamiento?.tipTecho), fTecho > 0, fCentros > 0, fZona > 0 ];
+  const docItemsL = esPequeno
+    ? [ ['Levantamiento', !!(doc.levantamiento?.tipTecho)] ]
+    : [ ['Levantamiento',              !!(doc.levantamiento?.tipTecho)],
+        ['fotos de Techo',             fTecho > 0],
+        ['fotos de Centros de carga',  fCentros > 0],
+        ['fotos de Zona del inversor', fZona > 0] ];
+  const docItems = docItemsL.map(([,ok]) => ok);
+  const docFaltantes = docItemsL.filter(([,ok]) => !ok).map(([l]) => l);
   const docItemsOk = docItems.filter(Boolean).length;
   const docCompleta = docItemsOk >= 1;
   const docPct      = Math.round(docItemsOk / docItems.length * 100);
@@ -644,18 +650,20 @@ export function calcFaseEstado(project) {
   const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st) => s + (st.paneles?.length||0), 0);
 
   // Sistema pequeño no tiene tablero AC / inversor de red
-  const garItems = esPequeno
+  const garItemsL = esPequeno
     ? [
-        !!gar.fotoSistema,
-        (gar.equipos?.length||0) > 0,
-        totalPaneles > 0,
+        ['foto general del sistema', !!gar.fotoSistema],
+        ['equipos registrados',      (gar.equipos?.length||0) > 0],
+        ['seriales de paneles',      totalPaneles > 0],
       ]
     : [
-        !!gar.fotoSistema,
-        !!(gar.fotosTecnicas?.tableroAC || gar.fotosTecnicas?.inversorEnergizado),
-        (gar.equipos?.length||0) > 0,
-        totalPaneles > 0,
+        ['foto general del sistema', !!gar.fotoSistema],
+        ['foto técnica (tablero AC o inversor)', !!(gar.fotosTecnicas?.tableroAC || gar.fotosTecnicas?.inversorEnergizado)],
+        ['equipos registrados',      (gar.equipos?.length||0) > 0],
+        ['seriales de paneles',      totalPaneles > 0],
       ];
+  const garItems = garItemsL.map(([,ok]) => ok);
+  const garFaltantes = garItemsL.filter(([,ok]) => !ok).map(([l]) => l);
   const garItemsOk  = garItems.filter(Boolean).length;
   const garCompleta = garItemsOk >= (esPequeno ? 2 : 2);
   const garPct      = Math.round(garItemsOk / garItems.length * 100);
@@ -678,6 +686,7 @@ export function calcFaseEstado(project) {
     aud: audDesbloqueada ? (audCompleta ? 'completa' : 'disponible') : 'bloqueada',
     docFirmada, garFirmada,
     docPct, garPct, audPct,
+    docFaltantes, garFaltantes,
     garRequisito: 'Completa el Levantamiento en Documentación primero.',
     audRequisito: 'Completa Garantía primero (foto del sistema + al menos un equipo o foto técnica).',
   };
