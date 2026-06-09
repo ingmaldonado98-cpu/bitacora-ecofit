@@ -83,20 +83,20 @@ export async function renderChecklistModule(projectId, session) {
     <button class="btn-primary btn-sm" onclick="clPublish('${projectId}')">Aprobar y publicar</button>
   </div>` : ''}
 
-  <div class="tab-bar" id="cl-tabs">
-    <button class="tab-btn tab-active" data-tab="cl-herr" onclick="switchTab('cl-tabs','cl-herr',this)">
+  <div class="tab-bar" id="cl-tabs" role="tablist" aria-label="Secciones del checklist">
+    <button class="tab-btn tab-active" role="tab" aria-selected="true"  aria-controls="cl-herr" tabindex="0"  data-tab="cl-herr" onclick="switchTab('cl-tabs','cl-herr',this)">
       Herramienta${doneHerr === herramienta.length && herramienta.length ? '<span class="tab-badge tab-ok">✓</span>' : ''}
     </button>
-    <button class="tab-btn" data-tab="cl-cons" onclick="switchTab('cl-tabs','cl-cons',this)">
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-cons" tabindex="-1" data-tab="cl-cons" onclick="switchTab('cl-tabs','cl-cons',this)">
       Materiales${totalMat > 0 && doneMat === totalMat ? '<span class="tab-badge tab-ok">✓</span>' : (totalMat > 0 ? `<span class="tab-badge">${doneMat}/${totalMat}</span>` : '')}
     </button>
-    <button class="tab-btn" data-tab="cl-exec" onclick="switchTab('cl-tabs','cl-exec',this)">
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-exec" tabindex="-1" data-tab="cl-exec" onclick="switchTab('cl-tabs','cl-exec',this)">
       Ejecución${doneExec === totalExec && totalExec ? '<span class="tab-badge tab-ok">✓</span>' : `<span class="tab-badge">${doneExec}/${totalExec}</span>`}
     </button>
-    <button class="tab-btn" data-tab="cl-torq" onclick="switchTab('cl-tabs','cl-torq',this)">
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-torq" tabindex="-1" data-tab="cl-torq" onclick="switchTab('cl-tabs','cl-torq',this)">
       Torques${torqDone === torqTotal && torqTotal ? '<span class="tab-badge tab-ok">✓</span>' : `<span class="tab-badge">${torqDone}/${torqTotal}</span>`}
     </button>
-    <button class="tab-btn" data-tab="cl-guia" onclick="switchTab('cl-tabs','cl-guia',this)">
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-guia" tabindex="-1" data-tab="cl-guia" onclick="switchTab('cl-tabs','cl-guia',this)">
       Guía
     </button>
   </div>

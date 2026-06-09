@@ -27,12 +27,24 @@ const app = document.getElementById('app');
 window.switchTab = function(tabBarId, targetId, btn) {
   const bar = document.getElementById(tabBarId);
   if (!bar) return;
-  bar.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+  bar.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('tab-active');
+    b.setAttribute('aria-selected', 'false');
+    b.setAttribute('tabindex', '-1');
+  });
   btn.classList.add('tab-active');
+  btn.setAttribute('aria-selected', 'true');
+  btn.setAttribute('tabindex', '0');
   const container = bar.parentElement;
-  container.querySelectorAll(':scope > .tab-panel').forEach(p => p.classList.remove('tab-panel-active'));
+  container.querySelectorAll(':scope > .tab-panel').forEach(p => {
+    p.classList.remove('tab-panel-active');
+    p.setAttribute('aria-hidden', 'true');
+  });
   const target = document.getElementById(targetId);
-  if (target) target.classList.add('tab-panel-active');
+  if (target) {
+    target.classList.add('tab-panel-active');
+    target.setAttribute('aria-hidden', 'false');
+  }
   // Permite que los módulos reaccionen al cambio de tab (ej: detener scanner en garantia)
   window._onTabChange?.(tabBarId, targetId);
 };

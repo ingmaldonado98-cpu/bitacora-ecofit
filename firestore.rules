@@ -1,0 +1,89 @@
+// firestore.rules — Bitácora Ecofit V6
+// Desplegar con: firebase deploy --only firestore:rules
+//
+// Modelo de seguridad:
+//   - Solo usuarios autenticados con Firebase Auth pueden leer/escribir
+//   - El perfil del usuario en /users/{uid} determina su rol
+//   - Admins pueden hacer todo
+//   - Líderes pueden leer y escribir proyectos, pero no crear/eliminar usuarios
+//   - Apoyo puede leer proyectos y escribir solo los proyectos asignados
+//   - /kv y /config: solo admins escriben, todos los autenticados leen
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function isAuth()  { return request.auth != null; }
+    function uid()     { return request.auth.uid; }
+
+    // Leer el perfil del usuario actual desde Firestore
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(uid())).data;
+    }
+
+    function myRol() {
+      return myProfile().rol;
+    }
+
+    function isAdmin()  { return isAuth() && myRol() == 'admin'; }
+    function isLider()  { return isAuth() && (myRol() == 'lider' || myRol() == 'admin'); }
+    function isActive() { return isAuth() && myProfile().activo == true; }
+
+    // ── Proyectos ─────────────────────────────────────────────────────────────
+    match /projects/{projectId} {
+      // Cualquier usuario activo puede leer proyectos
+      allow read: if isActive();
+
+      // Admin y líder pueden crear proyectos
+      allow create: if isLider() && isActive();
+
+      // Admin puede actualizar cualquier proyecto
+      // Líder puede actualizar cualquier proyecto activo
+      // Apoyo solo puede actualizar proyectos donde está asignado
+      allow update: if isActive() && (
+        isAdmin() ||
+        isLider() ||
+        (myRol() == 'apoyo' && (
+          resource.data.tecnicoLiderId == uid() ||
+          uid() in resource.data.tecnicosApoyo
+        ))
+      );
+
+      // Solo admin puede eliminar
+      allow delete: if isAdmin();
+    }
+
+    // ── Usuarios ──────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Cualquier usuario activo puede leer perfiles (para selects de técnicos)
+      allow read: if isActive();
+
+      // Solo admin puede crear, modificar o eliminar usuarios
+      allow write: if isAdmin();
+
+      // Excepción: el propio usuario puede actualizar su perfil (cambio de contraseña UI)
+      // pero NO puede cambiar su rol ni activo
+      allow update: if isActive() && userId == uid() &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['rol', 'activo', 'id']);
+    }
+
+    // ── KV store (inventario, presets de panel, config ligera) ───────────────
+    match /kv/{key} {
+      allow read: if isActive();
+      allow write: if isLider() && isActive(); // admin y líderes escriben KV
+    }
+
+    // ── Configuración global ──────────────────────────────────────────────────
+    match /config/{key} {
+      allow read: if isActive();
+      allow write: if isAdmin();
+    }
+
+    // ── Denegar todo lo demás por defecto ─────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

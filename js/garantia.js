@@ -8,6 +8,7 @@ import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 import { scanOnce, startContinuousScan, stopScanner } from './scanner.js';
+import { TMIN_ZONA_LABELS } from './clima.js';
 
 // ── Vista principal del módulo ─────────────────────────────────────────────────
 export async function renderGarantia(projectId, session) {
@@ -48,14 +49,14 @@ export async function renderGarantia(projectId, session) {
     </span>
   </div>
 
-  <div class="tab-bar" id="garantia-tabs">
-    <button class="tab-btn tab-active" data-tab="g-equipos"   onclick="switchTab('garantia-tabs','g-equipos',this)">Equipos</button>
-    <button class="tab-btn" data-tab="g-voc"                  onclick="switchTab('garantia-tabs','g-voc',this)">
+  <div class="tab-bar" id="garantia-tabs" role="tablist" aria-label="Secciones de garantía">
+    <button class="tab-btn tab-active" role="tab" aria-selected="true"  aria-controls="g-equipos"   tabindex="0"  data-tab="g-equipos"   onclick="switchTab('garantia-tabs','g-equipos',this)">Equipos</button>
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-voc"       tabindex="-1" data-tab="g-voc"       onclick="switchTab('garantia-tabs','g-voc',this)">
       Voc${(() => { const v = project.garantia?.validacionVoc; return v ? `<span class="tab-badge ${v.resultado==='seguro'?'tab-ok':v.resultado==='excede'?'tab-err':''}">${v.resultado==='seguro'?'✓':v.resultado==='excede'?'⚠':'~'}</span>` : ''; })()}
     </button>
-    <button class="tab-btn" data-tab="g-estructura"           onclick="switchTab('garantia-tabs','g-estructura',this)">Estructura</button>
-    <button class="tab-btn" data-tab="g-paneles"              onclick="switchTab('garantia-tabs','g-paneles',this)">Paneles</button>
-    <button class="tab-btn" data-tab="g-notas"                onclick="switchTab('garantia-tabs','g-notas',this)">
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-estructura" tabindex="-1" data-tab="g-estructura" onclick="switchTab('garantia-tabs','g-estructura',this)">Estructura</button>
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-paneles"   tabindex="-1" data-tab="g-paneles"   onclick="switchTab('garantia-tabs','g-paneles',this)">Paneles</button>
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-notas"     tabindex="-1" data-tab="g-notas"     onclick="switchTab('garantia-tabs','g-notas',this)">
       Notas${(g.notas||[]).length ? `<span class="tab-badge tab-ok">${(g.notas||[]).length}</span>` : ''}
     </button>
   </div>
@@ -159,9 +160,7 @@ function renderVocTab(project, projectId, edit) {
   // compatibilidad: tMinCiudad era el nombre anterior del campo
   const tMinCiudad  = lev.tMinCiudad || lev.tMinEstado || (lev.tMin != null ? 'manual' : null);
   const tMinZona    = lev.tMinZona || 'valle';
-  // Etiqueta de zona para el tile
-  const _ZONA_LABELS = { costa:'🌊 Costa', valle:'🏜️ Valle', rural:'🌿 Campo', sierra1:'⛰️ Pie de sierra', sierra2:'🏔️ Sierra' };
-  const tMinZonaLabel = _ZONA_LABELS[tMinZona] || '';
+  const tMinZonaLabel = TMIN_ZONA_LABELS[tMinZona] || '';
 
   // Datos tomados directo de los registros — sin campos manuales
   const vocPanel     = g.paneles?.voc || vd.vocPanel || null;
@@ -256,10 +255,10 @@ function renderVocTab(project, projectId, edit) {
 
     <!-- Alertas si faltan datos -->
     ${alertas.length ? `
-    <div class="voc-no-inversor" style="margin-top:10px">
+    <div class="voc-no-inversor" role="status" aria-live="polite" style="margin-top:10px">
       ${icon('warning-circle', 16)}
       <div>
-        <strong>Datos pendientes para calcular:</strong>
+        <strong>Falta registrar para continuar:</strong>
         <ul style="margin:4px 0 0;padding-left:16px;font-size:.8rem">
           ${alertas.map(a=>`<li>${a}</li>`).join('')}
         </ul>
@@ -333,29 +332,49 @@ window.syncVocFromPanel = function() {
   }
 };
 
-// Cálculo Voc — tMin viene del hidden input (cargado desde levantamiento del proyecto)
+// ── Función pura de cálculo Voc (sin DOM) — exportada para tests ─────────────
+// Implementa corrección de temperatura IEC 60891 / NOM-001-SEDE:
+//   Voc_corr = Voc_STC × (1 + (α_Voc/100) × (T_min − T_STC))
+//   Voc_STC  = voltaje open-circuit a condiciones estándar (25°C)
+//   α_Voc    = coeficiente de temperatura (%/°C) — negativo para Si cristalino
+//   T_STC    = 25°C (temperatura de referencia estándar)
+export function calcVocPuro({ vocPanel, panelesSerie, vocMaxInversor, tMin, coefVoc }) {
+  if (!vocPanel || !panelesSerie || !vocMaxInversor) return null;
+  const coef     = coefVoc ?? VOC_COEF;
+  const tMinVal  = tMin ?? VOC_T_MIN;
+
+  const vocCorregido = vocPanel * (1 + (coef / 100) * (tMinVal - 25));
+  const vocString    = vocCorregido * panelesSerie;
+  const margen       = ((vocMaxInversor - vocString) / vocMaxInversor) * 100;
+  const maxSerie     = Math.floor(vocMaxInversor * 0.90 / vocCorregido);
+
+  let resultado, mensaje;
+  if (vocString <= vocMaxInversor * 0.90) {
+    resultado = 'seguro';
+    mensaje   = `✅ Seguro. Margen: ${margen.toFixed(1)}%. Máximo recomendado: ${maxSerie} paneles en serie.`;
+  } else if (vocString <= vocMaxInversor) {
+    resultado = 'limite';
+    mensaje   = `⚠️ En el límite (${margen.toFixed(1)}% de margen). Considera reducir a ${maxSerie} paneles en serie.`;
+  } else {
+    resultado = 'excede';
+    mensaje   = `🚨 Excede el límite por ${(vocString - vocMaxInversor).toFixed(1)} V. Máximo seguro: ${maxSerie} paneles en serie.`;
+  }
+
+  return { vocPanel, panelesSerie, vocMaxInversor, tMin: tMinVal, coefVoc: coef,
+           vocCorregido, vocString, margen, resultado, mensaje };
+}
+
+// Cálculo Voc — lee parámetros del DOM, delega lógica a calcVocPuro
 function _calcVocData() {
   const vocP   = parseFloat(document.getElementById('voc-panel')?.value)   || 0;
   const serie  = parseInt(document.getElementById('voc-serie')?.value)      || 0;
   const vocMax = parseFloat(document.getElementById('voc-max-inv')?.value)  || 0;
-  const tMin   = parseFloat(document.getElementById('voc-tmin')?.value) ?? VOC_T_MIN;
-  const coef   = VOC_COEF;    // -0.29 %/°C constante
-
-  if (!vocP || !serie || !vocMax) return null;
-
-  const vocCorr  = vocP * (1 + (coef / 100) * (tMin - 25));
-  const vocStr   = vocCorr * serie;
-  const margen   = ((vocMax - vocStr) / vocMax) * 100;
-  const maxSerie = Math.floor(vocMax * 0.90 / vocCorr);
-
-  let resultado, mensaje;
-  if (vocStr <= vocMax * 0.90)  { resultado = 'seguro'; mensaje = `✅ Seguro. Margen: ${margen.toFixed(1)}%. Máximo recomendado: ${maxSerie} paneles en serie.`; }
-  else if (vocStr <= vocMax)    { resultado = 'limite'; mensaje = `⚠️ En el límite (${margen.toFixed(1)}% de margen). Considera reducir a ${maxSerie} paneles en serie.`; }
-  else                          { resultado = 'excede'; mensaje = `🚨 Excede el límite por ${(vocStr-vocMax).toFixed(1)} V. Máximo seguro: ${maxSerie} paneles en serie.`; }
-
+  const tMin   = parseFloat(document.getElementById('voc-tmin')?.value || '') || VOC_T_MIN;
   const tMinZona = document.getElementById('voc-tmin-zona')?.value || 'valle';
-  return { vocPanel:vocP, panelesSerie:serie, tMin, tMinZona, coefVoc:coef,
-    vocMaxInversor:vocMax, vocCorregido:vocCorr, vocString:vocStr, margen, resultado, mensaje };
+
+  const result = calcVocPuro({ vocPanel: vocP, panelesSerie: serie, vocMaxInversor: vocMax, tMin, coefVoc: VOC_COEF });
+  if (!result) return null;
+  return { ...result, tMinZona };
 }
 
 window.calcVoc = function() {

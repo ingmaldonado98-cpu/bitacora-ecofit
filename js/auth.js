@@ -165,7 +165,7 @@ export function renderLogin() {
                    placeholder="••••••••" required />
           </div>
         </div>
-        <div id="login-error" class="login-error" style="display:none"></div>
+        <div id="login-error" class="login-error" role="alert" aria-live="assertive" style="display:none"></div>
         <button type="submit" class="btn-primary btn-full" id="login-btn">
           Iniciar sesión
         </button>

@@ -1,7 +1,7 @@
 // sw.js — Service Worker Bitácora Ecofit V6
 // ⚠ Cambiar BUILD_DATE y CACHE_NAME en cada deploy para invalidar caché
 const BUILD_DATE  = '2026-06-08';
-const CACHE_NAME  = 'ecofit-v6-v55';
+const CACHE_NAME  = 'ecofit-v6-v56';
 const SW_VERSION  = '6.44.0';
 
 const APP_SHELL = [
@@ -33,6 +33,7 @@ const APP_SHELL = [
   './modules/calculadora/index.js',
   './modules/checklist/index.js',
   './js/checklist.js',
+  './js/clima.js',
   './modules/inventario/index.js',
   './ecofit-scanner.html',
   './js/vendor/zxing.min.js',

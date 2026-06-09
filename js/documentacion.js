@@ -5,6 +5,7 @@ import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirm
 import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
+import { TMIN_ESTADOS, TMIN_ZONAS, TMIN_ZONA_DESC } from './clima.js';
 
 // ── Vista principal ────────────────────────────────────────────────────────────
 export async function renderDocumentacion(projectId, session) {
@@ -44,23 +45,19 @@ export async function renderDocumentacion(projectId, session) {
     <span class="hdr-sub">${esc(project.displayId)}</span>
   </div>
 
-  <div class="tab-bar" id="doc-tabs">
-    <button class="tab-btn tab-active" data-tab="d-lev"
-            onclick="switchTab('doc-tabs','d-lev',this)">
+  <div class="tab-bar" id="doc-tabs" role="tablist" aria-label="Secciones de documentación">
+    <button class="tab-btn tab-active" role="tab" aria-selected="true"  aria-controls="d-lev"    tabindex="0"  data-tab="d-lev"    onclick="switchTab('doc-tabs','d-lev',this)">
       ${icon('clipboard-text', 14)} Levantamiento
     </button>
-    <button class="tab-btn" data-tab="d-fases"
-            onclick="switchTab('doc-tabs','d-fases',this)">
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-fases"  tabindex="-1" data-tab="d-fases"  onclick="switchTab('doc-tabs','d-fases',this)">
       ${icon('camera', 14)} Fases
       ${totalFases > 0 ? `<span class="tab-badge tab-ok">${totalFases}</span>` : ''}
     </button>
-    <button class="tab-btn" data-tab="d-cierre"
-            onclick="switchTab('doc-tabs','d-cierre',this)">
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-cierre" tabindex="-1" data-tab="d-cierre" onclick="switchTab('doc-tabs','d-cierre',this)">
       ${icon('seal-check', 14)} Verificación de cierre
       ${cCierre > 0 ? `<span class="tab-badge tab-ok">${cCierre}</span>` : ''}
     </button>
-    <button class="tab-btn" data-tab="d-notas"
-            onclick="switchTab('doc-tabs','d-notas',this)">
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-notas"  tabindex="-1" data-tab="d-notas"  onclick="switchTab('doc-tabs','d-notas',this)">
       ${icon('note', 14)} Notas
       ${cNotas ? `<span class="tab-badge tab-ok">${cNotas}</span>` : ''}
     </button>
@@ -1379,60 +1376,10 @@ window._delNotaDoc = async function(projectId, idx) {
   toast('Nota eliminada');
 };
 
-// ── Temperatura mínima por estado ────────────────────────────────────────────
-// Valor de referencia = planicie/valle del estado (capital o zona urbana principal)
-// La zona climática aplica el ajuste fino dentro del estado
-// Fuente: registros históricos SMN / ASHRAE 99% design temp
-const _TMIN_CIUDADES = [  // nombre interno conservado para compatibilidad con datos guardados
-  { nombre: 'Aguascalientes',      tMin: -1 },
-  { nombre: 'Baja California',     tMin: -2 },  // Mexicali como referencia (más fría)
-  { nombre: 'Baja California Sur', tMin:  3 },  // La Paz
-  { nombre: 'Campeche',            tMin: 12 },
-  { nombre: 'Chiapas',             tMin:  5 },
-  { nombre: 'Chihuahua',           tMin: -8 },
-  { nombre: 'Ciudad de México',    tMin:  2 },
-  { nombre: 'Coahuila',            tMin: -5 },  // Saltillo
-  { nombre: 'Colima',              tMin:  8 },
-  { nombre: 'Durango',             tMin: -5 },
-  { nombre: 'Guanajuato',          tMin:  1 },
-  { nombre: 'Guerrero',            tMin:  8 },
-  { nombre: 'Hidalgo',             tMin:  0 },
-  { nombre: 'Jalisco',             tMin:  3 },  // Guadalajara
-  { nombre: 'México (Estado)',     tMin:  1 },
-  { nombre: 'Michoacán',           tMin:  1 },
-  { nombre: 'Morelos',             tMin:  5 },
-  { nombre: 'Nayarit',             tMin:  8 },
-  { nombre: 'Nuevo León',          tMin:  0 },  // Monterrey
-  { nombre: 'Oaxaca',              tMin:  3 },
-  { nombre: 'Puebla',              tMin:  0 },
-  { nombre: 'Querétaro',           tMin:  2 },
-  { nombre: 'Quintana Roo',        tMin: 15 },
-  { nombre: 'San Luis Potosí',     tMin: -2 },
-  { nombre: 'Sinaloa',             tMin:  5 },  // Culiacán
-  { nombre: 'Sonora',              tMin:  0 },  // Hermosillo
-  { nombre: 'Tabasco',             tMin: 12 },
-  { nombre: 'Tamaulipas',          tMin:  2 },
-  { nombre: 'Tlaxcala',            tMin: -1 },
-  { nombre: 'Veracruz',            tMin:  8 },
-  { nombre: 'Yucatán',             tMin: 12 },
-  { nombre: 'Zacatecas',           tMin: -3 },
-];
-
-// Zonas climáticas con offset sobre T_min de ciudad de referencia
-const _TMIN_ZONAS = [
-  { key: 'costa',   label: '🌊 Litoral / playa (< 50 msnm)',      offset:  2 },
-  { key: 'valle',   label: '🏜️ Planicie / valle (ref. ciudad)',    offset:  0 },
-  { key: 'rural',   label: '🌿 Rural / campo (200–500 msnm)',      offset: -2 },
-  { key: 'sierra1', label: '⛰️ Pie de sierra (500–1500 msnm)',     offset: -5 },
-  { key: 'sierra2', label: '🏔️ Sierra / montaña (> 1500 msnm)',   offset: -8 },
-];
-const _TMIN_ZONA_DESC = {
-  costa:   'Brisa marina modera el frío. Playas, puertos, zonas costeras. Ej: frente de playa en La Paz, Cabo, Mazatlán.',
-  valle:   'Valor de referencia de la ciudad. Centros urbanos, valles, llanuras. Ej: La Paz centro, Hermosillo, Monterrey.',
-  rural:   'Campo abierto, ligera elevación. Pequeñas comunidades fuera de la ciudad. Ej: San Pedro BCS, ejidos, ranchos bajos.',
-  sierra1: 'Comunidades en ladera o pie de sierra. Noches más frías por altitud. Ej: El Triunfo, San Antonio, Miraflores (BCS).',
-  sierra2: 'Alta montaña, cañadas y sierras. Heladas frecuentes en invierno. Ej: Sierra de la Laguna, sierras de Chihuahua/Durango.',
-};
+// Alias locales para compatibilidad con el código existente en este módulo
+const _TMIN_CIUDADES  = TMIN_ESTADOS;
+const _TMIN_ZONAS     = TMIN_ZONAS;
+const _TMIN_ZONA_DESC = TMIN_ZONA_DESC;
 
 function _tminDescripcion(estado, zona, tMinFinal) {
   if (!estado || estado === 'otro') return '';
