@@ -144,14 +144,19 @@ export async function renderGarantia(projectId, session) {
 }
 
 // ── Validación Voc ────────────────────────────────────────────────────────────
-// Temperatura mínima fija para La Paz, BCS (valor histórico conservador)
-const VOC_T_MIN  = 3;    // °C
+// Fallback cuando el proyecto no tiene T_min capturado en levantamiento
+const VOC_T_MIN  = 3;    // °C — La Paz, BCS (valor por defecto)
 const VOC_COEF   = -0.29; // %/°C  coeficiente típico monocristalino
 
 function renderVocTab(project, projectId, edit) {
   const g        = project.garantia || {};
   const inversor = (g.equipos || []).find(e => e.tipo === 'inversor');
   const vd       = g.validacionVoc || {};
+  const lev      = project.documentacion?.levantamiento || {};
+
+  // T_min: primero del levantamiento, fallback constante La Paz
+  const tMin        = (lev.tMin != null) ? lev.tMin : VOC_T_MIN;
+  const tMinCiudad  = lev.tMinCiudad || (lev.tMin != null ? 'manual' : null);
 
   // Datos tomados directo de los registros — sin campos manuales
   const vocPanel     = g.paneles?.voc || vd.vocPanel || null;
@@ -171,7 +176,8 @@ function renderVocTab(project, projectId, edit) {
   const stale = resultado && (
     (vd.panelesSerie != null && panelesSerie != null && vd.panelesSerie !== panelesSerie) ||
     (vd.vocPanel     != null && vocPanel     != null && Math.abs(vd.vocPanel - vocPanel) > 0.01) ||
-    (vd.vocMaxInversor != null && vocMax     != null && vd.vocMaxInversor !== vocMax)
+    (vd.vocMaxInversor != null && vocMax     != null && vd.vocMaxInversor !== vocMax) ||
+    (vd.tMin         != null && vd.tMin     !== tMin)
   );
 
   const semaforo = resultado === 'seguro'  ? { cls: 'voc-ok',   ico: '🟢', txt: 'Configuración segura' }
@@ -231,7 +237,14 @@ function renderVocTab(project, projectId, edit) {
       </div>
       <div class="vda-item">
         <span class="vda-lbl">${icon('thermometer', 14)} T mín sitio</span>
-        <span class="vda-val">${VOC_T_MIN}°C <span style="font-size:.7rem;color:var(--text-muted)">(La Paz, BCS)</span></span>
+        <span class="vda-val">${tMin}°C
+          <span style="font-size:.7rem;color:var(--text-muted)">
+            ${tMinCiudad && tMinCiudad !== 'otro' && tMinCiudad !== 'manual'
+              ? `(${esc(tMinCiudad)})`
+              : tMinCiudad === 'otro' ? '(manual)' : '(La Paz, BCS — default)'}
+          </span>
+        </span>
+        ${!lev.tMin && lev.tMin !== 0 ? `<span style="font-size:.65rem;color:#c8a000">⚠ Captura en Levantamiento</span>` : ''}
       </div>
     </div>
 
@@ -251,12 +264,12 @@ function renderVocTab(project, projectId, edit) {
     <input type="hidden" id="voc-panel"   value="${vocPanel    || ''}" />
     <input type="hidden" id="voc-serie"   value="${panelesSerie|| ''}" />
     <input type="hidden" id="voc-max-inv" value="${vocMax      || ''}" />
-    <input type="hidden" id="voc-tmin"    value="${VOC_T_MIN}" />
+    <input type="hidden" id="voc-tmin"    value="${tMin}" />
     <input type="hidden" id="voc-coef"    value="${VOC_COEF}" />
 
     <!-- Resultado -->
     <div id="voc-resultado" class="voc-resultado" style="${resultado && !alertas.length && !stale ? '' : 'display:none'}">
-      <div class="voc-res-row"><span>Voc corregido (${VOC_T_MIN}°C)</span><strong id="voc-r-corr">${vd.vocCorregido?.toFixed(2) || '—'} V</strong></div>
+      <div class="voc-res-row"><span>Voc corregido (${tMin}°C)</span><strong id="voc-r-corr">${vd.vocCorregido?.toFixed(2) || '—'} V</strong></div>
       <div class="voc-res-row"><span>Voc string completo</span><strong id="voc-r-str">${vd.vocString?.toFixed(2) || '—'} V</strong></div>
       <div class="voc-res-row"><span>Margen de seguridad</span><strong id="voc-r-margen">${vd.margen != null ? vd.margen.toFixed(1) + '%' : '—'}</strong></div>
       <div id="voc-r-msg" class="voc-res-msg ${semaforo?.cls || ''}">${semaforo ? semaforo.ico + ' ' + (vd.mensaje || semaforo.txt) : ''}</div>
@@ -313,12 +326,12 @@ window.syncVocFromPanel = function() {
   }
 };
 
-// Cálculo Voc — usa constantes fijas para T_min y coef (no campos manuales)
+// Cálculo Voc — tMin viene del hidden input (cargado desde levantamiento del proyecto)
 function _calcVocData() {
   const vocP   = parseFloat(document.getElementById('voc-panel')?.value)   || 0;
   const serie  = parseInt(document.getElementById('voc-serie')?.value)      || 0;
   const vocMax = parseFloat(document.getElementById('voc-max-inv')?.value)  || 0;
-  const tMin   = VOC_T_MIN;   // 3°C constante La Paz
+  const tMin   = parseFloat(document.getElementById('voc-tmin')?.value) ?? VOC_T_MIN;
   const coef   = VOC_COEF;    // -0.29 %/°C constante
 
   if (!vocP || !serie || !vocMax) return null;

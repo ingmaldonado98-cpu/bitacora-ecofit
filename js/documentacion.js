@@ -455,6 +455,29 @@ function renderLevantamiento(project, tipo, edit) {
           </div>
         </div>
       </div>
+      <!-- Temperatura mínima del sitio -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Ciudad de referencia (T mín)</label>
+          <select name="tMinCiudad" ${dis} onchange="window._onTMinCiudadChange(this)">
+            <option value="">— Seleccionar ciudad —</option>
+            ${_TMIN_CIUDADES.map(c=>
+              `<option value="${esc(c.nombre)}" data-tmin="${c.tMin}"
+                ${lev.tMinCiudad===c.nombre?'selected':''}>${esc(c.nombre)} (${c.tMin}°C)</option>`
+            ).join('')}
+            <option value="otro" ${lev.tMinCiudad==='otro'?'selected':''}>Otro (manual)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>T mín del sitio (°C)
+            <span class="form-hint">Para cálculo Voc</span>
+          </label>
+          <input type="number" name="tMin" id="lev-tmin-input"
+                 value="${lev.tMin ?? 3}" min="-20" max="30" step="0.5"
+                 ${dis} ${lev.tMinCiudad && lev.tMinCiudad !== 'otro' && edit ? 'readonly' : ''}
+                 style="background:${lev.tMinCiudad && lev.tMinCiudad !== 'otro' ? 'var(--surface2)' : ''}"/>
+        </div>
+      </div>
       <div class="form-row">
         <div class="form-group"><label>Orientación del techo</label>
           <select name="orientacion" ${dis}>
@@ -946,6 +969,8 @@ window.guardarLevantamiento = async function(e, projectId) {
     areaDisponible:      areaTotal ? parseFloat(areaTotal.toFixed(2)) : (lev.areaDisponible || null),
     estadoMadera:        tipTechoVal === 'Madera' ? (fd.get('estadoMadera') || null) : null,
     distVigas:           tipTechoVal === 'Madera' ? (parseFloat(fd.get('distVigas')) || null) : null,
+    tMin:                parseFloat(fd.get('tMin')) ?? 3,
+    tMinCiudad:          fd.get('tMinCiudad') || null,
     orientacion:         fd.get('orientacion'),
     numPisos:            parseInt(fd.get('numPisos')) || null,
     inclinacion:         parseFloat(fd.get('inclinacion')) || null,
@@ -1308,6 +1333,56 @@ window._delNotaDoc = async function(projectId, idx) {
   if (tabBtn) tabBtn.innerHTML = p.documentacion.notas.length
     ? `Notas<span class="tab-badge tab-ok">${p.documentacion.notas.length}</span>` : 'Notas';
   toast('Nota eliminada');
+};
+
+// ── Temperatura mínima por ciudad ────────────────────────────────────────────
+// Valores históricos típicos de T_min para cálculo de Voc (NOM-001-SEDE / ASHRAE)
+const _TMIN_CIUDADES = [
+  { nombre: 'La Paz, BCS',            tMin:  3 },
+  { nombre: 'Los Cabos, BCS',         tMin:  5 },
+  { nombre: 'Tijuana, BC',            tMin:  3 },
+  { nombre: 'Mexicali, BC',           tMin: -2 },
+  { nombre: 'Ensenada, BC',           tMin:  3 },
+  { nombre: 'Hermosillo, Son',        tMin:  0 },
+  { nombre: 'Ciudad Obregón, Son',    tMin:  2 },
+  { nombre: 'Culiacán, Sin',          tMin:  5 },
+  { nombre: 'Mazatlán, Sin',          tMin:  8 },
+  { nombre: 'Los Mochis, Sin',        tMin:  5 },
+  { nombre: 'Chihuahua, Chih',        tMin: -8 },
+  { nombre: 'Ciudad Juárez, Chih',    tMin:-10 },
+  { nombre: 'Torreón, Coah',          tMin: -3 },
+  { nombre: 'Saltillo, Coah',         tMin: -5 },
+  { nombre: 'Monterrey, NL',          tMin:  0 },
+  { nombre: 'San Luis Potosí, SLP',   tMin: -2 },
+  { nombre: 'Zacatecas, Zac',         tMin: -3 },
+  { nombre: 'Durango, Dgo',           tMin: -5 },
+  { nombre: 'Guadalajara, Jal',       tMin:  3 },
+  { nombre: 'Puerto Vallarta, Jal',   tMin: 12 },
+  { nombre: 'Ciudad de México, CDMX', tMin:  2 },
+  { nombre: 'Puebla, Pue',            tMin:  0 },
+  { nombre: 'Querétaro, Qro',         tMin:  2 },
+  { nombre: 'Mérida, Yuc',            tMin: 12 },
+  { nombre: 'Cancún, Q. Roo',         tMin: 15 },
+  { nombre: 'Veracruz, Ver',          tMin: 10 },
+  { nombre: 'Oaxaca, Oax',            tMin:  3 },
+  { nombre: 'Morelia, Mich',          tMin:  1 },
+  { nombre: 'León, Gto',              tMin:  1 },
+  { nombre: 'Aguascalientes, Ags',    tMin: -1 },
+];
+
+window._onTMinCiudadChange = function(sel) {
+  const inp = document.getElementById('lev-tmin-input');
+  if (!inp) return;
+  if (sel.value === '' || sel.value === 'otro') {
+    inp.removeAttribute('readonly');
+    inp.style.background = '';
+    if (sel.value === '') inp.value = '3';
+  } else {
+    const opt = sel.options[sel.selectedIndex];
+    inp.value = opt.dataset.tmin;
+    inp.setAttribute('readonly', true);
+    inp.style.background = 'var(--surface2)';
+  }
 };
 
 // ── Sujeción automática según tipo de techo ───────────────────────────────────
