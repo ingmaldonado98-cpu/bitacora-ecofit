@@ -90,14 +90,44 @@ export function compressImage(file, maxDim = 1280, quality = 0.72) {
   });
 }
 
-// Captura foto con input file (abre cámara directo en móvil).
+// Captura foto: muestra selector Cámara / Galería y abre el input correspondiente.
 // Opciones: multiple, projectId, fase, campo → renombran el archivo automáticamente.
 //           preview → muestra confirmación antes de llamar al callback (solo single).
-export function capturePhoto(callback, { multiple = false, projectId, fase, campo, preview = false } = {}) {
+export function capturePhoto(callback, opts = {}) {
+  _photoSourceSheet(fuente => _launchPhotoInput(fuente, callback, opts));
+}
+
+// Selector de fuente (bottom sheet): Tomar foto o Subir de galería
+function _photoSourceSheet(onPick) {
+  const ov = document.createElement('div');
+  ov.className = 'photo-src-ov';
+  ov.innerHTML = `
+    <div class="photo-src-sheet" role="dialog" aria-label="Origen de la foto">
+      <button type="button" class="photo-src-btn" data-src="camera">
+        <span class="photo-src-ico">📷</span>
+        <span>Tomar foto</span>
+      </button>
+      <button type="button" class="photo-src-btn" data-src="galeria">
+        <span class="photo-src-ico">🖼️</span>
+        <span>Subir de galería</span>
+      </button>
+      <button type="button" class="photo-src-cancel">Cancelar</button>
+    </div>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('psrc-visible'));
+  const close = () => { ov.classList.remove('psrc-visible'); setTimeout(() => ov.remove(), 200); };
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  ov.querySelector('.photo-src-cancel').onclick = close;
+  ov.querySelectorAll('.photo-src-btn').forEach(btn => {
+    btn.onclick = () => { close(); onPick(btn.dataset.src); };
+  });
+}
+
+function _launchPhotoInput(fuente, callback, { multiple = false, projectId, fase, campo, preview = false } = {}) {
   const input = document.createElement('input');
-  input.type        = 'file';
-  input.accept      = 'image/*';
-  input.capture     = 'environment'; // abre cámara trasera directamente en Android
+  input.type   = 'file';
+  input.accept = 'image/*';
+  if (fuente === 'camera') input.capture = 'environment'; // cámara trasera directa en Android
   if (multiple) input.multiple = true;
 
   input.onchange = async (e) => {
@@ -114,13 +144,13 @@ export function capturePhoto(callback, { multiple = false, projectId, fase, camp
         : files;
 
       const compressed = await Promise.all(renamedFiles.map(f => compressImage(f)));
-      const fileMeta   = { fuente: 'camera', nombres: renamedFiles.map(f => f.name) };
+      const fileMeta   = { fuente, nombres: renamedFiles.map(f => f.name) };
 
       if (preview && !multiple) {
         _showPhotoPreview(
           compressed[0],
           () => callback(compressed[0], renamedFiles, fileMeta),
-          () => capturePhoto(callback, { multiple, projectId, fase, campo, preview })
+          () => _launchPhotoInput(fuente, callback, { multiple, projectId, fase, campo, preview })
         );
       } else {
         await callback(multiple ? compressed : compressed[0], renamedFiles, fileMeta);

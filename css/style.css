@@ -2656,3 +2656,39 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 }
 .photo-preview-actions { display: flex; gap: 10px; }
 .photo-preview-actions button { flex: 1; justify-content: center; }
+
+/* ── Photo source sheet (Cámara / Galería) ───────────────────────────────── */
+.photo-src-ov {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; transition: opacity .2s;
+}
+.photo-src-ov.psrc-visible { opacity: 1; }
+.photo-src-sheet {
+  background: var(--surface); width: 100%; max-width: 480px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 10px;
+  box-shadow: var(--shadow);
+  transform: translateY(12px); transition: transform .2s;
+}
+.photo-src-ov.psrc-visible .photo-src-sheet { transform: translateY(0); }
+.photo-src-btn {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 14px 16px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer;
+  font-size: .95rem; font-weight: 600; color: var(--text);
+}
+.photo-src-btn:active { background: var(--border); }
+.photo-src-ico { font-size: 1.3rem; }
+.photo-src-cancel {
+  width: 100%; padding: 12px;
+  background: transparent; border: none; cursor: pointer;
+  font-size: .9rem; color: var(--text-muted);
+}
+@media (min-width: 641px) {
+  .photo-src-ov { align-items: center; }
+  .photo-src-sheet { border-radius: var(--radius); }
+}
