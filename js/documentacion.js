@@ -459,7 +459,7 @@ function renderLevantamiento(project, tipo, edit) {
       <div class="form-row">
         <div class="form-group">
           <label>Ciudad de referencia (T mín)</label>
-          <select name="tMinCiudad" ${dis} onchange="window._onTMinCiudadChange(this)">
+          <select name="tMinCiudad" ${dis} onchange="window._onTMinRecalc()">
             <option value="">— Seleccionar ciudad —</option>
             ${_TMIN_CIUDADES.map(c=>
               `<option value="${esc(c.nombre)}" data-tmin="${c.tMin}"
@@ -469,13 +469,31 @@ function renderLevantamiento(project, tipo, edit) {
           </select>
         </div>
         <div class="form-group">
-          <label>T mín del sitio (°C)
-            <span class="form-hint">Para cálculo Voc</span>
+          <label>Zona del sitio</label>
+          <select name="tMinZona" ${dis} onchange="window._onTMinRecalc()">
+            ${_TMIN_ZONAS.map(z=>
+              `<option value="${z.key}" data-offset="${z.offset}"
+                ${(lev.tMinZona||'valle')===z.key?'selected':''}>${z.label}</option>`
+            ).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-row" id="lev-tmin-row">
+        <div class="form-group">
+          <label>T mín calculada del sitio (°C)
+            <span class="form-hint">Usada en validación Voc</span>
           </label>
           <input type="number" name="tMin" id="lev-tmin-input"
                  value="${lev.tMin ?? 3}" min="-20" max="30" step="0.5"
-                 ${dis} ${lev.tMinCiudad && lev.tMinCiudad !== 'otro' && edit ? 'readonly' : ''}
+                 ${dis}
+                 ${(lev.tMinCiudad && lev.tMinCiudad !== 'otro') && edit ? 'readonly' : ''}
                  style="background:${lev.tMinCiudad && lev.tMinCiudad !== 'otro' ? 'var(--surface2)' : ''}"/>
+        </div>
+        <div class="form-group" id="lev-tmin-desglose" style="display:${lev.tMinCiudad && lev.tMinCiudad !== 'otro' ? 'flex' : 'none'}">
+          <label>Desglose</label>
+          <div class="input-info-badge tmin-desglose" id="lev-tmin-desc">
+            ${_tminDescripcion(lev.tMinCiudad, lev.tMinZona, lev.tMin)}
+          </div>
         </div>
       </div>
       <div class="form-row">
@@ -971,6 +989,7 @@ window.guardarLevantamiento = async function(e, projectId) {
     distVigas:           tipTechoVal === 'Madera' ? (parseFloat(fd.get('distVigas')) || null) : null,
     tMin:                parseFloat(fd.get('tMin')) ?? 3,
     tMinCiudad:          fd.get('tMinCiudad') || null,
+    tMinZona:            fd.get('tMinZona') || 'valle',
     orientacion:         fd.get('orientacion'),
     numPisos:            parseInt(fd.get('numPisos')) || null,
     inclinacion:         parseFloat(fd.get('inclinacion')) || null,
@@ -1370,18 +1389,55 @@ const _TMIN_CIUDADES = [
   { nombre: 'Aguascalientes, Ags',    tMin: -1 },
 ];
 
-window._onTMinCiudadChange = function(sel) {
-  const inp = document.getElementById('lev-tmin-input');
-  if (!inp) return;
-  if (sel.value === '' || sel.value === 'otro') {
+// Zonas climáticas con offset sobre T_min de ciudad de referencia
+const _TMIN_ZONAS = [
+  { key: 'costa',   label: '🌊 Litoral / playa (< 50 msnm)',      offset:  2 },
+  { key: 'valle',   label: '🏜️ Planicie / valle (ref. ciudad)',    offset:  0 },
+  { key: 'rural',   label: '🌿 Rural / campo (200–500 msnm)',      offset: -2 },
+  { key: 'sierra1', label: '⛰️ Pie de sierra (500–1500 msnm)',     offset: -5 },
+  { key: 'sierra2', label: '🏔️ Sierra / montaña (> 1500 msnm)',   offset: -8 },
+];
+
+function _tminDescripcion(ciudad, zona, tMinFinal) {
+  if (!ciudad || ciudad === 'otro') return '';
+  const c = _TMIN_CIUDADES.find(x => x.nombre === ciudad);
+  const z = _TMIN_ZONAS.find(x => x.key === (zona || 'valle'));
+  if (!c || !z) return '';
+  const base   = c.tMin;
+  const offset = z.offset;
+  const signo  = offset >= 0 ? `+${offset}` : `${offset}`;
+  return `${base}°C (ciudad) ${signo}°C (zona) = ${tMinFinal ?? (base + offset)}°C`;
+}
+
+window._onTMinRecalc = function() {
+  const selCiudad = document.querySelector('[name="tMinCiudad"]');
+  const selZona   = document.querySelector('[name="tMinZona"]');
+  const inp       = document.getElementById('lev-tmin-input');
+  const desglose  = document.getElementById('lev-tmin-desglose');
+  const desc      = document.getElementById('lev-tmin-desc');
+  if (!selCiudad || !inp) return;
+
+  const ciudad = selCiudad.value;
+  const zona   = selZona?.value || 'valle';
+
+  if (!ciudad || ciudad === 'otro') {
+    // Manual: desbloquear campo
     inp.removeAttribute('readonly');
     inp.style.background = '';
-    if (sel.value === '') inp.value = '3';
+    if (!ciudad) inp.value = '3';
+    if (desglose) desglose.style.display = 'none';
   } else {
-    const opt = sel.options[sel.selectedIndex];
-    inp.value = opt.dataset.tmin;
+    // Auto: calcular ciudad + zona
+    const optC  = selCiudad.options[selCiudad.selectedIndex];
+    const optZ  = selZona?.options[selZona.selectedIndex];
+    const base  = parseFloat(optC?.dataset?.tmin || '3');
+    const off   = parseFloat(optZ?.dataset?.offset || '0');
+    const final = base + off;
+    inp.value = final;
     inp.setAttribute('readonly', true);
     inp.style.background = 'var(--surface2)';
+    if (desglose) desglose.style.display = 'flex';
+    if (desc) desc.textContent = _tminDescripcion(ciudad, zona, final);
   }
 };
 

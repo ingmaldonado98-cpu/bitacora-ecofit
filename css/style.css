@@ -2522,6 +2522,11 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .voc-stale-banner span { flex: 1; }
 .voc-stale-banner .btn-primary { padding: 4px 12px; font-size: .78rem; white-space: nowrap; }
 
+/* ── T-min desglose (levantamiento) ─────────────────────────────────────── */
+.tmin-desglose { font-size: .78rem; font-family: monospace; color: var(--g300);
+                 background: rgba(46,189,66,.06); border-color: var(--g500);
+                 flex-direction: column; gap: 2px; line-height: 1.4; }
+
 /* ── Voc datos automáticos ───────────────────────────────────────────────── */
 .voc-datos-auto { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
 .vda-item  { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;

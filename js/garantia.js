@@ -157,6 +157,10 @@ function renderVocTab(project, projectId, edit) {
   // T_min: primero del levantamiento, fallback constante La Paz
   const tMin        = (lev.tMin != null) ? lev.tMin : VOC_T_MIN;
   const tMinCiudad  = lev.tMinCiudad || (lev.tMin != null ? 'manual' : null);
+  const tMinZona    = lev.tMinZona || 'valle';
+  // Etiqueta de zona para el tile
+  const _ZONA_LABELS = { costa:'🌊 Costa', valle:'🏜️ Valle', rural:'🌿 Campo', sierra1:'⛰️ Pie de sierra', sierra2:'🏔️ Sierra' };
+  const tMinZonaLabel = _ZONA_LABELS[tMinZona] || '';
 
   // Datos tomados directo de los registros — sin campos manuales
   const vocPanel     = g.paneles?.voc || vd.vocPanel || null;
@@ -177,7 +181,8 @@ function renderVocTab(project, projectId, edit) {
     (vd.panelesSerie != null && panelesSerie != null && vd.panelesSerie !== panelesSerie) ||
     (vd.vocPanel     != null && vocPanel     != null && Math.abs(vd.vocPanel - vocPanel) > 0.01) ||
     (vd.vocMaxInversor != null && vocMax     != null && vd.vocMaxInversor !== vocMax) ||
-    (vd.tMin         != null && vd.tMin     !== tMin)
+    (vd.tMin         != null && vd.tMin     !== tMin) ||
+    (vd.tMinZona     != null && vd.tMinZona !== tMinZona)
   );
 
   const semaforo = resultado === 'seguro'  ? { cls: 'voc-ok',   ico: '🟢', txt: 'Configuración segura' }
@@ -237,14 +242,14 @@ function renderVocTab(project, projectId, edit) {
       </div>
       <div class="vda-item">
         <span class="vda-lbl">${icon('thermometer', 14)} T mín sitio</span>
-        <span class="vda-val">${tMin}°C
-          <span style="font-size:.7rem;color:var(--text-muted)">
-            ${tMinCiudad && tMinCiudad !== 'otro' && tMinCiudad !== 'manual'
-              ? `(${esc(tMinCiudad)})`
-              : tMinCiudad === 'otro' ? '(manual)' : '(La Paz, BCS — default)'}
-          </span>
+        <span class="vda-val">${tMin}°C</span>
+        <span style="font-size:.68rem;color:var(--text-muted);line-height:1.3">
+          ${tMinCiudad && tMinCiudad !== 'otro' && tMinCiudad !== 'manual'
+            ? `${esc(tMinCiudad)}<br>${tMinZonaLabel}`
+            : tMinCiudad === 'otro' ? 'manual' : '⚠ La Paz, BCS (default)'}
         </span>
-        ${!lev.tMin && lev.tMin !== 0 ? `<span style="font-size:.65rem;color:#c8a000">⚠ Captura en Levantamiento</span>` : ''}
+        ${!lev.tMin && lev.tMin !== 0
+          ? `<span style="font-size:.65rem;color:#c8a000">Configura en Levantamiento</span>` : ''}
       </div>
     </div>
 
@@ -264,7 +269,8 @@ function renderVocTab(project, projectId, edit) {
     <input type="hidden" id="voc-panel"   value="${vocPanel    || ''}" />
     <input type="hidden" id="voc-serie"   value="${panelesSerie|| ''}" />
     <input type="hidden" id="voc-max-inv" value="${vocMax      || ''}" />
-    <input type="hidden" id="voc-tmin"    value="${tMin}" />
+    <input type="hidden" id="voc-tmin"     value="${tMin}" />
+    <input type="hidden" id="voc-tmin-zona" value="${tMinZona}" />
     <input type="hidden" id="voc-coef"    value="${VOC_COEF}" />
 
     <!-- Resultado -->
@@ -346,7 +352,8 @@ function _calcVocData() {
   else if (vocStr <= vocMax)    { resultado = 'limite'; mensaje = `⚠️ En el límite (${margen.toFixed(1)}% de margen). Considera reducir a ${maxSerie} paneles en serie.`; }
   else                          { resultado = 'excede'; mensaje = `🚨 Excede el límite por ${(vocStr-vocMax).toFixed(1)} V. Máximo seguro: ${maxSerie} paneles en serie.`; }
 
-  return { vocPanel:vocP, panelesSerie:serie, tMin, coefVoc:coef,
+  const tMinZona = document.getElementById('voc-tmin-zona')?.value || 'valle';
+  return { vocPanel:vocP, panelesSerie:serie, tMin, tMinZona, coefVoc:coef,
     vocMaxInversor:vocMax, vocCorregido:vocCorr, vocString:vocStr, margen, resultado, mensaje };
 }
 
