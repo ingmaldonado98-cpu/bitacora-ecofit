@@ -422,6 +422,21 @@ function renderLevantamiento(project, tipo, edit) {
   <form id="form-levantamiento" onsubmit="guardarLevantamiento(event,'${pid}')"
         ${edit ? `oninput="_levAutoSave('${pid}')" onchange="_levAutoSave('${pid}')"` : ''}>
 
+    <div class="lev-cliente-card">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre del cliente</label>
+          <input type="text" name="lev_clientName" value="${esc(project.clientName||'')}"
+                 placeholder="Nombre completo del cliente" ${dis}/>
+        </div>
+        <div class="form-group">
+          <label>Alias / nombre del proyecto <span class="form-hint">opcional</span></label>
+          <input type="text" name="lev_nombreProyecto" value="${esc(project.nombreProyecto||'')}"
+                 placeholder="Ej: Casa bonita, Rancho norte…" ${dis}/>
+        </div>
+      </div>
+    </div>
+
     ${acc('sitio', 'Datos del techo y sitio', '🏠', true, `
       <div class="form-row">
         <div class="form-group"><label>Tipo de techo</label>
@@ -1089,7 +1104,13 @@ window.guardarLevantamiento = async function(e, projectId) {
 
   p.documentacion = p.documentacion || {};
   p.documentacion.levantamiento = newLev;
-  await projects.update(projectId, { documentacion: p.documentacion });
+
+  const rootUpdate = { documentacion: p.documentacion };
+  const newClientName = fd.get('lev_clientName')?.trim();
+  const newNombreProyecto = fd.get('lev_nombreProyecto')?.trim() || null;
+  if (newClientName && newClientName !== p.clientName) rootUpdate.clientName = newClientName;
+  if (newNombreProyecto !== (p.nombreProyecto || null)) rootUpdate.nombreProyecto = newNombreProyecto;
+  await projects.update(projectId, rootUpdate);
   // Actualizar indicador de auto-guardado
   const ind = document.getElementById('lev-autosave');
   if (ind) { ind.textContent = '✓ Guardado'; ind.className = 'autosave-indicator saved'; }

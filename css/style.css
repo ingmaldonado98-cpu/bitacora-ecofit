@@ -2311,6 +2311,15 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 }
 .lev-area-hint strong { color: var(--text); }
 
+/* ── Tarjeta de datos del cliente (levantamiento) ───────────────────────── */
+.lev-cliente-card {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
 /* ── Separador dentro del acordeón eléctrico+consumo ─────────────────────── */
 .lev-sep {
   border-top: 1px dashed var(--border2);
