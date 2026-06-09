@@ -496,6 +496,31 @@ function renderLevantamiento(project, tipo, edit) {
           </div>
         </div>
       </div>
+      <!-- Tabla de referencia de zonas -->
+      <div class="tmin-ref-wrap">
+        <button type="button" class="tmin-ref-toggle" onclick="this.parentElement.classList.toggle('open')">
+          ${icon('info', 13)} Referencia de zonas — ¿cómo afecta al T mín? <span class="tmin-ref-caret">▸</span>
+        </button>
+        <div class="tmin-ref-body">
+          <p class="tmin-ref-intro">El T mín se calcula como: <strong>ciudad base + ajuste por zona</strong>. Ejemplo con La Paz, BCS (3°C):</p>
+          <table class="tmin-ref-table">
+            <thead><tr><th>Zona</th><th>Ajuste</th><th>T mín (La Paz)</th><th>Descripción</th></tr></thead>
+            <tbody>
+              ${_TMIN_ZONAS.map(z => {
+                const ej = 3 + z.offset;
+                const signo = z.offset >= 0 ? `+${z.offset}` : `${z.offset}`;
+                return `<tr>
+                  <td>${z.label}</td>
+                  <td class="tmin-ref-offset ${z.offset > 0 ? 'pos' : z.offset < 0 ? 'neg' : 'zer'}">${signo}°C</td>
+                  <td class="tmin-ref-val">${ej}°C</td>
+                  <td class="tmin-ref-desc">${_TMIN_ZONA_DESC[z.key]}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          <p class="tmin-ref-note">💡 Si el sitio está en un microclima muy particular (cañón, laguna, cerro aislado), usa <em>Otro (manual)</em> para ingresar el valor real.</p>
+        </div>
+      </div>
       <div class="form-row">
         <div class="form-group"><label>Orientación del techo</label>
           <select name="orientacion" ${dis}>
@@ -1397,6 +1422,13 @@ const _TMIN_ZONAS = [
   { key: 'sierra1', label: '⛰️ Pie de sierra (500–1500 msnm)',     offset: -5 },
   { key: 'sierra2', label: '🏔️ Sierra / montaña (> 1500 msnm)',   offset: -8 },
 ];
+const _TMIN_ZONA_DESC = {
+  costa:   'Brisa marina modera el frío. Playas, puertos, zonas costeras. Ej: frente de playa en La Paz, Cabo, Mazatlán.',
+  valle:   'Valor de referencia de la ciudad. Centros urbanos, valles, llanuras. Ej: La Paz centro, Hermosillo, Monterrey.',
+  rural:   'Campo abierto, ligera elevación. Pequeñas comunidades fuera de la ciudad. Ej: San Pedro BCS, ejidos, ranchos bajos.',
+  sierra1: 'Comunidades en ladera o pie de sierra. Noches más frías por altitud. Ej: El Triunfo, San Antonio, Miraflores (BCS).',
+  sierra2: 'Alta montaña, cañadas y sierras. Heladas frecuentes en invierno. Ej: Sierra de la Laguna, sierras de Chihuahua/Durango.',
+};
 
 function _tminDescripcion(ciudad, zona, tMinFinal) {
   if (!ciudad || ciudad === 'otro') return '';

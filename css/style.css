@@ -2527,6 +2527,32 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
                  background: rgba(46,189,66,.06); border-color: var(--g500);
                  flex-direction: column; gap: 2px; line-height: 1.4; }
 
+/* ── T-min tabla de referencia ───────────────────────────────────────────── */
+.tmin-ref-wrap  { margin: 4px 0 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.tmin-ref-toggle { width: 100%; background: var(--surface2); border: none; padding: 8px 12px;
+                   font-size: .78rem; color: var(--text-muted); cursor: pointer;
+                   display: flex; align-items: center; gap: 6px; text-align: left; }
+.tmin-ref-toggle:hover { color: var(--text); }
+.tmin-ref-caret { margin-left: auto; transition: transform .2s; }
+.tmin-ref-wrap.open .tmin-ref-caret { transform: rotate(90deg); }
+.tmin-ref-body  { display: none; padding: 10px 12px; }
+.tmin-ref-wrap.open .tmin-ref-body { display: block; }
+.tmin-ref-intro { font-size: .77rem; color: var(--text-muted); margin: 0 0 8px; }
+.tmin-ref-table { width: 100%; border-collapse: collapse; font-size: .76rem; }
+.tmin-ref-table th { text-align: left; padding: 4px 8px; font-size: .7rem; color: var(--text-muted);
+                      text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); }
+.tmin-ref-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: top; }
+.tmin-ref-table tr:last-child td { border-bottom: none; }
+.tmin-ref-offset { font-family: monospace; font-weight: 700; text-align: center; }
+.tmin-ref-offset.pos { color: #f0a000; }
+.tmin-ref-offset.neg { color: #5bc8ff; }
+.tmin-ref-offset.zer { color: var(--text-muted); }
+.tmin-ref-val   { font-family: monospace; font-weight: 700; color: var(--g300); text-align: center; }
+.tmin-ref-desc  { color: var(--text-muted); font-size: .73rem; line-height: 1.4; }
+.tmin-ref-note  { font-size: .73rem; color: var(--text-muted); margin: 8px 0 0;
+                  padding: 6px 8px; background: var(--surface3,var(--surface2));
+                  border-radius: var(--radius-sm); border-left: 3px solid var(--g500); }
+
 /* ── Voc datos automáticos ───────────────────────────────────────────────── */
 .voc-datos-auto { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
 .vda-item  { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;
