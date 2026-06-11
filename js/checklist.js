@@ -94,7 +94,7 @@ export async function renderChecklistModule(projectId, session) {
       Ejecución${doneExec === totalExec && totalExec ? '<span class="tab-badge tab-ok">✓</span>' : `<span class="tab-badge">${doneExec}/${totalExec}</span>`}
     </button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-torq" tabindex="-1" data-tab="cl-torq" onclick="switchTab('cl-tabs','cl-torq',this)">
-      Torques${torqDone === torqTotal && torqTotal ? '<span class="tab-badge tab-ok">✓</span>' : `<span class="tab-badge">${torqDone}/${torqTotal}</span>`}
+      Torques<span class="tab-badge" style="opacity:.6">Ref.</span>
     </button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-guia" tabindex="-1" data-tab="cl-guia" onclick="switchTab('cl-tabs','cl-guia',this)">
       Guía
@@ -268,7 +268,7 @@ function renderTorqueTab(rows, torqData, done, total, projectId, edit) {
       <span class="cl-prog-lbl">${done}/${total} verificados</span>
     </div>
     ${renderProgress(done, total)}
-    <p class="torq-instruccion">Registra el torque aplicado con tu llave dinamométrica. La columna <b>Especificación</b> es el rango del fabricante.</p>
+    <p class="torq-instruccion">Tabla de referencia del fabricante. Si cuentas con llave dinamométrica, registra el valor aplicado — no afecta el porcentaje de avance del checklist.</p>
     <div class="torq-table-wrap">
       <table class="torq-table">
         <thead>
@@ -660,15 +660,14 @@ export async function renderChecklistsList(session) {
 
     const execBlocksL   = getExecBlocks(p.tipoSistema, techo);
     const execAllItemsL = execBlocksL.flatMap(b => b.items);
-    const torqueRowsL   = buildTorqueTable(cfg?.estructura || 'k2', techo);
 
-    const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length + execAllItemsL.length + torqueRowsL.length;
+    // Torques excluidos del progreso: los técnicos no tienen llave dinamométrica
+    const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length + execAllItemsL.length;
     const doneItems  =
       herr.filter(h => cl.herr?.[h.id]).length +
       cons.filter((_, i) => cl.cons?.[String(i)]).length +
       ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length +
-      execAllItemsL.filter(it => cl.exec?.[it.id]).length +
-      torqueRowsL.filter(r => cl.torques?.[_tkey(r.comp)]?.verificado).length;
+      execAllItemsL.filter(it => cl.exec?.[it.id]).length;
 
     const pct      = totalItems > 0 ? Math.round(doneItems / totalItems * 100) : 0;
     const published = !!cl.publishedAt;
