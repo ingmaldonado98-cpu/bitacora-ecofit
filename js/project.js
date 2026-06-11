@@ -34,6 +34,30 @@ export async function renderProjectDetail(id, session) {
   const edit = canEdit(session, project);
   const admin = isAdmin(session);
 
+  // ── Cálculo donut de progreso ──
+  const _esPeq = project.tipoSistema === 'sistema_pequeno';
+  const _dDoc  = project.documentacion || {};
+  const _dGar  = project.garantia || {};
+  const _dFt   = _dGar.fotosTecnicas || {};
+  const _pfc   = (sitio, sub) => {
+    const n = _dDoc.fases?.[sitio]?.[sub]?.length || 0;
+    if (n > 0) return n;
+    if (sitio === 'techo') { const m={antes:'antes',durante:'durante',cierre:'despues'}; return _dDoc.fases?.[m[sub]]?.length||0; }
+    return 0;
+  };
+  const _fT = ['antes','durante','cierre'].reduce((s,f)=>s+_pfc('techo',f),0);
+  const _fC = ['antes','durante','cierre'].reduce((s,f)=>s+_pfc('centrosCarga',f),0);
+  const _fZ = ['antes','durante','cierre'].reduce((s,f)=>s+_pfc('zonaDelSistema',f),0);
+  const _dItems = _esPeq ? [!!_dDoc.levantamiento?.tipTecho] : [!!_dDoc.levantamiento?.tipTecho, _fT>0, _fC>0, _fZ>0];
+  const docPct  = Math.round(_dItems.filter(Boolean).length / _dItems.length * 100);
+  const _gItems = _esPeq
+    ? [!!_dGar.fotoSistema, totalEquipos>0, totalPaneles>0]
+    : [!!_dGar.fotoSistema, !!(_dFt.tableroAC||_dFt.inversorEnergizado), totalEquipos>0, totalPaneles>0];
+  const garPct     = Math.round(_gItems.filter(Boolean).length / _gItems.length * 100);
+  const generalPct = Math.round((docPct + garPct) / 2);
+  const _circ      = 175.93;
+  const _dash      = ((generalPct / 100) * _circ).toFixed(1);
+
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#dashboard')">
@@ -55,6 +79,8 @@ export async function renderProjectDetail(id, session) {
 
   <!-- Info general -->
   <div class="card">
+  <div class="card-with-donut">
+  <div class="card-main-info">
     <div class="card-row">
       <div class="meta-item">
         <span class="meta-lbl">Cliente</span>
@@ -119,6 +145,23 @@ export async function renderProjectDetail(id, session) {
       </div>` : ''}
     </div>
   </div>
+  <div class="donut-wrap">
+    <svg class="donut-svg" viewBox="0 0 70 70" width="70" height="70">
+      <circle cx="35" cy="35" r="28" fill="none" stroke="var(--surface3)" stroke-width="7"/>
+      <circle cx="35" cy="35" r="28" fill="none"
+              stroke="${generalPct===100?'var(--g500)':'var(--g300)'}"
+              stroke-width="7" stroke-dasharray="${_dash} ${_circ}"
+              stroke-linecap="round" transform="rotate(-90 35 35)"/>
+      <text x="35" y="40" text-anchor="middle" class="donut-pct-text">${generalPct}%</text>
+    </svg>
+    <div class="donut-subs">
+      <span class="dsub">Doc <b>${docPct}%</b></span>
+      <span class="dsub">Gar <b>${garPct}%</b></span>
+    </div>
+  </div>
+  </div>
+  ${renderQuickCheck(project, id, admin, true)}
+</div>
 
   <!-- Foto del cliente (solo sistemas pequeños y cuando existe la foto) -->
   ${project.tipoSistema === 'sistema_pequeno' && project.clienteFoto ? `
@@ -131,9 +174,6 @@ export async function renderProjectDetail(id, session) {
 
   <!-- Módulos con progreso — orden: Documentación → Garantía → Auditoría -->
   ${renderModulosProgreso(project, id, session, admin)}
-
-  <!-- Quick-Check: pendientes críticos -->
-  ${renderQuickCheck(project, id, admin)}
 
   <!-- Cambio de estado -->
   ${myTransitions.length ? `
@@ -389,21 +429,6 @@ function renderModulosProgreso(project, id, session, admin) {
   };
 
   return `
-  <div class="card pp-card">
-    <div class="pp-header">
-      <span class="pp-title">Progreso general</span>
-      <span class="pp-pct ${generalPct === 100 ? 'pp-done' : ''}">${generalPct}%</span>
-    </div>
-    <div class="pp-bar-track">
-      <div class="pp-bar-fill ${generalPct === 100 ? 'pp-bar-done' : ''}" style="width:${generalPct}%"></div>
-    </div>
-    <div class="pp-subs">
-      <span class="pp-sub">Doc <b>${docPct}%</b></span>
-      <span class="pp-sub">Garantía <b>${garPct}%</b></span>
-      ${puedeAuditoria ? `<span class="pp-sub">Auditoría <b>${audPct}%</b></span>` : ''}
-    </div>
-  </div>
-
   <div class="modulos-progreso">
     ${modCard('Documentación', 'clipboard-text', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`, 'doc')}
     ${modCard('Garantía', 'seal-check', 'mpc-gar', garPct, garItems, `#proyecto/${id}/garantia`, 'gar')}
@@ -438,7 +463,7 @@ function renderModulosProgreso(project, id, session, admin) {
 }
 
 // ── Quick-Check: pendientes críticos ─────────────────────────────────────────
-function renderQuickCheck(project, id, admin) {
+function renderQuickCheck(project, id, admin, inline = false) {
   const doc = project.documentacion || {};
   const gar = project.garantia || {};
   const aud = project.auditoria || {};
@@ -497,12 +522,10 @@ function renderQuickCheck(project, id, admin) {
 
   const modColor = { doc: 'var(--accent)', gar: '#f0c000', aud: '#86868b' };
 
-  return `
-  <div class="card qc-card">
-    <div class="card-title-row">
+  const header = `<div class="card-title-row">
       <h3 class="card-title">${icon('warning-circle', 15)} Pendientes <span class="qc-count">${pendientes.length}</span></h3>
-    </div>
-    <div class="qc-list">
+    </div>`;
+  const body = `<div class="qc-list">
       ${pendientes.map(p => `
       <div class="qc-item" onclick="navigate('${p.link}')">
         <span class="qc-mod-dot" style="background:${modColor[p.mod]}"></span>
@@ -513,7 +536,14 @@ function renderQuickCheck(project, id, admin) {
     </div>
     <button class="qc-trayecto-cta" onclick="navigate('#proyecto/${id}/trayecto')">
       ${icon('list-numbers', 16)} Resolver con el trayecto guiado ${icon('arrow-right', 14)}
-    </button>
+    </button>`;
+
+  if (inline) return `<div class="qc-inline">${header}${body}</div>`;
+
+  return `
+  <div class="card qc-card">
+    ${header}
+    ${body}
   </div>`;
 }
 
