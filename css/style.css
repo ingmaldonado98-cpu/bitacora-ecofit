@@ -1090,6 +1090,8 @@ body.scanner-native-active > *:not(.scanner-native-ui) { visibility: hidden; }
 .kwh-total { font-size: .9rem; color: var(--g300); margin-top: 10px; font-weight: 600; }
 
 .carga-row { display: grid; grid-template-columns: 2fr 1fr 1fr 0.6fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+.carga-row-header { margin-bottom: 2px; }
+.carga-row-header span { font-size: .7rem; font-weight: 600; color: var(--g400); text-transform: uppercase; letter-spacing: .04em; padding: 0 2px; }
 .campo-libre-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 8px; }
 
 /* ── Auditoría ────────────────────────────────────────────────────────────── */

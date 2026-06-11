@@ -1017,13 +1017,21 @@ function renderCargas(cargas, edit, tipo) {
         ${CARGAS_RAPIDAS.map(a=>`<button type="button" class="chip chip-sm" onclick="addCargaRapida('${tipo}',${JSON.stringify(a).replace(/"/g,'&quot;')})">${a.nombre}</button>`).join('')}
       </div>
     </div>` : ''}
+    ${_cargas[tipo].length > 0 ? `
+    <div class="carga-row carga-row-header">
+      <span>Equipo</span>
+      <span title="Potencia en watts del aparato">Watts (W)</span>
+      <span title="Horas de uso al día">Horas/día</span>
+      <span title="Número de unidades">Cant.</span>
+      ${edit ? '<span></span>' : ''}
+    </div>` : ''}
     <div id="lista-cargas-${tipo}">
       ${_cargas[tipo].map((c,i)=>`
         <div class="carga-row">
-          <input type="text" value="${esc(c.nombre)}" placeholder="Nombre" ${edit?`oninput="_cargas['${tipo}'][${i}].nombre=this.value"`:'disabled'}/>
-          <input type="number" value="${c.potencia}" placeholder="W" min="0" ${edit?`oninput="_cargas['${tipo}'][${i}].potencia=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
-          <input type="number" value="${c.horas}" placeholder="h/día" min="0" step="0.5" ${edit?`oninput="_cargas['${tipo}'][${i}].horas=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
-          <input type="number" value="${c.cantidad||1}" placeholder="Cant." min="1" ${edit?`oninput="_cargas['${tipo}'][${i}].cantidad=parseInt(this.value)||1;refreshCargasTotales('${tipo}')"`:'disabled'}/>
+          <input type="text" value="${esc(c.nombre)}" placeholder="Nombre del equipo" ${edit?`oninput="_cargas['${tipo}'][${i}].nombre=this.value"`:'disabled'}/>
+          <input type="number" value="${c.potencia}" placeholder="0" min="0" ${edit?`oninput="_cargas['${tipo}'][${i}].potencia=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
+          <input type="number" value="${c.horas}" placeholder="0" min="0" step="0.5" ${edit?`oninput="_cargas['${tipo}'][${i}].horas=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
+          <input type="number" value="${c.cantidad||1}" placeholder="1" min="1" ${edit?`oninput="_cargas['${tipo}'][${i}].cantidad=parseInt(this.value)||1;refreshCargasTotales('${tipo}')"`:'disabled'}/>
           ${edit?`<button type="button" class="btn-del-sm" onclick="delCarga('${tipo}',${i})">✕</button>`:''}
         </div>`).join('')}
     </div>
