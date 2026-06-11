@@ -213,14 +213,24 @@ export async function renderChecklistModule(projectId, session) {
           <span class="cl-exec-caret">▾</span>
         </summary>
         <div class="cl-item-list" style="padding:0 4px 8px">
-          ${block.items.map(it => `
+          ${block.items.map(it => {
+            const savedVal = cl.execText?.[it.id] || '';
+            return `
           <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
             <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
               onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${projectId}','${it.id}',this.checked)">
-            <div class="cl-item-text">
+            <div class="cl-item-text" style="width:100%">
               <span class="cl-item-name">${esc(it.n)}</span>
+              ${it.hasInput ? `<div style="margin-top:6px">
+                <input type="text" class="torq-input" style="max-width:180px"
+                  placeholder="${esc(it.inputPlaceholder || 'Valor medido')}" ${!edit ? 'disabled' : ''}
+                  value="${esc(savedVal)}"
+                  onchange="clSaveExecText('${projectId}','${it.id}',this.value)"
+                  onclick="event.stopPropagation()">
+              </div>` : ''}
             </div>
-          </label>`).join('')}
+          </label>`;
+          }).join('')}
         </div>
       </details>`;
     }).join('')}
@@ -484,6 +494,15 @@ window.clToggleBOM   = (pid, idx, v) => _saveField(pid, 'bom',   String(idx), v)
 window.clToggleAdmin = (pid, id, v)  => _saveField(pid, 'admin', id,         v);
 window.clToggleExec  = (pid, id, v)  => _saveField(pid, 'exec',  id,         v);
 
+// Valor textual/numérico de ítems con hasInput (ej. medición de Voc)
+let _execTextTimer = null;
+window.clSaveExecText = (pid, id, val) => {
+  clearTimeout(_execTextTimer);
+  _execTextTimer = setTimeout(() => {
+    projects.setField(pid, `checklistData.execText.${id}`, val);
+  }, 600);
+};
+
 // Torques — guardar valor numérico aplicado
 let _torqSaveTimer = null;
 window.clSaveTorque = (pid, key, field, value) => {
@@ -551,8 +570,36 @@ window.clExportPDF = async function(projectId) {
     ? `Aprobado por ${cl.publishedBy} · ${new Date(cl.publishedAt).toLocaleDateString('es-MX')}`
     : 'Pendiente de aprobación';
 
-  const checkRow = (done, label, note) =>
-    `<tr class="${done?'done':''}"><td class="chk">${done?'☑':'☐'}</td><td>${label}${note?`<br><small>${note}</small>`:''}</td></tr>`;
+  const execBlocks  = getExecBlocks(project.tipoSistema, techo);
+  const torqueRows  = buildTorqueTable(cfg?.estructura || 'k2', techo);
+  const torqData    = cl.torques || {};
+  const execText    = cl.execText || {};
+
+  const checkRow = (done, label, note, val) =>
+    `<tr class="${done?'done':''}"><td class="chk">${done?'☑':'☐'}</td><td>${label}${note?`<br><small>${note}</small>`:''}${val?`<br><b style="color:#16a34a">${esc(val)}</b>`:''}</td></tr>`;
+
+  const execSection = execBlocks.map(block => {
+    const rows = block.items.map(it =>
+      checkRow(!!cl.exec?.[it.id], it.n, null, it.hasInput ? execText[it.id] : null)
+    ).join('');
+    return `<h2>${esc(block.label)}</h2><table>${rows}</table>`;
+  }).join('');
+
+  const torqueSection = torqueRows.length ? `
+  <h2>Torques de apriete</h2>
+  <table>
+    <tr style="background:#f3f4f6"><th style="text-align:left;padding:4px 6px">Componente</th><th style="padding:4px 6px">Especificación</th><th style="padding:4px 6px">Aplicado</th><th style="padding:4px 6px">✓</th></tr>
+    ${torqueRows.map(r => {
+      const k = _tkey(r.comp);
+      const td = torqData[k] || {};
+      return `<tr class="${td.verificado?'done':''}">
+        <td>${esc(r.comp)}<br><small>${esc(r.nota)}</small></td>
+        <td style="text-align:center">${esc(r.torque)}</td>
+        <td style="text-align:center;font-weight:700">${td.valor ? esc(td.valor)+' N·m' : '—'}</td>
+        <td style="text-align:center">${td.verificado?'☑':'☐'}</td>
+      </tr>`;
+    }).join('')}
+  </table>` : '';
 
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <title>Checklist — ${project.displayId}</title>
@@ -561,7 +608,7 @@ window.clExportPDF = async function(projectId) {
     h1 { font-size: 16px; margin: 0 0 4px; } .sub { color: #666; font-size: 10px; margin-bottom: 12px; }
     h2 { font-size: 12px; background: #1a1a1a; color: #fff; padding: 4px 8px; margin: 16px 0 6px; border-radius: 3px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-    td { padding: 4px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+    td, th { padding: 4px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
     td.chk { width: 22px; font-size: 14px; }
     tr.done td { color: #666; text-decoration: line-through; }
     small { color: #888; }
@@ -569,7 +616,7 @@ window.clExportPDF = async function(projectId) {
     @media print { body { padding: 0; } }
   </style></head><body>
   <h1>Checklist de instalación — ${project.displayId}</h1>
-  <p class="sub">${esc(project.cliente || project.displayId)} · Techo: ${techo === 'cemento' ? 'Concreto/losa' : 'Metálico/lámina'}</p>
+  <p class="sub">${esc(project.clientName || project.displayId)} · Techo: ${techo === 'cemento' ? 'Concreto/losa' : 'Metálico/lámina'}</p>
   <div class="status">${published}</div>
 
   <h2>Herramienta</h2>
@@ -580,6 +627,9 @@ window.clExportPDF = async function(projectId) {
 
   <h2>Revisión pre-instalación (Admin)</h2>
   <table>${ADMIN_REVIEW_ITEMS.map(it => checkRow(!!cl.admin?.[it.id], it.label, it.detail)).join('')}</table>
+
+  ${execSection}
+  ${torqueSection}
   </body></html>`;
 
   // iOS Safari bloquea window.open() — usar blob + <a download> para compatibilidad
@@ -608,11 +658,17 @@ export async function renderChecklistsList(session) {
     const herr = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
     const cons = cfg ? (cfg.computed?.consumibles || []) : [];
 
-    const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length;
+    const execBlocksL   = getExecBlocks(p.tipoSistema, techo);
+    const execAllItemsL = execBlocksL.flatMap(b => b.items);
+    const torqueRowsL   = buildTorqueTable(cfg?.estructura || 'k2', techo);
+
+    const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length + execAllItemsL.length + torqueRowsL.length;
     const doneItems  =
       herr.filter(h => cl.herr?.[h.id]).length +
       cons.filter((_, i) => cl.cons?.[String(i)]).length +
-      ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length;
+      ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length +
+      execAllItemsL.filter(it => cl.exec?.[it.id]).length +
+      torqueRowsL.filter(r => cl.torques?.[_tkey(r.comp)]?.verificado).length;
 
     const pct      = totalItems > 0 ? Math.round(doneItems / totalItems * 100) : 0;
     const published = !!cl.publishedAt;

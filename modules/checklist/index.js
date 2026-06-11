@@ -293,7 +293,7 @@ const _closingBlocks = [
   {
     id: 'cierre', label: 'Puesta en marcha y cierre',
     items: [
-      { id: 'pm-01', n: 'Voltaje y corriente DC verificados en operación' },
+      { id: 'pm-01', n: 'Voltaje y corriente DC verificados en operación', hasInput: true, inputPlaceholder: 'Ej. 380 V / 8 A' },
       { id: 'pm-02', n: 'Sistema operando sin alarmas ni fallas activas' },
       { id: 'pm-03', n: 'Fotografías técnicas tomadas (tablero DC, AC, tierra, inversor)' },
       { id: 'pm-04', n: 'Área de trabajo limpia — material sobrante retirado' },
