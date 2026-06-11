@@ -389,14 +389,18 @@ function renderLevantamiento(project, tipo, edit) {
   const pid = project.id;
   _levPid = pid;
   // Sincronizar state de áreas del techo (preserva fotos si existen)
-  _areasTecho = (lev.areasTecho || []).map(a => ({
-    ...a,
-    fotos: a.fotos ? {
-      antes:   Array.isArray(a.fotos.antes)   ? [...a.fotos.antes]   : [],
-      durante: Array.isArray(a.fotos.durante) ? [...a.fotos.durante] : [],
-      cierre:  Array.isArray(a.fotos.cierre)  ? [...a.fotos.cierre]  : [],
-    } : { antes: [], durante: [], cierre: [] },
-  }));
+  _areasTecho = (lev.areasTecho || []).map(a => {
+    let fotos;
+    if (Array.isArray(a.fotos)) {
+      fotos = [...a.fotos];
+    } else if (a.fotos && typeof a.fotos === 'object') {
+      // Migrar estructura antigua {antes,durante,cierre} → array plano
+      fotos = [...(a.fotos.antes||[]), ...(a.fotos.durante||[]), ...(a.fotos.cierre||[])];
+    } else {
+      fotos = [];
+    }
+    return { ...a, fotos };
+  });
 
   // Reinicializar estado de módulo con datos del proyecto (evita estado stale entre navegaciones)
   _camposLibres = [...(lev.camposLibres || [])];
@@ -406,7 +410,7 @@ function renderLevantamiento(project, tipo, edit) {
   };
 
   // Detectar si secciones tienen datos para abrir acordeón pre-llenado
-  const hasSitio      = !!(lev.tipTecho || lev.distTableroInversor);
+  const hasSitio      = !!(lev.tipTecho || (lev.areasTecho?.length > 0));
   const hasElecConsumo= !!(lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga ||
                            lev.recibos?.length || lev.aparatos?.length || lev.tarifaCFE ||
                            lev.autonomia || lev.cargasCriticas?.length);
@@ -545,22 +549,6 @@ function renderLevantamiento(project, tipo, edit) {
           <p class="tmin-ref-note">💡 Si el sitio está en un microclima muy particular (cañón, laguna, cerro aislado), usa <em>Otro (manual)</em> para ingresar el valor real.</p>
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>Orientación del techo</label>
-          <select name="orientacion" ${dis}>
-            ${['Sur','Poniente','Oriente','Norte','Sur-Poniente','Sur-Oriente'].map(t=>
-              `<option ${lev.orientacion===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group"><label>Número de pisos</label>
-          <input type="number" name="numPisos" value="${lev.numPisos||''}" min="1" max="30"
-                 placeholder="1" ${dis}/></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Inclinación del techo (°)</label>
-          <input type="number" name="inclinacion" value="${lev.inclinacion||''}" placeholder="15" ${dis}/></div>
-      </div>
-
       <!-- Áreas del techo — repetibles -->
       <div class="lev-areas-wrap">
         <div class="lev-areas-hdr">
@@ -571,12 +559,6 @@ function renderLevantamiento(project, tipo, edit) {
           ${_renderAreasTecho(lev.areasTecho || [], edit, pid)}
         </div>
         ${(lev.areasTecho||[]).length === 0 && !edit ? `<p style="font-size:.78rem;color:var(--text-muted);padding:8px 0">Sin áreas registradas</p>` : ''}
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Dist. tablero→inversor (m)</label>
-          <input type="number" name="distTableroInversor" value="${lev.distTableroInversor||''}" step="0.5" ${dis}/></div>
-        <div class="form-group"><label>Dist. inversor→paneles (m)</label>
-          <input type="number" name="distInversorPaneles" value="${lev.distInversorPaneles||''}" step="0.5" ${dis}/></div>
       </div>
       <!-- Fotos del levantamiento -->
       <div class="foto-tecnica-row" style="margin-top:12px">
@@ -1089,11 +1071,16 @@ window.guardarLevantamiento = async function(e, projectId) {
   const areasTechoVal = _areasTecho
     .filter(a => a.nombre || a.ancho || a.largo)
     .map(a => ({
-      nombre: a.nombre || `Área ${_areasTecho.indexOf(a)+1}`,
-      ancho:  a.ancho  || null,
-      largo:  a.largo  || null,
-      area:   (a.ancho && a.largo) ? parseFloat((a.ancho*a.largo).toFixed(2)) : null,
-      fotos:  a.fotos  || { antes: [], durante: [], cierre: [] },
+      nombre:             a.nombre || `Área ${_areasTecho.indexOf(a)+1}`,
+      ancho:              a.ancho  || null,
+      largo:              a.largo  || null,
+      area:               (a.ancho && a.largo) ? parseFloat((a.ancho*a.largo).toFixed(2)) : null,
+      orientacion:        a.orientacion || null,
+      pisos:              a.pisos || null,
+      inclinacion:        a.inclinacion || null,
+      distTableroInversor: a.distTableroInversor || null,
+      distInversorPaneles: a.distInversorPaneles || null,
+      fotos:              Array.isArray(a.fotos) ? a.fotos : [],
     }));
   const areaTotal = areasTechoVal.reduce((s,a)=>s+(a.area||0), 0) || null;
 
@@ -1108,11 +1095,6 @@ window.guardarLevantamiento = async function(e, projectId) {
     tMin:                parseFloat(fd.get('tMin')) ?? 3,
     tMinCiudad:          fd.get('tMinCiudad') || null,
     tMinZona:            fd.get('tMinZona') || 'valle',
-    orientacion:         fd.get('orientacion'),
-    numPisos:            parseInt(fd.get('numPisos')) || null,
-    inclinacion:         parseFloat(fd.get('inclinacion')) || null,
-    distTableroInversor: parseFloat(fd.get('distTableroInversor')) || null,
-    distInversorPaneles: parseFloat(fd.get('distInversorPaneles')) || null,
     tipoServicioCFE:     fd.get('tipoServicioCFE'),
     tierraFisica:        fd.get('tierraFisica'),
     centroCarga:         fd.get('centroCarga'),
@@ -1298,22 +1280,7 @@ window.delFotoLev = async function(pid, idx) {
 };
 
 // ── Fotos por área ─────────────────────────────────────────────────────────────
-window._switchAreaFotos = function(areaIdx, subfase, btn) {
-  const SUBFASES = ['antes', 'durante', 'cierre'];
-  // Deactivate all tab buttons for this area
-  SUBFASES.forEach(sf => {
-    const b = document.getElementById(`laf-btn-${areaIdx}-${sf}`);
-    if (b) b.classList.remove('laf-active');
-    const p = document.getElementById(`lev-area-fotos-${areaIdx}-${sf}`);
-    if (p) p.style.display = 'none';
-  });
-  // Activate selected
-  btn.classList.add('laf-active');
-  const panel = document.getElementById(`lev-area-fotos-${areaIdx}-${subfase}`);
-  if (panel) panel.style.display = '';
-};
-
-window.capFotoArea = function(pid, areaIdx, subfase) {
+window.capFotoArea = function(pid, areaIdx) {
   capturePhoto(async (b64Array) => {
     const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
     const total = fotos.length;
@@ -1321,21 +1288,19 @@ window.capFotoArea = function(pid, areaIdx, subfase) {
     const p = await projects.getById(pid);
     const areas = p.documentacion?.levantamiento?.areasTecho || [];
     if (!areas[areaIdx]) { toast('Área no encontrada', 'error'); return; }
-    areas[areaIdx].fotos = areas[areaIdx].fotos || { antes: [], durante: [], cierre: [] };
+    areas[areaIdx].fotos = Array.isArray(areas[areaIdx].fotos) ? areas[areaIdx].fotos : [];
     for (let i = 0; i < total; i++) {
       prog.update(i + 1);
       const fid = uuid();
       const result = await uploadPhotoQueued(fotos[i],
-        `projects/${pid}/area${areaIdx}_${subfase}_${fid}.jpg`, pid, 'fotoArea',
-        { areaIdx, subfase, itemId: fid });
-      areas[areaIdx].fotos[subfase].push({
+        `projects/${pid}/area${areaIdx}_${fid}.jpg`, pid, 'fotoArea',
+        { areaIdx, itemId: fid });
+      areas[areaIdx].fotos.push({
         url: result.url || null, id: fid, createdAt: isoNow(),
         ...(result.pending && { pending: true, pendingId: result.pendingId }),
       });
-      // Keep in-memory state in sync
       if (_areasTecho[areaIdx]) {
-        _areasTecho[areaIdx].fotos = _areasTecho[areaIdx].fotos || { antes: [], durante: [], cierre: [] };
-        _areasTecho[areaIdx].fotos[subfase] = [...areas[areaIdx].fotos[subfase]];
+        _areasTecho[areaIdx].fotos = [...areas[areaIdx].fotos];
       }
     }
     prog.done();
@@ -1346,15 +1311,13 @@ window.capFotoArea = function(pid, areaIdx, subfase) {
   }, { multiple: true });
 };
 
-window.delFotoArea = async function(pid, areaIdx, subfase, fotoIdx) {
+window.delFotoArea = async function(pid, areaIdx, fotoIdx) {
   if (!await confirmDialog('¿Eliminar esta foto?')) return;
   const p = await projects.getById(pid);
   const areas = p.documentacion?.levantamiento?.areasTecho || [];
-  if (!areas[areaIdx]?.fotos?.[subfase]) return;
-  areas[areaIdx].fotos[subfase].splice(fotoIdx, 1);
-  if (_areasTecho[areaIdx]?.fotos?.[subfase]) {
-    _areasTecho[areaIdx].fotos[subfase].splice(fotoIdx, 1);
-  }
+  if (!Array.isArray(areas[areaIdx]?.fotos)) return;
+  areas[areaIdx].fotos.splice(fotoIdx, 1);
+  if (_areasTecho[areaIdx]?.fotos) _areasTecho[areaIdx].fotos.splice(fotoIdx, 1);
   p.documentacion.levantamiento.areasTecho = areas;
   await projects.update(pid, { documentacion: p.documentacion });
   navigate(`#proyecto/${pid}/documentacion`);
@@ -1671,43 +1634,20 @@ window._onTipTechoChange = function(sel) {
 let _areasTecho = [];  // array de {nombre, ancho, largo, fotos:{antes,durante,cierre}}
 let _levPid = '';      // projectId activo en la vista de levantamiento
 
-function _renderAreaFotosPanel(a, i, subfase, edit, pid) {
-  const fotos = (a.fotos?.[subfase]) || [];
-  const isFirst = subfase === 'antes';
-  return `
-  <div id="lev-area-fotos-${i}-${subfase}" class="lev-area-fotos-panel"${isFirst ? '' : ' style="display:none"'}>
-    <div class="lev-area-fotos-grid">
-      ${fotos.map((f, fi) => `
-        <div class="lev-area-foto-wrap">
-          ${fotoMini(f.url || f, `${subfase} ${fi+1}`)}
-          ${edit ? `<button type="button" class="btn-del-foto"
-            onclick="window.delFotoArea('${pid}',${i},'${subfase}',${fi})">✕</button>` : ''}
-        </div>`).join('')}
-      ${edit ? `<button type="button" class="btn-foto-sm lev-area-foto-add"
-        onclick="window.capFotoArea('${pid}',${i},'${subfase}')">${icon('camera')} Foto</button>` : ''}
-    </div>
-  </div>`;
-}
 
 function _renderAreasTecho(areas, edit, pid) {
   if (!areas.length && !edit) return '';
-  const SUBFASES = [
-    { id: 'antes',   label: 'Antes'   },
-    { id: 'durante', label: 'Durante' },
-    { id: 'cierre',  label: 'Cierre'  },
-  ];
+  const ORIENTACIONES = ['Sur','Poniente','Oriente','Norte','Sur-Poniente','Sur-Oriente'];
   return areas.map((a, i) => {
-    const fAntes   = (a.fotos?.antes   || []).length;
-    const fDurante = (a.fotos?.durante || []).length;
-    const fCierre  = (a.fotos?.cierre  || []).length;
-    const totalFotos = fAntes + fDurante + fCierre;
+    const fotos = Array.isArray(a.fotos) ? a.fotos : [];
+    const totalFotos = fotos.length;
     return `
   <div class="lev-area-item" id="lev-area-${i}">
     <div class="form-row" style="align-items:flex-end">
       <div class="form-group" style="flex:2">
         <label>Nombre del área</label>
         <input type="text" class="input-field" value="${esc(a.nombre||'')}"
-               placeholder="Ej: Área 1, Techo sur, Bodega…"
+               placeholder="Ej: Techo sur, Bodega…"
                ${edit?`oninput="window._updateAreaTecho(${i},'nombre',this.value)"`:''} ${edit?'':'disabled'} />
       </div>
       <div class="form-group" style="flex:1">
@@ -1729,27 +1669,54 @@ function _renderAreasTecho(areas, edit, pid) {
       ${edit ? `<button type="button" class="btn-icon-sm" style="margin-bottom:4px;color:var(--red)"
         onclick="window._removeAreaTecho(${i})" title="Eliminar área">✕</button>` : ''}
     </div>
-    <!-- Fotos por área — colapsadas en modo lectura -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>Orientación</label>
+        <select ${edit?`onchange="window._updateAreaTecho(${i},'orientacion',this.value)"`:''} ${edit?'':'disabled'}>
+          ${ORIENTACIONES.map(t=>`<option ${(a.orientacion||'Sur')===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Número de pisos</label>
+        <input type="number" value="${a.pisos||''}" placeholder="1" min="1" max="30"
+               ${edit?`oninput="window._updateAreaTecho(${i},'pisos',this.value)"`:''} ${edit?'':'disabled'} />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Inclinación (°)</label>
+        <input type="number" value="${a.inclinacion||''}" placeholder="15"
+               ${edit?`oninput="window._updateAreaTecho(${i},'inclinacion',this.value)"`:''} ${edit?'':'disabled'} />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Dist. tablero→inversor (m)</label>
+        <input type="number" value="${a.distTableroInversor||''}" step="0.5"
+               ${edit?`oninput="window._updateAreaTecho(${i},'distTableroInversor',this.value)"`:''} ${edit?'':'disabled'} />
+      </div>
+      <div class="form-group">
+        <label>Dist. inversor→paneles (m)</label>
+        <input type="number" value="${a.distInversorPaneles||''}" step="0.5"
+               ${edit?`oninput="window._updateAreaTecho(${i},'distInversorPaneles',this.value)"`:''} ${edit?'':'disabled'} />
+      </div>
+    </div>
     ${!edit ? `
     <button type="button" class="lev-area-fotos-toggle"
             onclick="const s=document.getElementById('laf-sec-${i}');const open=s.style.display==='none';s.style.display=open?'':'none';this.querySelector('.laft-caret').textContent=open?'▾':'▸'">
       ${icon('camera', 13)} Fotos (${totalFotos}) <span class="laft-caret">▸</span>
     </button>` : ''}
     <div class="lev-area-fotos-section" id="laf-sec-${i}" ${!edit ? 'style="display:none"' : ''}>
-      <div class="lev-area-fotos-bar">
-        ${SUBFASES.map((sf, si) => {
-          const cnt = sf.id === 'antes' ? fAntes : sf.id === 'durante' ? fDurante : fCierre;
-          return `<button type="button"
-            class="lev-area-sf-btn${si === 0 ? ' laf-active' : ''}"
-            id="laf-btn-${i}-${sf.id}"
-            onclick="window._switchAreaFotos(${i},'${sf.id}',this)">
-            ${sf.label}${cnt ? `<span class="laf-count">${cnt}</span>` : ''}
-          </button>`;
-        }).join('')}
+      <div class="lev-area-fotos-grid">
+        ${fotos.map((f, fi) => `
+          <div class="lev-area-foto-wrap">
+            ${fotoMini(f.url || f, `Foto ${fi+1}`)}
+            ${edit ? `<button type="button" class="btn-del-foto"
+              onclick="window.delFotoArea('${pid||''}',${i},${fi})">✕</button>` : ''}
+          </div>`).join('')}
       </div>
-      ${_renderAreaFotosPanel(a, i, 'antes',   edit, pid || '')}
-      ${_renderAreaFotosPanel(a, i, 'durante', edit, pid || '')}
-      ${_renderAreaFotosPanel(a, i, 'cierre',  edit, pid || '')}
+      ${edit ? `<button type="button" class="btn-foto-sm lev-area-add-foto"
+        onclick="window.capFotoArea('${pid||''}',${i})">${icon('camera')} Foto</button>` : ''}
     </div>
   </div>`;
   }).join('');
@@ -1757,7 +1724,7 @@ function _renderAreasTecho(areas, edit, pid) {
 
 window._addAreaTecho = function() {
   const n = _areasTecho.length + 1;
-  _areasTecho.push({ nombre: `Área ${n}`, ancho: null, largo: null, fotos: { antes: [], durante: [], cierre: [] } });
+  _areasTecho.push({ nombre: `Área ${n}`, ancho: null, largo: null, orientacion: 'Sur', pisos: null, inclinacion: null, distTableroInversor: null, distInversorPaneles: null, fotos: [] });
   const list = document.getElementById('lev-areas-list');
   if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true, _levPid);
 };
@@ -1770,7 +1737,8 @@ window._removeAreaTecho = function(idx) {
 
 window._updateAreaTecho = function(idx, campo, val) {
   if (!_areasTecho[idx]) return;
-  _areasTecho[idx][campo] = campo === 'nombre' ? val : (parseFloat(val) || null);
+  const isStr = campo === 'nombre' || campo === 'orientacion';
+  _areasTecho[idx][campo] = isStr ? val : (parseFloat(val) || null);
   const a = _areasTecho[idx];
   const res = document.getElementById(`lev-area-res-${idx}`);
   if (res) res.innerHTML = (a.ancho && a.largo)
