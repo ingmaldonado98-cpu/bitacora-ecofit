@@ -2620,6 +2620,29 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .lev-area-foto-add { margin-top: 2px; }
 
 
+/* ── Quick-Check: pendientes críticos ────────────────────────────────────── */
+.qc-card { padding: 14px 16px; }
+.qc-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 10px; background: rgba(240,192,0,.18); color: #f0c000;
+  font-size: .72rem; font-weight: 700; margin-left: 6px; vertical-align: middle;
+}
+.qc-list { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.qc-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: var(--radius-sm);
+  background: var(--surface3); cursor: pointer;
+  transition: background .15s;
+}
+.qc-item:active { background: var(--border2); }
+.qc-mod-dot {
+  flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
+}
+.qc-label { flex: 1; font-size: .82rem; color: var(--text); }
+.qc-mod-tag { font-size: .7rem; font-weight: 700; opacity: .9; flex-shrink: 0; }
+.qc-arrow { color: var(--text-muted); flex-shrink: 0; }
+
 /* ── Historial de cambios ─────────────────────────────────────────────────── */
 .changelog-card { padding: 12px 16px; }
 .changelog-list { display: flex; flex-direction: column; gap: 0; }

@@ -132,6 +132,9 @@ export async function renderProjectDetail(id, session) {
   <!-- Módulos con progreso — orden: Documentación → Garantía → Auditoría -->
   ${renderModulosProgreso(project, id, session, admin)}
 
+  <!-- Quick-Check: pendientes críticos -->
+  ${renderQuickCheck(project, id, admin)}
+
   <!-- Cambio de estado -->
   ${myTransitions.length ? `
   <div class="card">
@@ -429,6 +432,83 @@ function renderModulosProgreso(project, id, session, admin) {
 
   <!-- Historial de cambios -->
   ${renderChangeLog(project.changeLog)}`;
+}
+
+// ── Quick-Check: pendientes críticos ─────────────────────────────────────────
+function renderQuickCheck(project, id, admin) {
+  const doc = project.documentacion || {};
+  const gar = project.garantia || {};
+  const aud = project.auditoria || {};
+  const ft  = gar.fotosTecnicas || {};
+  const esPequeno = project.tipoSistema === 'sistema_pequeno';
+  const estado = calcFaseEstado(project);
+
+  const _fc = (sitio, sub) => {
+    const n = doc.fases?.[sitio]?.[sub]?.length || 0;
+    if (n > 0) return n;
+    if (sitio === 'techo') { const m={antes:'antes',durante:'durante',cierre:'despues'}; return doc.fases?.[m[sub]]?.length||0; }
+    return 0;
+  };
+  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('techo',f),0);
+  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('centrosCarga',f),0);
+  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('zonaDelSistema',f),0);
+  const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
+  const checkDone = aud.checklist?.length || 0;
+
+  const docItems = esPequeno
+    ? [ { label: 'Levantamiento', ok: !!(doc.levantamiento?.tipTecho) } ]
+    : [
+        { label: 'Levantamiento',                  ok: !!(doc.levantamiento?.tipTecho) },
+        { label: `Fotos techo (${fTecho})`,         ok: fTecho > 0 },
+        { label: `Fotos centros de carga`,          ok: fCentros > 0 },
+        { label: `Fotos zona del sistema`,          ok: fZona > 0 },
+      ];
+  const garItems = esPequeno
+    ? [
+        { label: 'Foto del sistema',                ok: !!gar.fotoSistema },
+        { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
+        { label: `Paneles (${totalPaneles})`,       ok: totalPaneles > 0 },
+      ]
+    : [
+        { label: 'Foto del sistema',                ok: !!gar.fotoSistema },
+        { label: 'Fotos técnicas',                  ok: !!(ft.tableroAC || ft.inversorEnergizado) },
+        { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
+        { label: `Paneles (${totalPaneles})`,       ok: totalPaneles > 0 },
+      ];
+  const audItems = admin ? [
+    { label: `Checklist (${checkDone}/11)`,         ok: checkDone >= 11 },
+    { label: 'Resultado de auditoría',              ok: !!aud.resultado },
+  ] : [];
+
+  const docLocked = estado.doc === 'bloqueada';
+  const garLocked = estado.gar === 'bloqueada';
+  const audLocked = estado.aud === 'bloqueada';
+
+  const pendientes = [
+    ...(!docLocked ? docItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'doc', link: `#proyecto/${id}/documentacion`, modLabel: 'Doc' })) : []),
+    ...(!garLocked ? garItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'gar', link: `#proyecto/${id}/garantia`,      modLabel: 'Garantía' })) : []),
+    ...(!audLocked ? audItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'aud', link: `#proyecto/${id}/auditoria`,     modLabel: 'Auditoría' })) : []),
+  ];
+
+  if (!pendientes.length) return '';
+
+  const modColor = { doc: 'var(--accent)', gar: '#f0c000', aud: '#86868b' };
+
+  return `
+  <div class="card qc-card">
+    <div class="card-title-row">
+      <h3 class="card-title">${icon('warning-circle', 15)} Pendientes <span class="qc-count">${pendientes.length}</span></h3>
+    </div>
+    <div class="qc-list">
+      ${pendientes.map(p => `
+      <div class="qc-item" onclick="navigate('${p.link}')">
+        <span class="qc-mod-dot" style="background:${modColor[p.mod]}"></span>
+        <span class="qc-label">${esc(p.label)}</span>
+        <span class="qc-mod-tag" style="color:${modColor[p.mod]}">${esc(p.modLabel)}</span>
+        ${icon('caret-right', 14, 'qc-arrow')}
+      </div>`).join('')}
+    </div>
+  </div>`;
 }
 
 // ── Historial de cambios ──────────────────────────────────────────────────────
