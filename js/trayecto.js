@@ -34,7 +34,11 @@ function buildPasos(project, id) {
   }, 0);
 
   const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
-  const checkDone    = Object.keys(aud.checklist || {}).length;
+  // Checklist de instalación (checklistData), NO el checklist de auditoría
+  const cl        = project.checklistData || {};
+  const clExec    = Object.values(cl.exec || {}).filter(Boolean).length;
+  const clHerr    = Object.values(cl.herr || {}).filter(Boolean).length;
+  const checkDone = clExec + clHerr;
 
   const pasos = [];
 
@@ -102,9 +106,10 @@ function buildPasos(project, id) {
       emoji:    '✅',
       titulo:   'Checklist de instalación',
       desc:     'Verifica herramienta, materiales y ejecución paso a paso.',
-      ok:       checkDone > 5,
+      ok:       !!cl.publishedAt || checkDone > 5,
       link:     `#checklist/${id}`,
-      hint:     checkDone > 0 ? `${checkDone} ítems verificados` : 'Sin verificar aún',
+      hint:     cl.publishedAt ? 'Aprobado y publicado'
+              : checkDone > 0 ? `${checkDone} ítems verificados` : 'Sin verificar aún',
     });
   }
 

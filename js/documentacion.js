@@ -1733,7 +1733,6 @@ function _renderAreasTecho(areas, edit, pid) {
             ${sf.label}${cnt ? `<span class="laf-count">${cnt}</span>` : ''}
           </button>`;
         }).join('')}
-        ${totalFotos === 0 && !edit ? '' : ''}
       </div>
       ${_renderAreaFotosPanel(a, i, 'antes',   edit, pid || '')}
       ${_renderAreaFotosPanel(a, i, 'durante', edit, pid || '')}
