@@ -7,6 +7,7 @@ import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 import { TMIN_ESTADOS, TMIN_ZONAS, TMIN_ZONA_DESC } from './clima.js';
+import { calcVocPuro } from './garantia.js';
 
 // ── Vista principal ────────────────────────────────────────────────────────────
 export async function renderDocumentacion(projectId, session) {
@@ -1168,8 +1169,52 @@ window.guardarLevantamiento = async function(e, projectId) {
   if (!e._auto) {
     toast('✅ Levantamiento guardado');
     logChange(projectId, { modulo: 'Documentación', accion: 'levantamiento guardado', detalle: '', quien: await getSession() });
+    // Auto-carry Tmin → Voc si el valor cambió
+    _autoRecalcVocSilent(projectId, newLev.tMin, newLev.tMinZona);
   }
 };
+
+// ── Auto-carry Tmin → Voc ─────────────────────────────────────────────────────
+// Después de guardar el levantamiento, recalcula Voc silenciosamente si todos
+// los datos están disponibles Y el tMin realmente cambió respecto al último cálculo.
+async function _autoRecalcVocSilent(projectId, newTMin, newTMinZona) {
+  if (newTMin == null) return;
+  try {
+    const p       = await projects.getById(projectId);
+    const g       = p?.garantia || {};
+    const vd      = g.validacionVoc || {};
+
+    // Solo recalcular si el tMin cambió respecto al guardado anterior
+    if (vd.tMin != null && Math.abs(vd.tMin - newTMin) < 0.001 && vd.tMinZona === (newTMinZona || 'valle')) return;
+
+    // Ingredientes para el cálculo
+    const vocPanel     = g.paneles?.voc || null;
+    const inversor     = (g.equipos || []).find(e => e.tipo === 'inversor');
+    const vocMax       = inversor?.vocMax || null;
+    const strings      = g.paneles?.strings || [];
+    const maxPorString = strings.length > 0 ? Math.max(...strings.map(s => s.paneles?.length || 0)) : null;
+    const panelesSerie = maxPorString || p.projectConfig?.layout?.totalPanels || null;
+
+    if (!vocPanel || !vocMax || !panelesSerie) return; // datos insuficientes — silencio
+
+    const result = calcVocPuro({ vocPanel, panelesSerie, vocMaxInversor: vocMax, tMin: newTMin });
+    if (!result) return;
+
+    await projects.setField(projectId, 'garantia.validacionVoc', {
+      ...result,
+      tMin:          newTMin,
+      tMinZona:      newTMinZona || 'valle',
+      vocPanel,
+      panelesSerie,
+      vocMaxInversor: vocMax,
+      savedAt:       isoNow(),
+      savedBy:       'auto-tmin',
+    });
+    toast(`🌡 Voc recalculado (T mín = ${newTMin}°C)`, 'info', 3000);
+  } catch (_) {
+    // Error silencioso — no interrumpir el flujo del usuario
+  }
+}
 
 // Auto-guardado con debounce 3 segundos
 let _levAutoSaveTimer = null;
