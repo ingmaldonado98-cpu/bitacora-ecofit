@@ -93,11 +93,8 @@ export async function renderChecklistModule(projectId, session) {
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-exec" tabindex="-1" data-tab="cl-exec" onclick="switchTab('cl-tabs','cl-exec',this)">
       Ejecución${doneExec === totalExec && totalExec ? '<span class="tab-badge tab-ok">✓</span>' : `<span class="tab-badge">${doneExec}/${totalExec}</span>`}
     </button>
-    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-torq" tabindex="-1" data-tab="cl-torq" onclick="switchTab('cl-tabs','cl-torq',this)">
-      Torques<span class="tab-badge" style="opacity:.6">Ref.</span>
-    </button>
-    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-guia" tabindex="-1" data-tab="cl-guia" onclick="switchTab('cl-tabs','cl-guia',this)">
-      Guía
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-consulta" tabindex="-1" data-tab="cl-consulta" onclick="switchTab('cl-tabs','cl-consulta',this)">
+      Consulta
     </button>
   </div>
 
@@ -215,6 +212,20 @@ export async function renderChecklistModule(projectId, session) {
         <div class="cl-item-list" style="padding:0 4px 8px">
           ${block.items.map(it => {
             const savedVal = cl.execText?.[it.id] || '';
+            if (it.isNav) {
+              return `
+          <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
+            <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
+              onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${projectId}','${it.id}',this.checked)">
+            <div class="cl-item-text" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <span class="cl-item-name">${esc(it.n)}</span>
+              <button class="btn-outline btn-sm" style="flex-shrink:0"
+                onclick="event.preventDefault();event.stopPropagation();navigate('#${esc(it.navRoute)}/${projectId}')">
+                Ir →
+              </button>
+            </div>
+          </label>`;
+            }
             return `
           <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
             <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
@@ -236,13 +247,9 @@ export async function renderChecklistModule(projectId, session) {
     }).join('')}
   </div>
 
-  <!-- Torques de apriete -->
-  <div id="cl-torq" class="tab-panel">
+  <!-- Consulta: Torques (referencia) + Guía técnica -->
+  <div id="cl-consulta" class="tab-panel">
     ${renderTorqueTab(torqueRows, torqData, torqDone, torqTotal, projectId, edit)}
-  </div>
-
-  <!-- Guía técnica -->
-  <div id="cl-guia" class="tab-panel">
     ${renderGuiaTab(cfg, projectId)}
   </div>
 

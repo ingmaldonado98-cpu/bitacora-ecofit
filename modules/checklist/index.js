@@ -106,23 +106,23 @@ export function emptyChecklistState() {
   };
 }
 
+// ── Tierra: sub-ítems que se inyectan al final de cada bloque de inversor ──────
+const _tierraItems = [
+  { id: 'ptr-01', n: 'Varilla PTR enterrada (profundidad suficiente)' },
+  { id: 'ptr-02', n: 'Continuidad de tierra verificada con multímetro' },
+  { id: 'ptr-03', n: 'Cable de tierra conectado a estructura metálica de paneles' },
+  { id: 'ptr-04', n: 'Cable de tierra conectado a inversor / equipo principal' },
+];
+
 // ── Bloques de ejecución por tipo de sistema ──────────────────────────────────
-// Bloques base: aplican a todos los sistemas
+// Bloques base: aplican a todos los sistemas (sin bloque Preparación)
 function _baseBlocks(techo) {
   const esCemento = techo !== 'metal';
   return [
     {
-      id: 'prep', label: 'Preparación',
-      items: [
-        { id: 'pr-01', n: 'Herramienta y consumibles verificados en vehículo' },
-        { id: 'pr-02', n: 'Diagrama de instalación revisado con el equipo' },
-        { id: 'pr-03', n: 'Área de trabajo limpia y despejada' },
-        { id: 'pr-04', n: 'EPP colocado — casco, arnés y líneas de vida (si aplica)' },
-      ],
-    },
-    {
       id: 'struct', label: 'Estructura / Anclaje',
       items: esCemento ? [
+        { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
         { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
         { id: 'st-02', n: 'Puntos de anclaje marcados según diagrama' },
         { id: 'st-03', n: 'Perforación con rotomartillo — 5 cm profundidad con tubo guía' },
@@ -134,9 +134,10 @@ function _baseBlocks(techo) {
         { id: 'st-09', n: 'Rieles instalados y nivelados' },
         { id: 'st-10', n: 'Cortes de riel correctos (medidas del diagrama)' },
         { id: 'st-11', n: 'Paneles montados con mid/end-clamps' },
-        { id: 'st-12', n: 'Torque aplicado con llave de torque' },
+        { id: 'st-12', n: 'Apriete de sujetadores aplicado con rach' },
         { id: 'st-13', n: 'Bases y tuercas selladas con sellador blanco' },
       ] : [
+        { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
         { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
         { id: 'st-02', n: 'Puntos de anclaje marcados sobre estructura metálica' },
         { id: 'st-03', n: 'Perforación con WD-40 (broca para metal)' },
@@ -145,7 +146,7 @@ function _baseBlocks(techo) {
         { id: 'st-06', n: 'Rieles instalados y nivelados' },
         { id: 'st-07', n: 'Cortes de riel correctos (medidas del diagrama)' },
         { id: 'st-08', n: 'Paneles montados con mid/end-clamps' },
-        { id: 'st-09', n: 'Torque aplicado con llave de torque' },
+        { id: 'st-09', n: 'Apriete de sujetadores aplicado con rach' },
         { id: 'st-10', n: 'Bases y tuercas selladas con sellador transparente' },
       ],
     },
@@ -178,16 +179,17 @@ function _baseBlocks(techo) {
   ];
 }
 
-// Bloques específicos por tipo de sistema
+// Bloques específicos por tipo de sistema (tierra incluida al final de cada inversor)
 const _typeBlocks = {
   interconectado: [
     {
-      id: 'inversor', label: 'Inversor on-grid',
+      id: 'inversor', label: 'Inversor y puesta a tierra',
       items: [
         { id: 'inv-01', n: 'Inversor montado y nivelado en lugar ventilado' },
         { id: 'inv-02', n: 'Conexión DC al inversor verificada' },
         { id: 'inv-03', n: 'Cable AC tendido hasta tablero principal' },
         { id: 'inv-04', n: 'Protección AC (interruptor dedicado) instalada en tablero' },
+        ..._tierraItems,
         { id: 'inv-05', n: 'Inversor energizado — sin fallas ni alarmas' },
         { id: 'inv-06', n: 'Monitoreo configurado y datos visibles' },
       ],
@@ -203,12 +205,13 @@ const _typeBlocks = {
   ],
   hibrido_respaldo: [
     {
-      id: 'inversor', label: 'Inversor híbrido',
+      id: 'inversor', label: 'Inversor y puesta a tierra',
       items: [
         { id: 'inv-01', n: 'Inversor híbrido montado y nivelado' },
         { id: 'inv-02', n: 'Conexión DC (paneles) al inversor verificada' },
         { id: 'inv-03', n: 'Cable AC tendido hasta tablero' },
         { id: 'inv-04', n: 'Protección AC instalada en tablero' },
+        ..._tierraItems,
         { id: 'inv-05', n: 'Modo de operación configurado (grid-tie + respaldo)' },
         { id: 'inv-06', n: 'Inversor energizado — sin fallas' },
       ],
@@ -226,11 +229,12 @@ const _typeBlocks = {
   ],
   aislado: [
     {
-      id: 'inversor', label: 'Inversor / Regulador',
+      id: 'inversor', label: 'Inversor / Regulador y puesta a tierra',
       items: [
         { id: 'inv-01', n: 'Inversor/regulador montado en lugar protegido' },
         { id: 'inv-02', n: 'Conexión DC desde paneles verificada' },
         { id: 'inv-03', n: 'Salida AC configurada y protegida (si aplica)' },
+        ..._tierraItems,
         { id: 'inv-04', n: 'Sistema energizado — sin fallas' },
       ],
     },
@@ -247,11 +251,12 @@ const _typeBlocks = {
   ],
   bombeo: [
     {
-      id: 'controlador', label: 'Controlador de bomba',
+      id: 'controlador', label: 'Controlador de bomba y puesta a tierra',
       items: [
         { id: 'ctrl-01', n: 'Controlador montado en lugar protegido de lluvia' },
         { id: 'ctrl-02', n: 'Conexión DC desde paneles al controlador verificada' },
         { id: 'ctrl-03', n: 'Conexión del motor al controlador verificada' },
+        ..._tierraItems,
         { id: 'ctrl-04', n: 'Parámetros configurados (voltaje, frecuencia, protecciones)' },
       ],
     },
@@ -267,11 +272,12 @@ const _typeBlocks = {
   ],
   sistema_pequeno: [
     {
-      id: 'equipo', label: 'Equipos y conexión',
+      id: 'equipo', label: 'Equipos, conexión y tierra',
       items: [
         { id: 'eq-01', n: 'Panel(es) instalados y correctamente orientados' },
         { id: 'eq-02', n: 'Controlador de carga conectado entre paneles y batería' },
         { id: 'eq-03', n: 'Batería conectada (si incluye)' },
+        ..._tierraItems,
         { id: 'eq-04', n: 'Carga / equipo (congelador, etc.) conectado' },
         { id: 'eq-05', n: 'Sistema energizado — sin fallas' },
       ],
@@ -279,25 +285,15 @@ const _typeBlocks = {
   ],
 };
 
-// Bloques de cierre: aplican a todos los sistemas
+// Bloque de cierre: aplica a todos los sistemas
 const _closingBlocks = [
-  {
-    id: 'tierra', label: 'Puesta a tierra',
-    items: [
-      { id: 'ptr-01', n: 'Varilla PTR enterrada (profundidad suficiente)' },
-      { id: 'ptr-02', n: 'Continuidad de tierra verificada con multímetro' },
-      { id: 'ptr-03', n: 'Cable de tierra conectado a estructura metálica de paneles' },
-      { id: 'ptr-04', n: 'Cable de tierra conectado a inversor / equipo principal' },
-    ],
-  },
   {
     id: 'cierre', label: 'Puesta en marcha y cierre',
     items: [
       { id: 'pm-01', n: 'Voltaje y corriente DC verificados en operación', hasInput: true, inputPlaceholder: 'Ej. 380 V / 8 A' },
       { id: 'pm-02', n: 'Sistema operando sin alarmas ni fallas activas' },
-      { id: 'pm-03', n: 'Fotografías técnicas tomadas (tablero DC, AC, tierra, inversor)' },
-      { id: 'pm-04', n: 'Área de trabajo limpia — material sobrante retirado' },
-      { id: 'pm-05', n: 'Cliente informado y uso del sistema explicado' },
+      { id: 'pm-03', n: 'Fotos técnicas subidas en módulo Garantía', isNav: true, navRoute: 'garantia' },
+      { id: 'pm-04', n: 'Cliente informado y uso del sistema explicado' },
     ],
   },
 ];
