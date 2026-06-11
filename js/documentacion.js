@@ -386,8 +386,16 @@ function renderLevantamiento(project, tipo, edit) {
   const lev = project.documentacion?.levantamiento || {};
   const dis = edit ? '' : 'disabled';
   const pid = project.id;
-  // Sincronizar state de áreas del techo
-  _areasTecho = (lev.areasTecho || []).map(a => ({ ...a }));
+  _levPid = pid;
+  // Sincronizar state de áreas del techo (preserva fotos si existen)
+  _areasTecho = (lev.areasTecho || []).map(a => ({
+    ...a,
+    fotos: a.fotos ? {
+      antes:   Array.isArray(a.fotos.antes)   ? [...a.fotos.antes]   : [],
+      durante: Array.isArray(a.fotos.durante) ? [...a.fotos.durante] : [],
+      cierre:  Array.isArray(a.fotos.cierre)  ? [...a.fotos.cierre]  : [],
+    } : { antes: [], durante: [], cierre: [] },
+  }));
 
   // Reinicializar estado de módulo con datos del proyecto (evita estado stale entre navegaciones)
   _camposLibres = [...(lev.camposLibres || [])];
@@ -559,7 +567,7 @@ function renderLevantamiento(project, tipo, edit) {
           ${edit ? `<button type="button" class="btn-sm btn-outline" onclick="window._addAreaTecho()">+ Área</button>` : ''}
         </div>
         <div id="lev-areas-list">
-          ${_renderAreasTecho(lev.areasTecho || [], edit)}
+          ${_renderAreasTecho(lev.areasTecho || [], edit, pid)}
         </div>
         ${(lev.areasTecho||[]).length === 0 && !edit ? `<p style="font-size:.78rem;color:var(--text-muted);padding:8px 0">Sin áreas registradas</p>` : ''}
       </div>
@@ -1076,6 +1084,7 @@ window.guardarLevantamiento = async function(e, projectId) {
       ancho:  a.ancho  || null,
       largo:  a.largo  || null,
       area:   (a.ancho && a.largo) ? parseFloat((a.ancho*a.largo).toFixed(2)) : null,
+      fotos:  a.fotos  || { antes: [], durante: [], cierre: [] },
     }));
   const areaTotal = areasTechoVal.reduce((s,a)=>s+(a.area||0), 0) || null;
 
@@ -1231,6 +1240,69 @@ window.delFotoLev = async function(pid, idx) {
   const fotos = p.documentacion?.levantamiento?.fotosLevantamiento || [];
   fotos.splice(idx, 1);
   p.documentacion.levantamiento.fotosLevantamiento = fotos;
+  await projects.update(pid, { documentacion: p.documentacion });
+  navigate(`#proyecto/${pid}/documentacion`);
+};
+
+// ── Fotos por área ─────────────────────────────────────────────────────────────
+window._switchAreaFotos = function(areaIdx, subfase, btn) {
+  const SUBFASES = ['antes', 'durante', 'cierre'];
+  // Deactivate all tab buttons for this area
+  SUBFASES.forEach(sf => {
+    const b = document.getElementById(`laf-btn-${areaIdx}-${sf}`);
+    if (b) b.classList.remove('laf-active');
+    const p = document.getElementById(`lev-area-fotos-${areaIdx}-${sf}`);
+    if (p) p.style.display = 'none';
+  });
+  // Activate selected
+  btn.classList.add('laf-active');
+  const panel = document.getElementById(`lev-area-fotos-${areaIdx}-${subfase}`);
+  if (panel) panel.style.display = '';
+};
+
+window.capFotoArea = function(pid, areaIdx, subfase) {
+  capturePhoto(async (b64Array) => {
+    const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
+    const total = fotos.length;
+    const prog = uploadProgressBar(total);
+    const p = await projects.getById(pid);
+    const areas = p.documentacion?.levantamiento?.areasTecho || [];
+    if (!areas[areaIdx]) { toast('Área no encontrada', 'error'); return; }
+    areas[areaIdx].fotos = areas[areaIdx].fotos || { antes: [], durante: [], cierre: [] };
+    for (let i = 0; i < total; i++) {
+      prog.update(i + 1);
+      const fid = uuid();
+      const result = await uploadPhotoQueued(fotos[i],
+        `projects/${pid}/area${areaIdx}_${subfase}_${fid}.jpg`, pid, 'fotoArea',
+        { areaIdx, subfase, itemId: fid });
+      areas[areaIdx].fotos[subfase].push({
+        url: result.url || null, id: fid, createdAt: isoNow(),
+        ...(result.pending && { pending: true, pendingId: result.pendingId }),
+      });
+      // Keep in-memory state in sync
+      if (_areasTecho[areaIdx]) {
+        _areasTecho[areaIdx].fotos = _areasTecho[areaIdx].fotos || { antes: [], durante: [], cierre: [] };
+        _areasTecho[areaIdx].fotos[subfase] = [...areas[areaIdx].fotos[subfase]];
+      }
+    }
+    prog.done();
+    p.documentacion.levantamiento.areasTecho = areas;
+    await projects.update(pid, { documentacion: p.documentacion });
+    navigate(`#proyecto/${pid}/documentacion`);
+    toast(`✅ ${total} foto${total > 1 ? 's' : ''} guardada${total > 1 ? 's' : ''}`);
+  }, { multiple: true });
+};
+
+window.delFotoArea = async function(pid, areaIdx, subfase, fotoIdx) {
+  if (!await confirmDialog('¿Eliminar esta foto?')) return;
+  const p = await projects.getById(pid);
+  const areas = p.documentacion?.levantamiento?.areasTecho || [];
+  if (!areas[areaIdx]?.fotos?.[subfase]) return;
+  areas[areaIdx].fotos[subfase].splice(fotoIdx, 1);
+  if (_areasTecho[areaIdx]?.fotos?.[subfase]) {
+    _areasTecho[areaIdx].fotos[subfase].splice(fotoIdx, 1);
+  }
+  p.documentacion.levantamiento.areasTecho = areas;
   await projects.update(pid, { documentacion: p.documentacion });
   navigate(`#proyecto/${pid}/documentacion`);
 };
@@ -1543,11 +1615,40 @@ window._onTipTechoChange = function(sel) {
 };
 
 // ── Áreas del techo — state y render ─────────────────────────────────────────
-let _areasTecho = [];  // array de {nombre, ancho, largo}
+let _areasTecho = [];  // array de {nombre, ancho, largo, fotos:{antes,durante,cierre}}
+let _levPid = '';      // projectId activo en la vista de levantamiento
 
-function _renderAreasTecho(areas, edit) {
+function _renderAreaFotosPanel(a, i, subfase, edit, pid) {
+  const fotos = (a.fotos?.[subfase]) || [];
+  const isFirst = subfase === 'antes';
+  return `
+  <div id="lev-area-fotos-${i}-${subfase}" class="lev-area-fotos-panel"${isFirst ? '' : ' style="display:none"'}>
+    <div class="lev-area-fotos-grid">
+      ${fotos.map((f, fi) => `
+        <div class="lev-area-foto-wrap">
+          ${fotoMini(f.url || f, `${subfase} ${fi+1}`)}
+          ${edit ? `<button type="button" class="btn-del-foto"
+            onclick="window.delFotoArea('${pid}',${i},'${subfase}',${fi})">✕</button>` : ''}
+        </div>`).join('')}
+      ${edit ? `<button type="button" class="btn-foto-sm lev-area-foto-add"
+        onclick="window.capFotoArea('${pid}',${i},'${subfase}')">${icon('camera')} Foto</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function _renderAreasTecho(areas, edit, pid) {
   if (!areas.length && !edit) return '';
-  return areas.map((a, i) => `
+  const SUBFASES = [
+    { id: 'antes',   label: 'Antes'   },
+    { id: 'durante', label: 'Durante' },
+    { id: 'cierre',  label: 'Cierre'  },
+  ];
+  return areas.map((a, i) => {
+    const fAntes   = (a.fotos?.antes   || []).length;
+    const fDurante = (a.fotos?.durante || []).length;
+    const fCierre  = (a.fotos?.cierre  || []).length;
+    const totalFotos = fAntes + fDurante + fCierre;
+    return `
   <div class="lev-area-item" id="lev-area-${i}">
     <div class="form-row" style="align-items:flex-end">
       <div class="form-group" style="flex:2">
@@ -1575,20 +1676,39 @@ function _renderAreasTecho(areas, edit) {
       ${edit ? `<button type="button" class="btn-icon-sm" style="margin-bottom:4px;color:var(--red)"
         onclick="window._removeAreaTecho(${i})" title="Eliminar área">✕</button>` : ''}
     </div>
-  </div>`).join('');
+    <!-- Fotos por área -->
+    <div class="lev-area-fotos-section">
+      <div class="lev-area-fotos-bar">
+        ${SUBFASES.map((sf, si) => {
+          const cnt = sf.id === 'antes' ? fAntes : sf.id === 'durante' ? fDurante : fCierre;
+          return `<button type="button"
+            class="lev-area-sf-btn${si === 0 ? ' laf-active' : ''}"
+            id="laf-btn-${i}-${sf.id}"
+            onclick="window._switchAreaFotos(${i},'${sf.id}',this)">
+            ${sf.label}${cnt ? `<span class="laf-count">${cnt}</span>` : ''}
+          </button>`;
+        }).join('')}
+        ${totalFotos === 0 && !edit ? '' : ''}
+      </div>
+      ${_renderAreaFotosPanel(a, i, 'antes',   edit, pid || '')}
+      ${_renderAreaFotosPanel(a, i, 'durante', edit, pid || '')}
+      ${_renderAreaFotosPanel(a, i, 'cierre',  edit, pid || '')}
+    </div>
+  </div>`;
+  }).join('');
 }
 
 window._addAreaTecho = function() {
   const n = _areasTecho.length + 1;
-  _areasTecho.push({ nombre: `Área ${n}`, ancho: null, largo: null });
+  _areasTecho.push({ nombre: `Área ${n}`, ancho: null, largo: null, fotos: { antes: [], durante: [], cierre: [] } });
   const list = document.getElementById('lev-areas-list');
-  if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true);
+  if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true, _levPid);
 };
 
 window._removeAreaTecho = function(idx) {
   _areasTecho.splice(idx, 1);
   const list = document.getElementById('lev-areas-list');
-  if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true);
+  if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true, _levPid);
 };
 
 window._updateAreaTecho = function(idx, campo, val) {

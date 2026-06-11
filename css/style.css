@@ -2588,6 +2588,37 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .lev-area-result .input-info-badge { background: rgba(46,189,66,.08); border-color: var(--g500);
                                       color: var(--g300); font-weight: 700; }
 
+/* ── Fotos por área ──────────────────────────────────────────────────────── */
+.lev-area-fotos-section { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+.lev-area-fotos-bar {
+  display: flex; gap: 4px; margin-bottom: 8px;
+}
+.lev-area-sf-btn {
+  flex: 1; padding: 5px 8px; font-size: .75rem; font-weight: 600;
+  background: var(--surface3); border: 1px solid var(--border);
+  border-radius: var(--radius-pill); color: var(--text-muted);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;
+  transition: background .15s, color .15s;
+}
+.lev-area-sf-btn.laf-active {
+  background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700;
+}
+.laf-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: rgba(0,0,0,.25); font-size: .68rem; font-weight: 700;
+}
+.lev-area-sf-btn.laf-active .laf-count { background: rgba(0,0,0,.3); color: #000; }
+.lev-area-fotos-panel { padding-top: 2px; }
+.lev-area-fotos-grid {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start;
+}
+.lev-area-foto-wrap { position: relative; }
+.lev-area-foto-wrap .btn-del-foto {
+  position: absolute; top: 2px; right: 2px;
+}
+.lev-area-foto-add { margin-top: 2px; }
+
 
 /* ── Historial de cambios ─────────────────────────────────────────────────── */
 .changelog-card { padding: 12px 16px; }
