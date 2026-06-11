@@ -2620,6 +2620,80 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .lev-area-foto-add { margin-top: 2px; }
 
 
+/* ── Trayecto guiado — botón CTA en detalle del proyecto ─────────────────── */
+.tool-btn-trayecto {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 14px 18px; margin: 0 0 10px;
+  background: linear-gradient(135deg, rgba(46,189,66,.15) 0%, rgba(46,189,66,.05) 100%);
+  border: 1px solid var(--accent); border-radius: var(--radius);
+  color: var(--accent); cursor: pointer; text-align: left;
+  transition: background .18s;
+}
+.tool-btn-trayecto:active { background: rgba(46,189,66,.22); }
+.tool-btn-trayecto > span:first-of-type { font-weight: 700; font-size: .92rem; flex: 1; }
+.trayecto-sub { font-size: .75rem; color: var(--text-muted); font-weight: 400; }
+
+/* ── Trayecto — vista step-by-step ──────────────────────────────────────── */
+.tr-progress-card { padding: 14px 16px; margin-bottom: 6px; }
+.tr-prog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.tr-prog-label { font-size: .82rem; font-weight: 600; color: var(--text-muted); }
+.tr-prog-pct { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.tr-pct-done { color: var(--accent); }
+.tr-prog-bar-track { height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+.tr-prog-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width .4s ease; }
+.tr-bar-done { background: var(--accent); }
+.tr-listo-msg { font-size: .84rem; color: var(--accent); margin: 10px 0 6px; display: flex; align-items: center; gap: 6px; }
+.tr-firmar-btn { width: 100%; margin-top: 8px; }
+
+.tr-pasos { display: flex; flex-direction: column; gap: 6px; }
+
+.tr-paso {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); overflow: hidden;
+  transition: border-color .2s;
+}
+.tr-paso-ok { opacity: .65; }
+.tr-paso-current {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, rgba(46,189,66,.06) 0%, var(--surface2) 60%);
+}
+
+.tr-paso-head {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+}
+.tr-paso-num {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface3); border: 1.5px solid var(--border2);
+  font-size: .75rem; font-weight: 700; color: var(--text-muted);
+}
+.tr-num-ok { background: rgba(46,189,66,.18); border-color: var(--accent); color: var(--accent); }
+.tr-num-cur { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 800; }
+
+.tr-paso-info { flex: 1; min-width: 0; }
+.tr-paso-titulo { display: block; font-size: .88rem; font-weight: 600; color: var(--text); }
+.tr-paso-hint { display: block; font-size: .75rem; color: var(--text-muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.tr-chip-ok {
+  flex-shrink: 0; font-size: .7rem; font-weight: 700; padding: 3px 8px;
+  background: rgba(46,189,66,.15); color: var(--accent); border-radius: var(--radius-pill);
+}
+
+.tr-paso-body, .tr-paso-body-skip {
+  padding: 0 14px 14px; border-top: 1px solid var(--border);
+}
+.tr-paso-body { border-top-color: rgba(46,189,66,.25); }
+.tr-paso-desc { font-size: .82rem; color: var(--text-muted); margin: 10px 0 12px; line-height: 1.45; }
+.tr-paso-actions { display: flex; gap: 8px; align-items: center; }
+.tr-ir-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.tr-omitir-btn { flex: 1; font-size: .8rem; display: flex; align-items: center; justify-content: center; gap: 6px; }
+
+.tr-footer-hint {
+  text-align: center; padding: 14px 16px 20px;
+  font-size: .76rem; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
 /* ── Quick-Check: pendientes críticos ────────────────────────────────────── */
 .qc-card { padding: 14px 16px; }
 .qc-count {

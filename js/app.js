@@ -14,6 +14,7 @@ import { renderInventario } from './inventario.js';
 import { renderCalculadora } from './calculadora.js';
 import { renderChecklistModule, renderChecklistsList } from './checklist.js';
 import { renderDimensionamiento } from './dimensionamiento.js';
+import { renderTrayecto } from './trayecto.js';
 import { projects, users } from './db.js';
 import { toast, esc } from './utils.js';
 import { icon } from './icons.js';
@@ -213,6 +214,8 @@ async function route() {
             navigate(`#proyecto/${id}`); return;
           }
           await render(renderAuditoria(id, session));
+        } else if (sub === 'trayecto') {
+          await render(renderTrayecto(id, session));
         } else if (sub === 'qr') {
           await render(renderQR(id, session));
         } else if (sub === 'pdf') {

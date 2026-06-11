@@ -411,6 +411,12 @@ function renderModulosProgreso(project, id, session, admin) {
   </div>
 
 
+  <!-- CTA trayecto inmersivo -->
+  <button class="tool-btn-trayecto" onclick="navigate('#proyecto/${id}/trayecto')">
+    ${icon('list-numbers', 20)}<span>Trayecto guiado</span>
+    <span class="trayecto-sub">Un Solo Camino →</span>
+  </button>
+
   <!-- Herramientas secundarias -->
   <div class="tools-row">
     <button class="tool-btn" onclick="navigate('#calculadora/${id}')">
