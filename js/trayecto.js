@@ -217,10 +217,11 @@ export async function renderTrayecto(projectId, session) {
   <div class="tr-pasos">
     ${pasos.map((paso, i) => {
       const esCurrent = !todoListo && i === primerPend;
-      const esOmitible = !paso.ok && i !== primerPend;
+      // Pendientes no actuales: tarjeta compacta tappable (saltable sin fricción)
+      const headClick = !esCurrent && !paso.ok ? ` onclick="navigate('${paso.link}')"` : '';
       return `
-    <div class="tr-paso ${paso.ok ? 'tr-paso-ok' : ''} ${esCurrent ? 'tr-paso-current' : ''}"
-         id="tr-paso-${paso.id}">
+    <div class="tr-paso ${paso.ok ? 'tr-paso-ok' : ''} ${esCurrent ? 'tr-paso-current' : ''} ${headClick ? 'tr-paso-tap' : ''}"
+         id="tr-paso-${paso.id}"${headClick}>
       <div class="tr-paso-head">
         <div class="tr-paso-num ${paso.ok ? 'tr-num-ok' : esCurrent ? 'tr-num-cur' : ''}">
           ${paso.ok ? icon('check', 13) : `<span>${i+1}</span>`}
@@ -229,7 +230,8 @@ export async function renderTrayecto(projectId, session) {
           <span class="tr-paso-titulo">${paso.emoji} ${esc(paso.titulo)}</span>
           <span class="tr-paso-hint">${esc(paso.hint)}</span>
         </div>
-        ${paso.ok ? `<span class="tr-chip-ok">Completo</span>` : ''}
+        ${paso.ok ? `<span class="tr-chip-ok">Completo</span>`
+          : !esCurrent ? icon('caret-right', 14, 'tr-paso-go') : ''}
       </div>
 
       ${esCurrent ? `
@@ -238,14 +240,6 @@ export async function renderTrayecto(projectId, session) {
         <div class="tr-paso-actions">
           <button class="btn-primary tr-ir-btn" onclick="navigate('${paso.link}')">
             Ir a este paso ${icon('arrow-right', 14)}
-          </button>
-        </div>
-      </div>` : !paso.ok ? `
-      <div class="tr-paso-body-skip">
-        <p class="tr-paso-desc">${esc(paso.desc)}</p>
-        <div class="tr-paso-actions">
-          <button class="btn-outline tr-omitir-btn" onclick="navigate('${paso.link}')">
-            Ir de todas formas ${icon('arrow-right', 14)}
           </button>
         </div>
       </div>` : ''}

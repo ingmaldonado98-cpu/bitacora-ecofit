@@ -411,14 +411,11 @@ function renderModulosProgreso(project, id, session, admin) {
   </div>
 
 
-  <!-- CTA trayecto inmersivo -->
-  <button class="tool-btn-trayecto" onclick="navigate('#proyecto/${id}/trayecto')">
-    ${icon('list-numbers', 20)}<span>Trayecto guiado</span>
-    <span class="trayecto-sub">Un Solo Camino →</span>
-  </button>
-
   <!-- Herramientas secundarias -->
   <div class="tools-row">
+    <button class="tool-btn" onclick="navigate('#proyecto/${id}/trayecto')">
+      ${icon('list-numbers', 18)}<span>Trayecto</span>
+    </button>
     <button class="tool-btn" onclick="navigate('#calculadora/${id}')">
       ${icon('calculator', 18)}<span>Calculadora</span>
     </button>
@@ -514,6 +511,9 @@ function renderQuickCheck(project, id, admin) {
         ${icon('caret-right', 14, 'qc-arrow')}
       </div>`).join('')}
     </div>
+    <button class="qc-trayecto-cta" onclick="navigate('#proyecto/${id}/trayecto')">
+      ${icon('list-numbers', 16)} Resolver con el trayecto guiado ${icon('arrow-right', 14)}
+    </button>
   </div>`;
 }
 

@@ -1721,8 +1721,13 @@ function _renderAreasTecho(areas, edit, pid) {
       ${edit ? `<button type="button" class="btn-icon-sm" style="margin-bottom:4px;color:var(--red)"
         onclick="window._removeAreaTecho(${i})" title="Eliminar área">✕</button>` : ''}
     </div>
-    <!-- Fotos por área -->
-    <div class="lev-area-fotos-section">
+    <!-- Fotos por área — colapsadas en modo lectura -->
+    ${!edit ? `
+    <button type="button" class="lev-area-fotos-toggle"
+            onclick="const s=document.getElementById('laf-sec-${i}');const open=s.style.display==='none';s.style.display=open?'':'none';this.querySelector('.laft-caret').textContent=open?'▾':'▸'">
+      ${icon('camera', 13)} Fotos (${totalFotos}) <span class="laft-caret">▸</span>
+    </button>` : ''}
+    <div class="lev-area-fotos-section" id="laf-sec-${i}" ${!edit ? 'style="display:none"' : ''}>
       <div class="lev-area-fotos-bar">
         ${SUBFASES.map((sf, si) => {
           const cnt = sf.id === 'antes' ? fAntes : sf.id === 'durante' ? fDurante : fCierre;

@@ -2589,7 +2589,16 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
                                       color: var(--g300); font-weight: 700; }
 
 /* ── Fotos por área ──────────────────────────────────────────────────────── */
+.lev-area-fotos-toggle {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; margin-top: 8px; padding: 7px 10px;
+  background: none; border: none; border-top: 1px solid var(--border);
+  color: var(--text-muted); font-size: .76rem; font-weight: 600;
+  cursor: pointer; text-align: left;
+}
+.laft-caret { margin-left: auto; }
 .lev-area-fotos-section { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+.lev-area-fotos-toggle + .lev-area-fotos-section { border-top: none; margin-top: 0; padding-top: 4px; }
 .lev-area-fotos-bar {
   display: flex; gap: 4px; margin-bottom: 8px;
 }
@@ -2619,19 +2628,6 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 }
 .lev-area-foto-add { margin-top: 2px; }
 
-
-/* ── Trayecto guiado — botón CTA en detalle del proyecto ─────────────────── */
-.tool-btn-trayecto {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%; padding: 14px 18px; margin: 0 0 10px;
-  background: linear-gradient(135deg, rgba(46,189,66,.15) 0%, rgba(46,189,66,.05) 100%);
-  border: 1px solid var(--accent); border-radius: var(--radius);
-  color: var(--accent); cursor: pointer; text-align: left;
-  transition: background .18s;
-}
-.tool-btn-trayecto:active { background: rgba(46,189,66,.22); }
-.tool-btn-trayecto > span:first-of-type { font-weight: 700; font-size: .92rem; flex: 1; }
-.trayecto-sub { font-size: .75rem; color: var(--text-muted); font-weight: 400; }
 
 /* ── Trayecto — vista step-by-step ──────────────────────────────────────── */
 .tr-progress-card { padding: 14px 16px; margin-bottom: 6px; }
@@ -2688,6 +2684,10 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .tr-ir-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .tr-omitir-btn { flex: 1; font-size: .8rem; display: flex; align-items: center; justify-content: center; gap: 6px; }
 
+.tr-paso-tap { cursor: pointer; }
+.tr-paso-tap:active { background: var(--surface3); }
+.tr-paso-go { color: var(--text-muted); flex-shrink: 0; }
+
 .tr-footer-hint {
   text-align: center; padding: 14px 16px 20px;
   font-size: .76rem; color: var(--text-muted);
@@ -2716,6 +2716,15 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .qc-label { flex: 1; font-size: .82rem; color: var(--text); }
 .qc-mod-tag { font-size: .7rem; font-weight: 700; opacity: .9; flex-shrink: 0; }
 .qc-arrow { color: var(--text-muted); flex-shrink: 0; }
+.qc-trayecto-cta {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; margin-top: 10px; padding: 11px 14px;
+  background: rgba(46,189,66,.1); border: 1px solid var(--accent);
+  border-radius: var(--radius-btn); color: var(--accent);
+  font-size: .84rem; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.qc-trayecto-cta:active { background: rgba(46,189,66,.2); }
 
 /* ── Historial de cambios ─────────────────────────────────────────────────── */
 .changelog-card { padding: 12px 16px; }
