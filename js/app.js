@@ -13,6 +13,7 @@ import { renderConcluidos } from './concluidos.js';
 import { renderInventario } from './inventario.js';
 import { renderCalculadora } from './calculadora.js';
 import { renderChecklistModule, renderChecklistsList } from './checklist.js';
+import { renderDimensionamiento } from './dimensionamiento.js';
 import { projects, users } from './db.js';
 import { toast, esc } from './utils.js';
 import { icon } from './icons.js';
@@ -239,6 +240,10 @@ async function route() {
 
       case 'checklist':
         await render(renderChecklistModule(id, session));
+        break;
+
+      case 'dimensionamiento':
+        await render(renderDimensionamiento(id, session));
         break;
 
       case 'concluidos':

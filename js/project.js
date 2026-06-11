@@ -416,6 +416,9 @@ function renderModulosProgreso(project, id, session, admin) {
     <button class="tool-btn" onclick="navigate('#checklist/${id}')">
       ${icon('check-square', 18)}<span>Checklist</span>
     </button>
+    <button class="tool-btn" onclick="navigate('#dimensionamiento/${id}')">
+      ${icon('chart-line-up', 18)}<span>Dimensionamiento</span>
+    </button>
     <button class="tool-btn" onclick="navigate('#proyecto/${id}/qr')">
       ${icon('qr-code', 18)}<span>QR Cliente</span>
     </button>

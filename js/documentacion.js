@@ -633,9 +633,16 @@ function renderLevantamiento(project, tipo, edit) {
 
     ${acc('notas', 'Notas del levantamiento', '📝', hasNotas, `
       <div class="form-group">
-        <textarea name="observacionesGenerales" rows="4" ${dis}
+        <label>Observaciones generales</label>
+        <textarea name="observacionesGenerales" rows="3" ${dis}
           placeholder="Condiciones especiales del sitio, acuerdos con el cliente, materiales extra, pendientes…"
         >${esc(lev.observacionesGenerales||'')}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Restricciones especiales <span class="form-hint">para la memoria técnica</span></label>
+        <textarea name="restricciones" rows="2" ${dis}
+          placeholder="Ej. Alta salinidad por ambiente marino / Vientos de 180 km/h en temporada de huracanes / Sin conexión a CFE"
+        >${esc(lev.restricciones||'')}</textarea>
       </div>
     `)}
 
@@ -651,11 +658,33 @@ function renderCamposDinamicos(tipo, lev, edit, pid) {
   if (tipo === 'interconectado' || tipo === 'hibrido' || tipo === 'hibrido_respaldo') {
     return `
     <div class="card">
-      <h3 class="card-title">Tarifa CFE</h3>
-      <select name="tarifaCFE" ${dis}>
-        ${['DAC','1','1A','1B','1C','1D','1E','1F','OM','OMF','PDBT','GDMT','Otra'].map(t=>
-          `<option ${lev.tarifaCFE===t?'selected':''}>${t}</option>`).join('')}
-      </select>
+      <h3 class="card-title">Tarifa CFE y contrato</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tarifa</label>
+          <select name="tarifaCFE" ${dis}>
+            ${['DAC','1','1A','1B','1C','1D','1E','1F','OM','OMF','PDBT','GDMT','Otra'].map(t=>
+              `<option ${lev.tarifaCFE===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Demanda contratada (kW) <span class="form-hint">opcional</span></label>
+          <input type="number" name="demandaKW" value="${lev.demandaKW||''}" min="0" step="0.5" placeholder="Ej. 5" ${dis}/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Factor de potencia <span class="form-hint">opcional</span></label>
+          <input type="number" name="factorPotencia" value="${lev.factorPotencia||''}" min="0.5" max="1" step="0.01" placeholder="Ej. 0.90" ${dis}/>
+        </div>
+        <div class="form-group">
+          <label>Horario de uso</label>
+          <select name="horarioUso" ${dis}>
+            ${['Residencial 24h','Comercial diurno (9–19h)','Comercial nocturno','Agropecuario / rancho','Industrial'].map(t=>
+              `<option ${lev.horarioUso===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
     </div>
     <div class="card">
       <h3 class="card-title">Consumo del cliente</h3>
@@ -1072,10 +1101,14 @@ window.guardarLevantamiento = async function(e, projectId) {
     sombras:             { checklist:sombrasChecklist, foto:lev.sombras?.foto||null, notas:fd.get('sombraNotas')||'' },
     fotosLevantamiento:  lev.fotosLevantamiento || [],
     observacionesGenerales: fd.get('observacionesGenerales') || '',
+    restricciones:          fd.get('restricciones') || '',
+    horarioUso:             fd.get('horarioUso') || null,
   };
 
   if (tipo==='interconectado'||tipo==='hibrido'||tipo==='hibrido_respaldo') {
-    newLev.tarifaCFE   = fd.get('tarifaCFE');
+    newLev.tarifaCFE      = fd.get('tarifaCFE');
+    newLev.demandaKW      = parseFloat(fd.get('demandaKW')) || null;
+    newLev.factorPotencia = parseFloat(fd.get('factorPotencia')) || null;
     newLev.modoConsumo = modoConsumo;
     newLev.recibos     = modoConsumo==='recibo' ? _recibos : [];
     newLev.aparatos    = modoConsumo==='aparatos' ? _aparatos : [];
