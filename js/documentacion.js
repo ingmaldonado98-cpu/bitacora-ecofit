@@ -1266,7 +1266,7 @@ window.capFotoLev = function(pid) {
     fotos.push({ url: fotoUrl, ts: new Date().toISOString() });
     p.documentacion.levantamiento.fotosLevantamiento = fotos;
     await projects.update(pid, { documentacion: p.documentacion });
-    navigate(`#proyecto/${pid}/documentacion`);
+    navigate(`#proyecto/${pid}/levantamiento`);
   });
 };
 
@@ -1276,7 +1276,7 @@ window.delFotoLev = async function(pid, idx) {
   fotos.splice(idx, 1);
   p.documentacion.levantamiento.fotosLevantamiento = fotos;
   await projects.update(pid, { documentacion: p.documentacion });
-  navigate(`#proyecto/${pid}/documentacion`);
+  navigate(`#proyecto/${pid}/levantamiento`);
 };
 
 // ── Fotos por área ─────────────────────────────────────────────────────────────
@@ -1306,7 +1306,7 @@ window.capFotoArea = function(pid, areaIdx) {
     prog.done();
     p.documentacion.levantamiento.areasTecho = areas;
     await projects.update(pid, { documentacion: p.documentacion });
-    navigate(`#proyecto/${pid}/documentacion`);
+    navigate(`#proyecto/${pid}/levantamiento`);
     toast(`✅ ${total} foto${total > 1 ? 's' : ''} guardada${total > 1 ? 's' : ''}`);
   }, { multiple: true });
 };
@@ -1320,7 +1320,7 @@ window.delFotoArea = async function(pid, areaIdx, fotoIdx) {
   if (_areasTecho[areaIdx]?.fotos) _areasTecho[areaIdx].fotos.splice(fotoIdx, 1);
   p.documentacion.levantamiento.areasTecho = areas;
   await projects.update(pid, { documentacion: p.documentacion });
-  navigate(`#proyecto/${pid}/documentacion`);
+  navigate(`#proyecto/${pid}/levantamiento`);
 };
 
 // ── Acordeón helper ───────────────────────────────────────────────────────────
@@ -1744,3 +1744,24 @@ window._updateAreaTecho = function(idx, campo, val) {
   if (res) res.innerHTML = (a.ancho && a.largo)
     ? `<strong>${(a.ancho * a.largo).toFixed(1)} m²</strong>` : '—';
 };
+
+// ── Levantamiento como vista standalone ────────────────────────────────────────
+export async function renderLevantamientoView(projectId, session) {
+  const project = await projects.getById(projectId);
+  if (!project) return '<p class="empty-msg">Proyecto no encontrado.</p>';
+  const edit = canEdit(session, project);
+  const tipo = project.tipoSistema || 'otro';
+
+  return `
+  <div class="view-header">
+    <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
+      ${icon('caret-left')}
+    </button>
+    <h1 class="hdr-title">Levantamiento</h1>
+    <span class="hdr-sub">${esc(project.displayId)}</span>
+  </div>
+
+  <div class="lev-standalone">
+    ${renderLevantamiento(project, tipo, edit)}
+  </div>`;
+}

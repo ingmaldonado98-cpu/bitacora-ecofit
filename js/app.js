@@ -4,7 +4,7 @@ import { renderLogin, getSession, logout, requireAuth } from './auth.js';
 import { renderDashboard, initDashboardFilters, populateTecnicoFilter, updateNavBadge } from './dashboard.js';
 import { renderProjectDetail, renderProjectForm, calcFaseEstado } from './project.js';
 import { renderGarantia, renderEstructuraForm } from './garantia.js';
-import { renderDocumentacion } from './documentacion.js';
+import { renderDocumentacion, renderLevantamientoView } from './documentacion.js';
 import { renderAuditoria } from './auditoria.js';
 import { renderQR } from './qr.js';
 import { renderPDFExport } from './pdf.js';
@@ -204,6 +204,8 @@ async function route() {
             }
             await render(renderGarantia(id, session));
           }
+        } else if (sub === 'levantamiento') {
+          await render(renderLevantamientoView(id, session));
         } else if (sub === 'documentacion') {
           await render(renderDocumentacion(id, session));
         } else if (sub === 'auditoria') {

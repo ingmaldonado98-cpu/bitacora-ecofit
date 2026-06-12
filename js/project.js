@@ -48,13 +48,16 @@ export async function renderProjectDetail(id, session) {
   const _fT = ['antes','durante','cierre'].reduce((s,f)=>s+_pfc('techo',f),0);
   const _fC = ['antes','durante','cierre'].reduce((s,f)=>s+_pfc('centrosCarga',f),0);
   const _fZ = ['antes','durante','cierre'].reduce((s,f)=>s+_pfc('zonaDelSistema',f),0);
-  const _dItems = _esPeq ? [!!_dDoc.levantamiento?.tipTecho] : [!!_dDoc.levantamiento?.tipTecho, _fT>0, _fC>0, _fZ>0];
-  const docPct  = Math.round(_dItems.filter(Boolean).length / _dItems.length * 100);
+  const levPct  = _dDoc.levantamiento?.tipTecho ? 100 : 0;
+  const _dItems = _esPeq ? [] : [_fT>0, _fC>0, _fZ>0];
+  const docPct  = _dItems.length ? Math.round(_dItems.filter(Boolean).length / _dItems.length * 100) : 0;
   const _gItems = _esPeq
     ? [!!_dGar.fotoSistema, totalEquipos>0, totalPaneles>0]
     : [!!_dGar.fotoSistema, !!(_dFt.tableroAC||_dFt.inversorEnergizado), totalEquipos>0, totalPaneles>0];
   const garPct     = Math.round(_gItems.filter(Boolean).length / _gItems.length * 100);
-  const generalPct = Math.round((docPct + garPct) / 2);
+  const generalPct = _esPeq
+    ? Math.round((levPct + garPct) / 2)
+    : Math.round((levPct + docPct + garPct) / 3);
   const _circ      = 175.93;
   const _dash      = ((generalPct / 100) * _circ).toFixed(1);
 
@@ -155,7 +158,8 @@ export async function renderProjectDetail(id, session) {
       <text x="35" y="40" text-anchor="middle" class="donut-pct-text">${generalPct}%</text>
     </svg>
     <div class="donut-subs">
-      <span class="dsub">Doc <b>${docPct}%</b></span>
+      <span class="dsub">Lev <b>${levPct}%</b></span>
+      ${!_esPeq ? `<span class="dsub">Doc <b>${docPct}%</b></span>` : ''}
       <span class="dsub">Gar <b>${garPct}%</b></span>
     </div>
   </div>
@@ -350,18 +354,25 @@ function renderModulosProgreso(project, id, session, admin) {
 
   const esPequenoTipo = project.tipoSistema === 'sistema_pequeno';
 
-  // Mismos ítems que calcFaseEstado — mantener en sincronía para que
-  // dashboard y detalle muestren el mismo porcentaje.
+  // Levantamiento (módulo independiente)
+  const levAreas = doc.levantamiento?.areasTecho?.length || 0;
+  const levItems = [
+    { label: 'Tipo de techo',             ok: !!(doc.levantamiento?.tipTecho) },
+    { label: `Áreas (${levAreas})`,       ok: levAreas > 0 },
+  ];
+  const levDone = levItems.filter(i=>i.ok).length;
+  const levPct  = Math.round(levDone / levItems.length * 100);
+
+  // Documentación: fases (techo/centros/zona) — sin levantamiento
   const docItems = esPequenoTipo
-    ? [ { label: 'Levantamiento', ok: !!(doc.levantamiento?.tipTecho) } ]
+    ? []
     : [
-        { label: 'Levantamiento',                    ok: !!(doc.levantamiento?.tipTecho) },
-        { label: `Techo (${fTecho})`,                ok: fTecho > 0 },
-        { label: `Centros de carga (${fCentros})`,   ok: fCentros > 0 },
-        { label: `Zona del sistema (${fZona})`,      ok: fZona > 0 },
+        { label: `Techo (${fTecho})`,              ok: fTecho > 0 },
+        { label: `Centros de carga (${fCentros})`, ok: fCentros > 0 },
+        { label: `Zona del sistema (${fZona})`,    ok: fZona > 0 },
       ];
-  const docDone = docItems.filter(i=>i.ok).length;
-  const docPct  = Math.round(docDone / docItems.length * 100);
+  const docDone = docItems.length ? docItems.filter(i=>i.ok).length : 0;
+  const docPct  = docItems.length ? Math.round(docDone / docItems.length * 100) : 0;
 
   // Garantía: foto sistema + fotos técnicas + equipos + paneles
   const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
@@ -395,10 +406,10 @@ function renderModulosProgreso(project, id, session, admin) {
 
   const estado = calcFaseEstado(project);
 
-  // Progreso general: misma fórmula que el dashboard (fases con peso igual,
-  // independiente del rol de quien lo ve)
-  const base       = esPequeno ? 200 : 300;
-  const generalPct = Math.round((docPct + garPct + (esPequeno ? 0 : audPct)) / base * 100);
+  // Progreso general: levantamiento + doc (si aplica) + garantía
+  const generalPct = esPequeno
+    ? Math.round((levPct + garPct) / 2)
+    : Math.round((levPct + docPct + garPct) / 3);
 
   const modCard = (title, iconName, colorClass, pct, items, link, faseKey) => {
     const locked = !admin && estado[faseKey] === 'bloqueada';
@@ -433,7 +444,8 @@ function renderModulosProgreso(project, id, session, admin) {
 
   return `
   <div class="modulos-progreso">
-    ${modCard('Documentación', 'clipboard-text', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`, 'doc')}
+    ${modCard('Levantamiento', 'clipboard-text', 'mpc-lev', levPct, levItems, `#proyecto/${id}/levantamiento`, 'lev')}
+    ${!esPequeno ? modCard('Documentación', 'camera', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`, 'doc') : ''}
     ${modCard('Garantía', 'seal-check', 'mpc-gar', garPct, garItems, `#proyecto/${id}/garantia`, 'gar')}
     ${puedeAuditoria ? modCard('Auditoría', 'magnifying-glass-plus', 'mpc-aud', audPct, audItems, `#proyecto/${id}/auditoria`, 'aud') : ''}
   </div>
@@ -486,13 +498,13 @@ function renderQuickCheck(project, id, admin, inline = false) {
   const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
   const checkDone = aud.checklist?.length || 0;
 
+  const levItems = [ { label: 'Levantamiento (tipo de techo)', ok: !!(doc.levantamiento?.tipTecho) } ];
   const docItems = esPequeno
-    ? [ { label: 'Levantamiento', ok: !!(doc.levantamiento?.tipTecho) } ]
+    ? []
     : [
-        { label: 'Levantamiento',                  ok: !!(doc.levantamiento?.tipTecho) },
-        { label: `Fotos techo (${fTecho})`,         ok: fTecho > 0 },
-        { label: `Fotos centros de carga`,          ok: fCentros > 0 },
-        { label: `Fotos zona del sistema`,          ok: fZona > 0 },
+        { label: `Fotos techo (${fTecho})`,    ok: fTecho > 0 },
+        { label: `Fotos centros de carga`,     ok: fCentros > 0 },
+        { label: `Fotos zona del sistema`,     ok: fZona > 0 },
       ];
   const garItems = esPequeno
     ? [
@@ -516,6 +528,7 @@ function renderQuickCheck(project, id, admin, inline = false) {
   const audLocked = estado.aud === 'bloqueada';
 
   const pendientes = [
+    ...levItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'lev', link: `#proyecto/${id}/levantamiento`, modLabel: 'Lev' })),
     ...(!docLocked ? docItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'doc', link: `#proyecto/${id}/documentacion`, modLabel: 'Doc' })) : []),
     ...(!garLocked ? garItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'gar', link: `#proyecto/${id}/garantia`,      modLabel: 'Garantía' })) : []),
     ...(!audLocked ? audItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'aud', link: `#proyecto/${id}/auditoria`,     modLabel: 'Auditoría' })) : []),
@@ -523,7 +536,7 @@ function renderQuickCheck(project, id, admin, inline = false) {
 
   if (!pendientes.length) return '';
 
-  const modColor = { doc: 'var(--accent)', gar: '#f0c000', aud: '#86868b' };
+  const modColor = { lev: '#3b82f6', doc: 'var(--accent)', gar: '#f0c000', aud: '#86868b' };
 
   const header = `<div class="card-title-row">
       <h3 class="card-title">${icon('warning-circle', 15)} Pendientes <span class="qc-count">${pendientes.length}</span></h3>
