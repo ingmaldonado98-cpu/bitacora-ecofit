@@ -445,7 +445,7 @@ function renderModulosProgreso(project, id, session, admin) {
   return `
   <div class="modulos-progreso">
     ${modCard('Levantamiento', 'clipboard-text', 'mpc-lev', levPct, levItems, `#proyecto/${id}/levantamiento`, 'lev')}
-    ${!esPequeno ? modCard('Documentación', 'camera', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`, 'doc') : ''}
+    ${!esPequeno ? modCard('Progreso de obra', 'camera', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`, 'doc') : ''}
     ${modCard('Garantía', 'seal-check', 'mpc-gar', garPct, garItems, `#proyecto/${id}/garantia`, 'gar')}
     ${puedeAuditoria ? modCard('Auditoría', 'magnifying-glass-plus', 'mpc-aud', audPct, audItems, `#proyecto/${id}/auditoria`, 'aud') : ''}
   </div>

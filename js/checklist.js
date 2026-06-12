@@ -37,11 +37,6 @@ export async function renderChecklistModule(projectId, session) {
   const totalMat  = bomItems.length + consumibles.length;
   const doneMat   = doneBOM + doneCons;
 
-  // Bloques de ejecución por tipo de sistema
-  const execBlocks   = getExecBlocks(project.tipoSistema, techo);
-  const execAllItems = execBlocks.flatMap(b => b.items);
-  const doneExec     = execAllItems.filter(it => cl.exec?.[it.id]).length;
-  const totalExec    = execAllItems.length;
 
   // Torques: tabla de referencia vs. valores registrados
   const torqueRows  = buildTorqueTable(estructura || cfg?.estructura || 'k2', techo);
@@ -89,9 +84,6 @@ export async function renderChecklistModule(projectId, session) {
     </button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-cons" tabindex="-1" data-tab="cl-cons" onclick="switchTab('cl-tabs','cl-cons',this)">
       Materiales${totalMat > 0 && doneMat === totalMat ? '<span class="tab-badge tab-ok">✓</span>' : (totalMat > 0 ? `<span class="tab-badge">${doneMat}/${totalMat}</span>` : '')}
-    </button>
-    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-exec" tabindex="-1" data-tab="cl-exec" onclick="switchTab('cl-tabs','cl-exec',this)">
-      Ejecución${doneExec === totalExec && totalExec ? '<span class="tab-badge tab-ok">✓</span>' : `<span class="tab-badge">${doneExec}/${totalExec}</span>`}
     </button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-consulta" tabindex="-1" data-tab="cl-consulta" onclick="switchTab('cl-tabs','cl-consulta',this)">
       Consulta
@@ -193,58 +185,6 @@ export async function renderChecklistModule(projectId, session) {
         </button>
       </div>
     </div>`}
-  </div>
-
-  <!-- Ejecución por bloques -->
-  <div id="cl-exec" class="tab-panel">
-    ${renderProgress(doneExec, totalExec)}
-    ${execBlocks.map(block => {
-      const blockDone  = block.items.filter(it => cl.exec?.[it.id]).length;
-      const blockTotal = block.items.length;
-      const allDone    = blockDone === blockTotal;
-      return `
-      <details class="cl-exec-block card" ${allDone ? '' : 'open'}>
-        <summary class="cl-exec-block-hdr">
-          <span class="cl-exec-block-title">${esc(block.label)}</span>
-          <span class="cl-exec-block-badge ${allDone ? 'cl-exec-ok' : ''}">${allDone ? '✓' : `${blockDone}/${blockTotal}`}</span>
-          <span class="cl-exec-caret">▾</span>
-        </summary>
-        <div class="cl-item-list" style="padding:0 4px 8px">
-          ${block.items.map(it => {
-            const savedVal = cl.execText?.[it.id] || '';
-            if (it.isNav) {
-              return `
-          <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
-            <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
-              onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${projectId}','${it.id}',this.checked)">
-            <div class="cl-item-text" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-              <span class="cl-item-name">${esc(it.n)}</span>
-              <button class="btn-outline btn-sm" style="flex-shrink:0"
-                onclick="event.preventDefault();event.stopPropagation();navigate('#${esc(it.navRoute)}/${projectId}')">
-                Ir →
-              </button>
-            </div>
-          </label>`;
-            }
-            return `
-          <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
-            <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
-              onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${projectId}','${it.id}',this.checked)">
-            <div class="cl-item-text" style="width:100%">
-              <span class="cl-item-name">${esc(it.n)}</span>
-              ${it.hasInput ? `<div style="margin-top:6px">
-                <input type="text" class="torq-input" style="max-width:180px"
-                  placeholder="${esc(it.inputPlaceholder || 'Valor medido')}" ${!edit ? 'disabled' : ''}
-                  value="${esc(savedVal)}"
-                  onchange="clSaveExecText('${projectId}','${it.id}',this.value)"
-                  onclick="event.stopPropagation()">
-              </div>` : ''}
-            </div>
-          </label>`;
-          }).join('')}
-        </div>
-      </details>`;
-    }).join('')}
   </div>
 
   <!-- Consulta: Torques (referencia) + Guía técnica -->

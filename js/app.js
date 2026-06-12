@@ -199,7 +199,7 @@ async function route() {
             const _gp = await projects.getById(id);
             const _ge = calcFaseEstado(_gp || {});
             if (_ge.gar === 'bloqueada') {
-              toast('Completa el Levantamiento en Documentación primero.', 'warn', 4000);
+              toast('Completa el Levantamiento primero.', 'warn', 4000);
               navigate(`#proyecto/${id}`); return;
             }
             await render(renderGarantia(id, session));

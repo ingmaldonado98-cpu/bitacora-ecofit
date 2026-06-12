@@ -687,7 +687,7 @@ export function calcFaseEstado(project) {
     docFirmada, garFirmada,
     docPct, garPct, audPct,
     docFaltantes, garFaltantes,
-    garRequisito: 'Completa el Levantamiento en Documentación primero.',
+    garRequisito: 'Completa el Levantamiento primero.',
     audRequisito: 'Completa Garantía primero (foto del sistema + al menos un equipo o foto técnica).',
   };
 }
