@@ -1066,9 +1066,10 @@ function renderAparatos(aparatos, edit) {
   `;
 }
 
-window.addAparatoRapido = function(a) { _aparatos.push({...a,cantidad:1}); refreshAparatos(); };
+const _triggerLevSave = () => { if (_levPid) window._levAutoSave(_levPid); };
+window.addAparatoRapido = function(a) { _aparatos.push({...a,cantidad:1}); refreshAparatos(); _triggerLevSave(); };
 window.addAparato = function() { _aparatos.push({nombre:'',potencia:0,horas:0,cantidad:1}); refreshAparatos(); };
-window.delAparato = function(i) { _aparatos.splice(i,1); refreshAparatos(); };
+window.delAparato = function(i) { _aparatos.splice(i,1); refreshAparatos(); _triggerLevSave(); };
 function refreshAparatos() {
   const el = document.getElementById('lista-aparatos');
   if (el) {
@@ -1144,9 +1145,9 @@ function renderCargas(cargas, edit, tipo) {
     <p class="kwh-total" id="cargas-total-${tipo}">Total: <strong>${totalW} W</strong> — <strong>${(totalWh/1000).toFixed(2)} kWh/día</strong></p>
   `;
 }
-window.addCargaRapida = function(tipo, a) { _cargas[tipo].push({...a, cantidad:1}); refreshCargas(tipo); };
+window.addCargaRapida = function(tipo, a) { _cargas[tipo].push({...a, cantidad:1}); refreshCargas(tipo); _triggerLevSave(); };
 window.addCarga = function(tipo) { _cargas[tipo].push({nombre:'',potencia:0,horas:0,cantidad:1}); refreshCargas(tipo); };
-window.delCarga = function(tipo,i) { _cargas[tipo].splice(i,1); refreshCargas(tipo); };
+window.delCarga = function(tipo,i) { _cargas[tipo].splice(i,1); refreshCargas(tipo); _triggerLevSave(); };
 window.refreshCargasTotales = function(tipo) {
   const el = document.getElementById(`cargas-total-${tipo}`);
   if (!el) return;
