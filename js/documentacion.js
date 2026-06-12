@@ -1840,6 +1840,9 @@ export async function renderLevantamientoView(projectId, session) {
     </button>
     <h1 class="hdr-title">Levantamiento</h1>
     <span class="hdr-sub">${esc(project.displayId)}</span>
+    <button class="btn-outline btn-sm" onclick="exportarWordLevantamiento('${projectId}')" title="Descargar Word del levantamiento">
+      ${icon('file-arrow-down', 15)} Word
+    </button>
   </div>
 
   <div class="lev-standalone">
