@@ -50,57 +50,190 @@
   --hdr-h:     56px;
 }
 
-/* ── Light theme ──────────────────────────────────────────────────────────── */
+/* ── Light theme — Linear / Vercel style ──────────────────────────────────── */
 body.theme-light {
-  --bg:        #ffffff;   /* Paper White */
-  --surface:   #f5f5f7;   /* Frost White panel */
-  --surface2:  #ffffff;
-  --surface3:  #e8e8ed;
+  /* Fondo base ligeramente off-white — característica Linear/Vercel */
+  --bg:        #f7f8fa;
+  --surface:   #ffffff;   /* cards blancas sobre fondo gris suave */
+  --surface2:  #f7f8fa;   /* hover/nested */
+  --surface3:  #f0f1f4;   /* pressed / deeply nested */
 
-  --g900:      #f5f5f7;
-  --g700:      #e8e8ed;
-  --g500:      #22a832;
-  --g300:      #178a26;
-  --g100:      #1d1d1f;   /* Obsidian — texto en light */
+  /* Verde Ecofit adaptado a light — más oscuro para contraste */
+  --g900:      #f0f5f1;
+  --g700:      #dcf0e0;
+  --g500:      #16a34a;   /* green-700 — acción principal */
+  --g300:      #15803d;   /* green-800 — hover/activo */
+  --g100:      #111827;   /* gray-900 — texto primario */
 
-  --solar:     #b88a00;
-  --solar-dim: rgba(184,138,0,.1);
+  --solar:     #92600a;
+  --solar-dim: rgba(146,96,10,.1);
 
-  --text:      #1d1d1f;   /* Obsidian */
-  --text-muted:#86868b;   /* Platinum */
+  /* Tipografía — escala neutral */
+  --text:      #111827;   /* gray-900 — máximo contraste */
+  --text-muted:#6b7280;   /* gray-500 */
 
-  --border:    #d2d2d7;
-  --border2:   #c7c7cc;
+  /* Bordes — muy sutiles, estilo Linear */
+  --border:    #e5e7eb;   /* gray-200 */
+  --border2:   #d1d5db;   /* gray-300 */
 
-  --yellow:    #c08800;
-  --red:       #cc3333;
-  --blue:      #1d6cc8;
-  --orange:    #b85000;
-  --green-vivo:#22a832;
-  --accent:    #178a26;
+  /* Semáforo en light */
+  --yellow:    #92600a;
+  --red:       #dc2626;
+  --blue:      #2563eb;
+  --orange:    #c2410c;
+  --green-vivo:#16a34a;
+  --accent:    #16a34a;
 
-  --shadow:    none;
+  /* Sombra sutil — reemplaza la profundidad que dan las capas oscuras */
+  --shadow:    0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
 }
 
-/* Nav y header en light */
+/* Header en light — frosted glass blanco */
+body.theme-light #top-header {
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom-color: var(--border);
+}
+
+/* Nav inferior en light */
 body.theme-light #bottom-nav {
-  background: rgba(255,255,255,.85);
-  border-top: 1px solid var(--border);
+  background: rgba(255,255,255,.95);
+  border-top-color: var(--border);
+  box-shadow: 0 -1px 0 var(--border);
 }
-body.theme-light #bottom-nav .nav-link { color: #507060; }
-body.theme-light #bottom-nav .nav-link.nav-active { color: var(--g500); }
+body.theme-light .nav-link         { color: #9ca3af; }   /* gray-400 */
+body.theme-light .nav-link.nav-active { color: var(--g500); }
+body.theme-light .nav-link:hover   { color: var(--text); }
 
-/* Cards y surfaces en light */
+/* Cards en light — blancas con sombra */
 body.theme-light .card {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+body.theme-light .card-sm {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+
+/* Project cards */
+body.theme-light .project-card {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+body.theme-light .project-card:hover {
+  border-color: var(--g500);
+  box-shadow: 0 4px 12px rgba(22,163,74,.1);
+}
+
+/* Stat pills */
+body.theme-light .stat-pill {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+
+/* Workload chips */
+body.theme-light .workload-chip {
+  background: #ffffff;
   border-color: var(--border);
 }
+body.theme-light .workload-chip:hover,
+body.theme-light .workload-chip.wl-active {
+  background: var(--g700);
+  border-color: var(--g500);
+}
+
+/* Module buttons */
+body.theme-light .module-btn {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+body.theme-light .module-btn:hover {
+  background: var(--surface2);
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
+
+/* Para-revisar cards */
+body.theme-light .para-revisar-card {
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+/* Inputs y selects */
 body.theme-light .input-field,
 body.theme-light .select-field {
   background: #ffffff;
   border-color: var(--border2);
   color: var(--text);
+  box-shadow: 0 1px 2px rgba(0,0,0,.03);
 }
-body.theme-light .input-field::placeholder { color: #8aaa94; }
+body.theme-light .input-field:focus,
+body.theme-light .select-field:focus {
+  border-color: var(--g500);
+  box-shadow: 0 0 0 3px rgba(22,163,74,.12);
+}
+body.theme-light .input-field::placeholder { color: #9ca3af; }
+
+/* Botones en light */
+body.theme-light .btn-secondary {
+  background: #ffffff;
+  border-color: var(--border2);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+body.theme-light .btn-secondary:hover {
+  background: var(--surface2);
+  border-color: var(--g500);
+}
+body.theme-light .btn-outline {
+  border-color: var(--border2);
+  color: var(--text);
+}
+body.theme-light .btn-ghost {
+  color: var(--text-muted);
+}
+body.theme-light .btn-ghost:hover { background: var(--surface3); }
+
+/* Header user hover */
+body.theme-light .hdr-user:hover { background: var(--surface3); }
+
+/* View headers en light */
+body.theme-light .view-header {
+  background: #f7f8fa;
+  border-bottom-color: var(--border);
+}
+
+/* Tabs */
+body.theme-light .tab-bar {
+  background: var(--surface2);
+  border-bottom-color: var(--border);
+}
+body.theme-light .tab-btn.tab-active {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+/* Checks y chips */
+body.theme-light .check-chip {
+  background: #ffffff;
+  border-color: var(--border2);
+}
+body.theme-light .check-chip:hover { border-color: var(--g500); }
+body.theme-light .check-chip.check-active {
+  background: var(--g700);
+  border-color: var(--g500);
+}
+
+/* Prog chips */
+body.theme-light .prog-chip {
+  background: #ffffff;
+  border-color: var(--border);
+}
 
 /* Toggle sol/luna */
 .hdr-theme-toggle {
@@ -127,11 +260,17 @@ body.theme-light .input-field::placeholder { color: #8aaa94; }
 body:not(.theme-light) .ico-moon { display: none; }
 body.theme-light .ico-sun        { display: none; }
 body.theme-light .ico-moon       { display: flex; }
-/* Auto button en light mode */
-body.theme-light .hdr-theme-auto {
-  background: rgba(0,0,0,.06); border-color: rgba(0,0,0,.1); color: var(--text-muted);
+/* Theme buttons en light — iconos oscuros sobre fondo claro */
+body.theme-light .hdr-theme-toggle {
+  background: #ffffff; border-color: var(--border); color: var(--text);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
 }
-body.theme-light .hdr-theme-auto:hover { background: rgba(0,0,0,.1); color: var(--text); }
+body.theme-light .hdr-theme-toggle:hover { background: var(--surface3); }
+body.theme-light .hdr-theme-auto {
+  background: #ffffff; border-color: var(--border); color: var(--text-muted);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+body.theme-light .hdr-theme-auto:hover { background: var(--surface3); color: var(--text); }
 
 /* ── Reset ────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
