@@ -2699,6 +2699,27 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 }
 
 /* ── Quick-Check: pendientes críticos ────────────────────────────────────── */
+/* ── Notas rápidas / Recordatorios ─────────────────────────────────────── */
+.notas-card    { padding: 14px 16px; }
+.notas-badge   { display: inline-flex; align-items: center; justify-content: center;
+                 min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+                 background: rgba(46,189,66,.15); color: var(--accent);
+                 font-size: .72rem; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+.notas-list    { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.nota-item     { display: flex; justify-content: space-between; align-items: flex-start;
+                 gap: 10px; padding: 8px 10px; background: var(--surface2);
+                 border-radius: 10px; border-left: 3px solid var(--accent); }
+.nota-texto    { font-size: .88rem; color: var(--text); flex: 1; line-height: 1.4; word-break: break-word; }
+.nota-meta     { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.nota-fecha    { font-size: .7rem; color: var(--text-muted); white-space: nowrap; }
+.nota-done-btn { font-size: .72rem; font-weight: 600; color: var(--accent);
+                 background: rgba(46,189,66,.12); border: 1px solid rgba(46,189,66,.25);
+                 border-radius: 6px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
+.nota-done-btn:active { background: rgba(46,189,66,.25); }
+.notas-empty   { font-size: .8rem; color: var(--text-muted); padding: 4px 0; margin: 0; }
+.nota-add-row  { display: flex; gap: 8px; margin-top: 10px; }
+.nota-input    { flex: 1; }
+
 .qc-card { padding: 14px 16px; }
 .qc-count {
   display: inline-flex; align-items: center; justify-content: center;

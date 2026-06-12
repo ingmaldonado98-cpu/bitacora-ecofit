@@ -172,6 +172,9 @@ export async function renderProjectDetail(id, session) {
     </div>
   </div>` : ''}
 
+  <!-- Recordatorios del equipo -->
+  ${renderNotasRapidas(project, id, edit)}
+
   <!-- Módulos con progreso — orden: Documentación → Garantía → Auditoría -->
   ${renderModulosProgreso(project, id, session, admin)}
 
@@ -546,6 +549,53 @@ function renderQuickCheck(project, id, admin, inline = false) {
     ${body}
   </div>`;
 }
+
+// ── Notas rápidas / Recordatorios ────────────────────────────────────────────
+function renderNotasRapidas(project, id, edit) {
+  const notas = project.notasRapidas || [];
+  if (!notas.length && !edit) return '';
+  return `
+  <div class="card notas-card">
+    <div class="card-title-row">
+      <h3 class="card-title">${icon('pencil', 15)} Recordatorios${notas.length ? ` <span class="notas-badge">${notas.length}</span>` : ''}</h3>
+    </div>
+    ${notas.length ? `
+    <div class="notas-list">
+      ${notas.map((n, i) => `
+      <div class="nota-item">
+        <span class="nota-texto">${esc(n.texto)}</span>
+        <div class="nota-meta">
+          <span class="nota-fecha">${fmtRelativa(n.creadaAt)}</span>
+          ${edit ? `<button class="nota-done-btn" onclick="window._doneNota('${id}',${i})" title="Marcar como hecha">✓ Hecho</button>` : ''}
+        </div>
+      </div>`).join('')}
+    </div>` : `<p class="notas-empty">Sin recordatorios activos</p>`}
+    ${edit ? `
+    <div class="nota-add-row">
+      <input type="text" id="nota-input-${id}" class="input-field nota-input"
+             placeholder="Ej: Faltó cable de comunicación…"
+             onkeydown="if(event.key==='Enter')window._addNota('${id}')"/>
+      <button class="btn-primary btn-sm" onclick="window._addNota('${id}')">+ Agregar</button>
+    </div>` : ''}
+  </div>`;
+}
+
+window._addNota = async function(pid) {
+  const input = document.getElementById(`nota-input-${pid}`);
+  const texto = input?.value?.trim();
+  if (!texto) { toast('Escribe un recordatorio primero', 'warn'); return; }
+  const project = await projects.getById(pid);
+  const notas = [...(project.notasRapidas || []), { id: uuid(), texto, creadaAt: isoNow() }];
+  await projects.setField(pid, 'notasRapidas', notas);
+  navigate(`#proyecto/${pid}`);
+};
+
+window._doneNota = async function(pid, idx) {
+  const project = await projects.getById(pid);
+  const notas = (project.notasRapidas || []).filter((_, i) => i !== idx);
+  await projects.setField(pid, 'notasRapidas', notas);
+  navigate(`#proyecto/${pid}`);
+};
 
 // ── Historial de cambios ──────────────────────────────────────────────────────
 function renderChangeLog(log) {
