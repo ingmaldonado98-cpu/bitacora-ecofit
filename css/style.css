@@ -2214,6 +2214,12 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 .mod-prog-card:active { transform: scale(.99); }
 
 /* Borde izquierdo de color por módulo */
+.mpc-opcional {
+  font-size: .68rem; font-weight: 600; letter-spacing: .02em;
+  color: var(--text-muted); background: var(--surface3);
+  border-radius: 4px; padding: 1px 5px; margin-left: 6px;
+  vertical-align: middle;
+}
 .mpc-lev  { border-left: 3px solid #a78bfa; }
 .mpc-doc  { border-left: 3px solid #6dd97a; }
 .mpc-gar  { border-left: 3px solid #60a5fa; }

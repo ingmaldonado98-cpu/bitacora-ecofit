@@ -402,16 +402,17 @@ function renderModulosProgreso(project, id, session, admin) {
   const audPct  = Math.round(audDone / audItems.length * 100);
 
   const esPequeno      = esPequenoTipo;
-  const puedeAuditoria = !esPequeno && admin;  // solo administradores ven la tarjeta
+  // Auditoría visible a todos (no solo admin) — es opcional y no afecta el progreso
+  const puedeAuditoria = !esPequeno;
 
   const estado = calcFaseEstado(project);
 
-  // Progreso general: levantamiento + doc (si aplica) + garantía
+  // Progreso general: levantamiento + doc (si aplica) + garantía (auditoría excluida — es opcional)
   const generalPct = esPequeno
     ? Math.round((levPct + garPct) / 2)
     : Math.round((levPct + docPct + garPct) / 3);
 
-  const modCard = (title, iconName, colorClass, pct, items, link, faseKey) => {
+  const modCard = (title, iconName, colorClass, pct, items, link, faseKey, optional = false) => {
     const locked = !admin && estado[faseKey] === 'bloqueada';
     const firmada = estado[`${faseKey}Firmada`];
     const clickHandler = locked
@@ -422,7 +423,7 @@ function renderModulosProgreso(project, id, session, admin) {
       <div class="mpc-top">
         <div class="mpc-icon">${locked ? icon('lock-simple', 22) : icon(iconName, 22)}</div>
         <div class="mpc-info">
-          <span class="mpc-title">${title}${firmada ? ' <span class="mpc-firmada">✓ Firmada</span>' : ''}</span>
+          <span class="mpc-title">${title}${optional ? ' <span class="mpc-opcional">Opcional</span>' : ''}${firmada ? ' <span class="mpc-firmada">✓ Firmada</span>' : ''}</span>
           <div class="mpc-chips">
             ${locked
               ? `<span class="mpc-chip mpc-locked-msg">🔒 Bloqueada — cumple requisito previo</span>`
@@ -447,7 +448,7 @@ function renderModulosProgreso(project, id, session, admin) {
     ${modCard('Levantamiento', 'clipboard-text', 'mpc-lev', levPct, levItems, `#proyecto/${id}/levantamiento`, 'lev')}
     ${!esPequeno ? modCard('Progreso de obra', 'camera', 'mpc-doc', docPct, docItems, `#proyecto/${id}/documentacion`, 'doc') : ''}
     ${modCard('Garantía', 'seal-check', 'mpc-gar', garPct, garItems, `#proyecto/${id}/garantia`, 'gar')}
-    ${puedeAuditoria ? modCard('Auditoría', 'magnifying-glass-plus', 'mpc-aud', audPct, audItems, `#proyecto/${id}/auditoria`, 'aud') : ''}
+    ${puedeAuditoria ? modCard('Auditoría', 'magnifying-glass-plus', 'mpc-aud', audPct, audItems, `#proyecto/${id}/auditoria`, 'aud', true) : ''}
   </div>
 
 
@@ -531,7 +532,7 @@ function renderQuickCheck(project, id, admin, inline = false) {
     ...levItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'lev', link: `#proyecto/${id}/levantamiento`, modLabel: 'Lev' })),
     ...(!docLocked ? docItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'doc', link: `#proyecto/${id}/documentacion`, modLabel: 'Doc' })) : []),
     ...(!garLocked ? garItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'gar', link: `#proyecto/${id}/garantia`,      modLabel: 'Garantía' })) : []),
-    ...(!audLocked ? audItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'aud', link: `#proyecto/${id}/auditoria`,     modLabel: 'Auditoría' })) : []),
+    // Auditoría es opcional — no aparece en pendientes
   ];
 
   if (!pendientes.length) return '';
