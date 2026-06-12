@@ -40,6 +40,9 @@ export async function renderGarantia(projectId, session) {
     <span class="hdr-sub">${esc(project.displayId)}</span>
   </div>
 
+  <!-- Puesta en marcha + vencimientos -->
+  ${renderVencimientos(g, projectId, edit)}
+
   <!-- Tabs internos — General movido a Documentación > Cierre -->
   <div class="garantia-notice card" style="margin-bottom:8px;padding:10px 14px;border-color:var(--border2)">
     <span style="color:var(--text-muted);font-size:.82rem">
@@ -136,6 +139,69 @@ export async function renderGarantia(projectId, session) {
   </script>
   `;
 }
+
+// ── Puesta en marcha + vencimientos de garantía ───────────────────────────────
+const GARANTIAS_STD = [
+  { key: 'paneles',    label: 'Paneles — producto',    anios: 10 },
+  { key: 'paneles25',  label: 'Paneles — desempeño',   anios: 25 },
+  { key: 'inversor',   label: 'Inversor',              anios: 10 },
+  { key: 'estructura', label: 'Estructura',            anios: 10 },
+  { key: 'manoObra',   label: 'Mano de obra',          anios:  1 },
+];
+
+function renderVencimientos(g, projectId, edit) {
+  const fi = g.fechaInstalacion || '';
+
+  const chips = fi ? GARANTIAS_STD.map(gar => {
+    const base   = new Date(fi);
+    const vence  = new Date(base);
+    vence.setFullYear(vence.getFullYear() + gar.anios);
+    const hoy    = new Date();
+    const diasLeft = Math.ceil((vence - hoy) / 86400000);
+    const pct    = Math.max(0, Math.min(100, ((gar.anios * 365 - diasLeft) / (gar.anios * 365)) * 100));
+    const cls    = diasLeft < 0 ? 'venc-vencida' : diasLeft < 180 ? 'venc-proxima' : 'venc-vigente';
+    const badge  = diasLeft < 0 ? '✗ Vencida' : diasLeft < 180 ? `⚠ ${diasLeft}d` : '✓ Vigente';
+    const fechaStr = vence.toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+    return `
+    <div class="venc-item ${cls}">
+      <div class="venc-barra-wrap"><div class="venc-barra" style="width:${pct.toFixed(0)}%"></div></div>
+      <span class="venc-label">${esc(gar.label)}</span>
+      <span class="venc-fecha">${fechaStr}</span>
+      <span class="venc-badge">${badge}</span>
+    </div>`;
+  }).join('') : '';
+
+  return `
+  <div class="card" style="margin-bottom:8px">
+    <div class="card-title-row">
+      <h3 class="card-title">${icon('calendar-check', 15)} Puesta en marcha</h3>
+    </div>
+    <div class="form-row" style="align-items:flex-end;gap:10px">
+      <div class="form-group" style="flex:1;margin:0">
+        <label style="font-size:.78rem">Fecha de instalación / comisionamiento</label>
+        <input type="date" id="gar-fecha-instalacion" value="${esc(fi)}"
+               ${!edit ? 'disabled' : ''}
+               style="max-width:180px"
+               onchange="guardarFechaInstalacion('${projectId}',this.value)" />
+      </div>
+      ${fi ? `<span style="font-size:.75rem;color:var(--text-muted);padding-bottom:6px">
+        ${Math.floor((new Date() - new Date(fi)) / (365.25 * 86400000))} año(s) en servicio
+      </span>` : ''}
+    </div>
+    ${chips ? `<div class="venc-lista" style="margin-top:10px">${chips}</div>` : `
+    <p style="font-size:.78rem;color:var(--text-muted);margin-top:6px">
+      ${icon('info', 13)} Ingresa la fecha para ver el estado de las garantías.
+    </p>`}
+  </div>`;
+}
+
+window.guardarFechaInstalacion = async function(projectId, fecha) {
+  if (!fecha) return;
+  await projects.setField(projectId, 'garantia.fechaInstalacion', fecha);
+  toast('✅ Fecha guardada');
+  sessionStorage.setItem('garantia-scroll-top', '1');
+  navigate(`#proyecto/${projectId}/garantia`);
+};
 
 // ── Validación Voc ────────────────────────────────────────────────────────────
 // Fallback cuando el proyecto no tiene T_min capturado en levantamiento

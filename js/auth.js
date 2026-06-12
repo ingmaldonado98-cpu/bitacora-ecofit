@@ -13,12 +13,15 @@ export const ROLES = {
 
 // ── Transiciones de estado ─────────────────────────────────────────────────
 export const TRANSITIONS = {
-  borrador:           { admin: ['en_progreso','cancelado'],           lider: ['en_progreso'],       apoyo: [] },
-  en_progreso:        { admin: ['pendiente_revision','cancelado'],    lider: ['pendiente_revision'], apoyo: ['pendiente_revision'] },
-  pendiente_revision: { admin: ['observado','cerrado','en_progreso'], lider: [],                    apoyo: [] },
-  observado:          { admin: ['cerrado','cancelado'],               lider: ['en_progreso'],        apoyo: [] },
-  cerrado:            { admin: [],                                    lider: [],                     apoyo: [] },
-  cancelado:          { admin: ['borrador'],                          lider: [],                     apoyo: [] },
+  borrador:           { admin: ['en_progreso','cancelado'],                         lider: ['en_progreso'],       apoyo: [] },
+  en_progreso:        { admin: ['pendiente_revision','cancelado'],                  lider: ['pendiente_revision'], apoyo: ['pendiente_revision'] },
+  pendiente_revision: { admin: ['observado','comisionado','cerrado','en_progreso'], lider: [],                    apoyo: [] },
+  observado:          { admin: ['cerrado','cancelado'],                             lider: ['en_progreso'],        apoyo: [] },
+  comisionado:        { admin: ['en_garantia','cerrado'],                           lider: ['en_garantia'],        apoyo: [] },
+  en_garantia:        { admin: ['fuera_garantia','cerrado'],                        lider: [],                     apoyo: [] },
+  fuera_garantia:     { admin: ['cerrado'],                                         lider: [],                     apoyo: [] },
+  cerrado:            { admin: [],                                                  lider: [],                     apoyo: [] },
+  cancelado:          { admin: ['borrador'],                                        lider: [],                     apoyo: [] },
 };
 
 // ── Sesión en memoria + localStorage (offline-safe) ───────────────────────

@@ -543,6 +543,9 @@ export const ESTADOS = {
   en_progreso:         { label: 'En Progreso',         color: '#4ade80', icon: 'play-circle' },
   pendiente_revision:  { label: 'Pendiente Revisión',  color: '#fbbf24', icon: 'clock-countdown' },
   observado:           { label: 'Observado',           color: '#fb923c', icon: 'warning-circle' },
+  comisionado:         { label: 'Comisionado',         color: '#a78bfa', icon: 'check-circle' },
+  en_garantia:         { label: 'En Garantía',         color: '#34d399', icon: 'shield-check' },
+  fuera_garantia:      { label: 'Fuera de Garantía',   color: '#6b7280', icon: 'shield-slash' },
   cerrado:             { label: 'Cerrado',             color: '#60a5fa', icon: 'seal-check' },
   cancelado:           { label: 'Cancelado',           color: '#f87171', icon: 'x-circle' },
 };

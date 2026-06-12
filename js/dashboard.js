@@ -5,6 +5,8 @@ import { esc, fmtFecha, fmtRelativa, fmtProjectId, ESTADOS, PRIORIDADES, TIPOS_S
 import { isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
 
+const _ARCHIVADOS = ['cerrado', 'cancelado', 'fuera_garantia'];
+
 // ── Helper: opciones de mes para el filtro de fecha ──────────────────────────
 function _buildMonthOptions(proyectos) {
   const meses = new Map();
@@ -41,8 +43,8 @@ export async function renderDashboard(session, all, allUsers) {
     [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
   }
 
-  // Proyectos activos = todo excepto cerrado y cancelado
-  const activos = all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
+  // Proyectos activos = todo excepto archivados
+  const activos = all.filter(p => !_ARCHIVADOS.includes(p.estado));
   const stats = calcStats(activos);
 
   const pendientes = activos.filter(p => p.estado === 'pendiente_revision')
@@ -134,7 +136,7 @@ let _showConcluidos = false;
 
 export function initDashboardFilters(all, allUsers = []) {
   _showConcluidos = false;
-  _allProjects = all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
+  _allProjects = all.filter(p => !_ARCHIVADOS.includes(p.estado));
   _allUsers    = allUsers;
   // populateTecnicoFilter() se llama desde app.js después de render (cuando el DOM existe)
 }
@@ -181,7 +183,7 @@ window._dashSearch = function(q) {
   _searchTimer = setTimeout(async () => {
     const all = q.trim() ? await projects.search(q) : await projects.getAll();
     // El dashboard solo muestra proyectos activos (no cerrados ni cancelados)
-    _allProjects = all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
+    _allProjects = all.filter(p => !_ARCHIVADOS.includes(p.estado));
     _page = 0;
     applyFilters();
   }, 350);

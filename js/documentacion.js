@@ -634,6 +634,25 @@ function renderLevantamiento(project, tipo, edit) {
         </div>
         ${(lev.areasTecho||[]).length === 0 && !edit ? `<p style="font-size:.78rem;color:var(--text-muted);padding:8px 0">Sin áreas registradas</p>` : ''}
       </div>
+      <!-- Ubicación GPS -->
+      <div class="form-row" style="align-items:flex-end;gap:10px;margin-top:8px">
+        <div class="form-group" style="flex:1;margin:0">
+          <label>${icon('map-pin',14)} Ubicación GPS <span class="form-hint">opcional</span></label>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            ${lev.gpsLat && lev.gpsLng
+              ? `<span class="input-info-badge" style="font-size:.75rem">${lev.gpsLat.toFixed(5)}, ${lev.gpsLng.toFixed(5)}</span>
+                 <a href="https://maps.google.com/?q=${lev.gpsLat},${lev.gpsLng}" target="_blank" rel="noopener"
+                    class="btn-outline btn-sm" style="text-decoration:none">
+                   ${icon('map-trifold',14)} Ver en mapa
+                 </a>
+                 ${edit ? `<button type="button" class="btn-del-sm" onclick="_clearGps('${pid}')" title="Quitar GPS">✕</button>` : ''}`
+              : (edit ? `<button type="button" class="btn-outline btn-sm" onclick="_captureGps('${pid}')">
+                   ${icon('map-pin',14)} Capturar ubicación
+                 </button>` : '<span style="color:var(--text-muted);font-size:.8rem">Sin GPS</span>')}
+          </div>
+        </div>
+      </div>
+
       <!-- Fotos del levantamiento -->
       <div class="foto-tecnica-row" style="margin-top:12px">
         <div class="ft-label">${icon('camera',14)} Fotos del levantamiento</div>
@@ -691,6 +710,36 @@ function renderLevantamiento(project, tipo, edit) {
             ${['Disponible','Saturado','Requiere actualización','N/A'].map(t=>
               `<option ${lev.centroCarga===t?'selected':''}>${t}</option>`).join('')}
           </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Calibre cable DC <span class="form-hint">instalado</span></label>
+          <select name="calibreCableDC" ${dis}>
+            ${['','10 AWG','12 AWG','14 AWG','6 AWG','8 AWG','4 AWG','Otro'].map(t=>
+              `<option ${(lev.calibreCableDC||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Calibre cable AC <span class="form-hint">instalado</span></label>
+          <select name="calibreCableAC" ${dis}>
+            ${['','10 AWG','12 AWG','14 AWG','6 AWG','8 AWG','4 AWG','Otro'].map(t=>
+              `<option ${(lev.calibreCableAC||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tipo de protección instalada</label>
+          <select name="tipoProteccion" ${dis}>
+            ${['','Interruptor termomagnético','Fusible','Ambos (DC fusible + AC interruptor)','Otro'].map(t=>
+              `<option ${(lev.tipoProteccion||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Circuito en tablero <span class="form-hint">número / identificador</span></label>
+          <input type="text" name="circuitoTablero" value="${esc(lev.circuitoTablero||'')}"
+                 placeholder="Ej: C-12, Breaker 3" ${dis}/>
         </div>
       </div>
       ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
@@ -1172,6 +1221,12 @@ window.guardarLevantamiento = async function(e, projectId) {
     tipoServicioCFE:     fd.get('tipoServicioCFE'),
     tierraFisica:        fd.get('tierraFisica'),
     centroCarga:         fd.get('centroCarga'),
+    calibreCableDC:      fd.get('calibreCableDC') || null,
+    calibreCableAC:      fd.get('calibreCableAC') || null,
+    tipoProteccion:      fd.get('tipoProteccion') || null,
+    circuitoTablero:     fd.get('circuitoTablero')?.trim() || null,
+    gpsLat:              lev.gpsLat  ?? null,
+    gpsLng:              lev.gpsLng  ?? null,
     sombras:             { checklist:sombrasChecklist, foto:lev.sombras?.foto||null, notas:fd.get('sombraNotas')||'' },
     fotosLevantamiento:  lev.fotosLevantamiento || [],
     observacionesGenerales: fd.get('observacionesGenerales') || '',
@@ -1849,3 +1904,34 @@ export async function renderLevantamientoView(projectId, session) {
     ${renderLevantamiento(project, tipo, edit)}
   </div>`;
 }
+
+// ── GPS capture / clear ────────────────────────────────────────────────────────
+window._captureGps = function(projectId) {
+  if (!navigator.geolocation) { toast('GPS no disponible en este dispositivo', 'warn'); return; }
+  toast('Obteniendo ubicación…');
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const lat = parseFloat(pos.coords.latitude.toFixed(6));
+      const lng = parseFloat(pos.coords.longitude.toFixed(6));
+      const p   = await projects.getById(projectId);
+      p.documentacion = p.documentacion || {};
+      p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+      p.documentacion.levantamiento.gpsLat = lat;
+      p.documentacion.levantamiento.gpsLng = lng;
+      await projects.update(projectId, { documentacion: p.documentacion });
+      toast(`📍 GPS guardado: ${lat}, ${lng}`, 'success');
+      navigate(window.location.hash);
+    },
+    () => toast('No se pudo obtener la ubicación — verifica los permisos', 'warn'),
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+};
+
+window._clearGps = async function(projectId) {
+  const p = await projects.getById(projectId);
+  if (!p.documentacion?.levantamiento) return;
+  p.documentacion.levantamiento.gpsLat = null;
+  p.documentacion.levantamiento.gpsLng = null;
+  await projects.update(projectId, { documentacion: p.documentacion });
+  navigate(window.location.hash);
+};

@@ -2675,6 +2675,23 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .voc-res-msg.voc-err  { background: rgba(220,53,69,.10);   color: var(--red); }
 .form-hint { font-size: .72rem; color: var(--text-muted); margin-left: 4px; font-weight: 400; }
 
+/* ── Vencimientos de garantía ────────────────────────────────────────────── */
+.venc-lista { display: flex; flex-direction: column; gap: 6px; }
+.venc-item  { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px;
+              padding: 6px 10px; border-radius: var(--radius-sm); background: var(--surface2);
+              font-size: .78rem; position: relative; overflow: hidden; }
+.venc-barra-wrap { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; pointer-events: none; }
+.venc-barra      { height: 100%; opacity: .10; transition: width .4s ease; }
+.venc-vigente  .venc-barra { background: var(--g500); }
+.venc-proxima  .venc-barra { background: #f5c400; }
+.venc-vencida  .venc-barra { background: var(--red); }
+.venc-label  { color: var(--text); font-weight: 500; position: relative; }
+.venc-fecha  { color: var(--text-muted); font-size: .72rem; position: relative; }
+.venc-badge  { font-size: .7rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; position: relative; white-space: nowrap; }
+.venc-vigente .venc-badge { background: rgba(109,217,122,.15); color: var(--g500); }
+.venc-proxima .venc-badge { background: rgba(245,196,0,.15);   color: #a88000; }
+.venc-vencida .venc-badge { background: rgba(220,53,69,.15);   color: var(--red); }
+
 /* ── Voc stale banner ────────────────────────────────────────────────────── */
 .voc-stale-banner { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
                     background: rgba(240,192,0,.10); border: 1px solid #c8a000;
