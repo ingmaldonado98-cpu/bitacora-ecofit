@@ -1258,6 +1258,7 @@ window.delString = async function(projectId, idx) {
   const p = await projects.getById(projectId);
   p.garantia.paneles.strings.splice(idx,1);
   await projects.update(projectId, { garantia: p.garantia });
+  sessionStorage.setItem('garantia-tab-target', 'g-paneles');
   navigate(`#proyecto/${projectId}/garantia`);
 };
 
@@ -1375,6 +1376,7 @@ window.addPanelManual = async function(projectId, stringIdx) {
         const nextLetra = letras[str.paneles.length] || `P${str.paneles.length+1}`;
         str.paneles.push({ letra: nextLetra, serial: serial.trim(), fotoRespaldo: null, createdAt: isoNow() });
         await projects.update(projectId, { garantia: p.garantia });
+        sessionStorage.setItem('garantia-tab-target', 'g-paneles');
         navigate(`#proyecto/${projectId}/garantia`);
       },
       { continuous: false, title: `Escanear panel — ${strNombre}` }
@@ -1392,6 +1394,7 @@ window.addPanelManual = async function(projectId, stringIdx) {
     const nextLetra = letras[str.paneles.length] || `P${str.paneles.length+1}`;
     str.paneles.push({ letra: nextLetra, serial: serial.trim(), fotoRespaldo: null, createdAt: isoNow() });
     await projects.update(projectId, { garantia: p.garantia });
+    sessionStorage.setItem('garantia-tab-target', 'g-paneles');
     navigate(`#proyecto/${projectId}/garantia`);
   }
 };
@@ -1401,6 +1404,7 @@ window.delPanel = async function(projectId, stringIdx, panelIdx) {
   const p = await projects.getById(projectId);
   p.garantia.paneles.strings[stringIdx].paneles.splice(panelIdx,1);
   await projects.update(projectId, { garantia: p.garantia });
+  sessionStorage.setItem('garantia-tab-target', 'g-paneles');
   navigate(`#proyecto/${projectId}/garantia`);
 };
 
