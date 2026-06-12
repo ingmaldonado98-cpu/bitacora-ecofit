@@ -726,36 +726,6 @@ function renderLevantamiento(project, tipo, edit) {
                  placeholder="Ej: 12 polos, 20 esp." ${dis}/>
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Calibre cable DC <span class="form-hint">instalado</span></label>
-          <select name="calibreCableDC" ${dis}>
-            ${['','10 AWG','12 AWG','14 AWG','6 AWG','8 AWG','4 AWG','Otro'].map(t=>
-              `<option ${(lev.calibreCableDC||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Calibre cable AC <span class="form-hint">instalado</span></label>
-          <select name="calibreCableAC" ${dis}>
-            ${['','10 AWG','12 AWG','14 AWG','6 AWG','8 AWG','4 AWG','Otro'].map(t=>
-              `<option ${(lev.calibreCableAC||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Tipo de protección instalada</label>
-          <select name="tipoProteccion" ${dis}>
-            ${['','Interruptor termomagnético','Fusible','Ambos (DC fusible + AC interruptor)','Otro'].map(t=>
-              `<option ${(lev.tipoProteccion||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Circuito en tablero <span class="form-hint">número / identificador</span></label>
-          <input type="text" name="circuitoTablero" value="${esc(lev.circuitoTablero||'')}"
-                 placeholder="Ej: C-12, Breaker 3" ${dis}/>
-        </div>
-      </div>
       ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
     `) : ''}
 
@@ -1238,10 +1208,6 @@ window.guardarLevantamiento = async function(e, projectId) {
     centroCarga:         fd.get('centroCarga'),
     marcaTablero:        fd.get('marcaTablero')    || null,
     capacidadTablero:    fd.get('capacidadTablero') || null,
-    calibreCableDC:      fd.get('calibreCableDC') || null,
-    calibreCableAC:      fd.get('calibreCableAC') || null,
-    tipoProteccion:      fd.get('tipoProteccion') || null,
-    circuitoTablero:     fd.get('circuitoTablero')?.trim() || null,
     gpsLat:              lev.gpsLat  ?? null,
     gpsLng:              lev.gpsLng  ?? null,
     sombras:             { checklist:sombrasChecklist, foto:lev.sombras?.foto||null, notas:fd.get('sombraNotas')||'' },
