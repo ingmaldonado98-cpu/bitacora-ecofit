@@ -705,11 +705,25 @@ function renderLevantamiento(project, tipo, edit) {
               `<option ${lev.tierraFisica===t?'selected':''}>${t}</option>`).join('')}
           </select>
         </div>
-        <div class="form-group"><label>Centro de carga</label>
+        <div class="form-group"><label>Centro de carga — estado</label>
           <select name="centroCarga" ${dis}>
             ${['Disponible','Saturado','Requiere actualización','N/A'].map(t=>
               `<option ${lev.centroCarga===t?'selected':''}>${t}</option>`).join('')}
           </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Marca del tablero</label>
+          <select name="marcaTablero" ${dis}>
+            ${['','Square D','Murray','Siemens','Riel DIN (genérico)','Eaton / Cutler-Hammer','Legrand','ABB','General Electric','IEM','Otro'].map(t=>
+              `<option ${(lev.marcaTablero||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Capacidad del tablero <span class="form-hint">espacios / polos</span></label>
+          <input type="text" name="capacidadTablero" value="${esc(lev.capacidadTablero||'')}"
+                 placeholder="Ej: 12 polos, 20 esp." ${dis}/>
         </div>
       </div>
       <div class="form-row">
@@ -1222,6 +1236,8 @@ window.guardarLevantamiento = async function(e, projectId) {
     tipoServicioCFE:     fd.get('tipoServicioCFE'),
     tierraFisica:        fd.get('tierraFisica'),
     centroCarga:         fd.get('centroCarga'),
+    marcaTablero:        fd.get('marcaTablero')    || null,
+    capacidadTablero:    fd.get('capacidadTablero') || null,
     calibreCableDC:      fd.get('calibreCableDC') || null,
     calibreCableAC:      fd.get('calibreCableAC') || null,
     tipoProteccion:      fd.get('tipoProteccion') || null,
