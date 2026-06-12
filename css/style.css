@@ -2253,6 +2253,38 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 .sync-pending { color: var(--solar); }
 .sync-local   { color: var(--g400); }
 
+/* ── Divulgación progresiva ───────────────────────────────────────────────── */
+.pd-details { margin: 8px 0 0; }
+.pd-details > summary {
+  list-style: none; display: flex; align-items: center; gap: 5px;
+  font-size: .78rem; color: var(--text-muted);
+  cursor: pointer; padding: 5px 0; outline: none;
+  user-select: none; width: fit-content; transition: color .15s;
+}
+.pd-details > summary::-webkit-details-marker { display: none; }
+.pd-details > summary .pd-caret { font-size: .7rem; transition: transform .18s; }
+.pd-details[open] > summary .pd-caret { transform: rotate(180deg); }
+.pd-details > summary:hover { color: var(--g300); }
+.pd-details > .pd-body { padding-top: 6px; }
+
+/* Botón y panel de filtros extra en dashboard */
+.pd-filter-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 0 12px;
+  font-size: .82rem; color: var(--text-muted); cursor: pointer;
+  white-space: nowrap; transition: border-color .15s, color .15s;
+  min-height: 36px; flex-shrink: 0;
+}
+.pd-filter-btn:hover, .pd-filter-btn.pd-open { border-color: var(--g500); color: var(--text); }
+.pd-filter-btn.pd-has-filter { border-color: var(--g500); color: var(--g300); }
+.pd-filter-btn .pd-caret { font-size: .72rem; transition: transform .18s; }
+.pd-filter-btn.pd-open .pd-caret { transform: rotate(180deg); }
+.dash-filters-extra {
+  display: none; flex-wrap: wrap; gap: 8px; padding: 0 0 6px;
+}
+.dash-filters-extra.pd-open { display: flex; }
+
 /* ── Acordeón (Levantamiento) ─────────────────────────────────────────────── */
 .accordion-section {
   border: 1px solid var(--border);

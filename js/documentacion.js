@@ -557,7 +557,10 @@ function renderLevantamiento(project, tipo, edit) {
           </div>
         </div>
       </div>
-      <!-- Temperatura mínima del sitio -->
+      <!-- Temperatura mínima del sitio — colapsable -->
+      <details class="pd-details" ${lev.tMinCiudad ? 'open' : ''}>
+        <summary>Temperatura mínima del sitio <span class="pd-caret">▾</span></summary>
+        <div class="pd-body">
       <div class="form-row">
         <div class="form-group">
           <label>Estado de referencia (T mín)</label>
@@ -623,6 +626,8 @@ function renderLevantamiento(project, tipo, edit) {
           <p class="tmin-ref-note">💡 Si el sitio está en un microclima muy particular (cañón, laguna, cerro aislado), usa <em>Otro (manual)</em> para ingresar el valor real.</p>
         </div>
       </div>
+        </div><!-- /.pd-body -->
+      </details>
       <!-- Áreas del techo — repetibles -->
       <div class="lev-areas-wrap">
         <div class="lev-areas-hdr">
@@ -712,20 +717,25 @@ function renderLevantamiento(project, tipo, edit) {
           </select>
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Marca del tablero</label>
-          <select name="marcaTablero" ${dis}>
-            ${['','Square D','Murray','Siemens','Riel DIN (genérico)','Eaton / Cutler-Hammer','Legrand','ABB','General Electric','IEM','Otro'].map(t=>
-              `<option ${(lev.marcaTablero||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
-          </select>
+      <details class="pd-details" ${lev.marcaTablero ? 'open' : ''}>
+        <summary>Detalles del tablero <span class="pd-caret">▾</span></summary>
+        <div class="pd-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Marca del tablero</label>
+              <select name="marcaTablero" ${dis}>
+                ${['','Square D','Murray','Siemens','Riel DIN (genérico)','Eaton / Cutler-Hammer','Legrand','ABB','General Electric','IEM','Otro'].map(t=>
+                  `<option ${(lev.marcaTablero||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Capacidad del tablero <span class="form-hint">espacios / polos</span></label>
+              <input type="text" name="capacidadTablero" value="${esc(lev.capacidadTablero||'')}"
+                     placeholder="Ej: 12 polos, 20 esp." ${dis}/>
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Capacidad del tablero <span class="form-hint">espacios / polos</span></label>
-          <input type="text" name="capacidadTablero" value="${esc(lev.capacidadTablero||'')}"
-                 placeholder="Ej: 12 polos, 20 esp." ${dis}/>
-        </div>
-      </div>
+      </details>
       ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
     `) : ''}
 
@@ -736,12 +746,17 @@ function renderLevantamiento(project, tipo, edit) {
           placeholder="Condiciones especiales del sitio, acuerdos con el cliente, materiales extra, pendientes…"
         >${esc(lev.observacionesGenerales||'')}</textarea>
       </div>
-      <div class="form-group">
-        <label>Restricciones especiales <span class="form-hint">para la memoria técnica</span></label>
-        <textarea name="restricciones" rows="2" ${dis}
-          placeholder="Ej. Alta salinidad por ambiente marino / Vientos de 180 km/h en temporada de huracanes / Sin conexión a CFE"
-        >${esc(lev.restricciones||'')}</textarea>
-      </div>
+      <details class="pd-details" ${lev.restricciones ? 'open' : ''}>
+        <summary>Restricciones especiales <span class="pd-caret">▾</span></summary>
+        <div class="pd-body">
+          <div class="form-group">
+            <label>Restricciones <span class="form-hint">para la memoria técnica</span></label>
+            <textarea name="restricciones" rows="2" ${dis}
+              placeholder="Ej. Alta salinidad por ambiente marino / Vientos de 180 km/h en temporada de huracanes / Sin conexión a CFE"
+            >${esc(lev.restricciones||'')}</textarea>
+          </div>
+        </div>
+      </details>
     `)}
 
     ${edit?`<div class="form-actions lev-actions">

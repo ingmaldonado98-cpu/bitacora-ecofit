@@ -97,6 +97,15 @@ export async function renderDashboard(session, all, allUsers) {
       ${Object.entries(ESTADOS).filter(([k]) => !['cerrado','cancelado'].includes(k))
         .map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
     </select>
+    <button class="pd-filter-btn" id="pd-filter-btn" onclick="window._pdFilters(this)" type="button">
+      Filtros <span class="pd-caret">▾</span>
+    </button>
+    <button class="dash-toggle-conc" id="btn-toggle-conc" onclick="window._toggleConcluidos()"
+            title="Ver proyectos cerrados y cancelados">
+      ${icon('seal-check', 16)} Concluidos
+    </button>
+  </div>
+  <div class="dash-filters-extra" id="dash-filters-extra">
     <select id="dash-filter-tipo" class="filter-select" onchange="window._dashFilter()">
       <option value="">Todos los tipos</option>
       ${Object.entries(TIPOS_SISTEMA).filter(([,v]) => !v.legacy).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
@@ -108,10 +117,6 @@ export async function renderDashboard(session, all, allUsers) {
       <option value="">Cualquier fecha</option>
       ${_buildMonthOptions(all)}
     </select>
-    <button class="dash-toggle-conc" id="btn-toggle-conc" onclick="window._toggleConcluidos()"
-            title="Ver proyectos cerrados y cancelados">
-      ${icon('seal-check', 16)} Concluidos
-    </button>
   </div>
 
   <div id="projects-list">
@@ -196,6 +201,13 @@ window._dashPage   = function(dir) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
+window._pdFilters = function(btn) {
+  const panel = document.getElementById('dash-filters-extra');
+  if (!panel) return;
+  const open = panel.classList.toggle('pd-open');
+  btn.classList.toggle('pd-open', open);
+};
+
 function applyFilters() {
   const estado   = document.getElementById('dash-filter-estado')?.value;
   const tipo     = document.getElementById('dash-filter-tipo')?.value;
@@ -212,6 +224,9 @@ function applyFilters() {
     const d = p.fechaInicio || p.createdAt;
     return d && d.startsWith(mes);
   });
+  const hasExtra = !!(tipo || tecnico || mes);
+  const pdBtn = document.getElementById('pd-filter-btn');
+  if (pdBtn) pdBtn.classList.toggle('pd-has-filter', hasExtra);
   const el = document.getElementById('projects-list');
   if (el) el.innerHTML = renderProjectList(list);
 }
