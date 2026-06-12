@@ -19,9 +19,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
 
-  <!-- Phosphor Icons -->
-  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1" defer></script>
-
   <!-- App CSS -->
   <link rel="stylesheet" href="./css/style.css" />
 </head>
@@ -43,12 +40,12 @@
     </div>
     <div class="hdr-right">
       <button class="hdr-theme-toggle" onclick="window._toggleTheme()" title="Cambiar tema claro/oscuro">
-        <ph-icon name="sun" size="17" class="ico-sun"></ph-icon>
-        <ph-icon name="moon" size="17" class="ico-moon"></ph-icon>
+        <svg width="17" height="17" viewBox="0 0 256 256" fill="currentColor" class="ico-sun" aria-hidden="true"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></svg>
+        <svg width="17" height="17" viewBox="0 0 256 256" fill="currentColor" class="ico-moon" aria-hidden="true"><path d="M235.54,150.21a104.84,104.84,0,0,1-37,52.91A104,104,0,0,1,32,120,103.09,103.09,0,0,1,52.85,57.11,104.84,104.84,0,0,1,105.75,20.26,8,8,0,0,1,115.5,33.47a88.07,88.07,0,0,0,104,109.22,8,8,0,0,1,16.07,7.52Z"/></svg>
       </button>
       <button class="hdr-theme-auto" onclick="window._setThemeAuto()" title="Tema del sistema / desactivar horario">
-        <ph-icon name="clock-countdown" size="17" class="ico-sched"></ph-icon>
-        <ph-icon name="device-mobile"   size="17" class="ico-auto"></ph-icon>
+        <svg width="17" height="17" viewBox="0 0 256 256" fill="currentColor" class="ico-sched" aria-hidden="true"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg>
+        <svg width="17" height="17" viewBox="0 0 256 256" fill="currentColor" class="ico-auto" aria-hidden="true"><path d="M176,16H80A24,24,0,0,0,56,40V216a24,24,0,0,0,24,24h96a24,24,0,0,0,24-24V40A24,24,0,0,0,176,16Zm8,200a8,8,0,0,1-8,8H80a8,8,0,0,1-8-8V40a8,8,0,0,1,8-8h96a8,8,0,0,1,8,8ZM120,184a8,8,0,1,0,16,0A8,8,0,0,0,120,184Z"/></svg>
       </button>
       <div class="hdr-user" onclick="window.location.hash='#settings'" title="Ajustes">
         <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" style="flex-shrink:0"><path d="M172,120a44,44,0,1,1-44-44A44.05,44.05,0,0,1,172,120Zm60,112a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16,88.1,88.1,0,0,1,82.06-87.63,60,60,0,1,1,67.88,0A88.1,88.1,0,0,1,224,224Z"/></svg>
@@ -79,25 +76,25 @@
   <nav id="bottom-nav" class="bottom-nav" style="display:none">
     <a class="nav-link" data-view="dashboard" onclick="navigate('#dashboard')">
       <div class="nav-icon-wrap">
-        <ph-icon name="house" size="24"></ph-icon>
+        <svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8H96a8,8,0,0,0,8-8V160h48v56a8,8,0,0,0,8,8h56a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H176V152a8,8,0,0,0-8-8H88a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></svg>
         <span id="nav-badge-revision" class="nav-badge" style="display:none">0</span>
       </div>
       <span>Inicio</span>
     </a>
     <a class="nav-link" data-view="checklists" onclick="navigate('#checklists')">
-      <ph-icon name="check-square" size="24"></ph-icon>
+      <svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM224,48V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48Zm-16,0H48V208H208Z"/></svg>
       <span>Checklist</span>
     </a>
     <a class="nav-link" data-view="calculadora" onclick="navigate('#calculadora')">
-      <ph-icon name="calculator" size="24"></ph-icon>
+      <svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M80,56H176a24,24,0,0,1,24,24V176a24,24,0,0,1-24,24H80a24,24,0,0,1-24-24V80A24,24,0,0,1,80,56Zm0,16a8,8,0,0,0-8,8V176a8,8,0,0,0,8,8H176a8,8,0,0,0,8-8V80a8,8,0,0,0-8-8Zm8,32h80a8,8,0,0,1,0,16H88a8,8,0,0,1,0-16Zm0,48a12,12,0,1,1,12,12A12,12,0,0,1,88,152Zm40,0a12,12,0,1,1,12,12A12,12,0,0,1,128,152Zm40,0a12,12,0,1,1,12,12A12,12,0,0,1,168,152Zm-80,32a12,12,0,1,1,12,12A12,12,0,0,1,88,184Zm40,0a12,12,0,1,1,12,12A12,12,0,0,1,128,184Zm40,0a12,12,0,1,1,12,12A12,12,0,0,1,168,184Z"/></svg>
       <span>Calcular</span>
     </a>
     <a class="nav-link" data-view="inventario" onclick="navigate('#inventario')">
-      <ph-icon name="package" size="24"></ph-icon>
+      <svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M223.68,66.15,135.68,18a15.88,15.88,0,0,0-15.36,0l-88,48.17a16,16,0,0,0-8.32,14v95.64a16,16,0,0,0,8.32,14l88,48.17a15.88,15.88,0,0,0,15.36,0l88-48.17a16,16,0,0,0,8.32-14V80.18A16,16,0,0,0,223.68,66.15ZM128,32l80.35,43.96L178.67,92.5,98.32,48.54ZM128,120,47.65,76.04,80,58.87l80.35,43.96ZM40,90.18l80,43.77V223.82L40,180.05ZM136,223.82V133.95l40-21.89V152a8,8,0,0,0,16,0V103.68l24-13.13V180.05Z"/></svg>
       <span>Inventario</span>
     </a>
     <a class="nav-link" data-view="settings" onclick="navigate('#settings')">
-      <ph-icon name="gear" size="24"></ph-icon>
+      <svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M237.84,100.21a12,12,0,0,0-7.27-9.6l-15.53-6.07,9.86-12.62a12,12,0,0,0-2.63-13c-4.68-4.69-11.81-5.85-17.79-3.88l-15.3,5.2-9.47-12.83a12,12,0,0,0-12.65-4.41l-17.06,4.5-4.93-15.51A12,12,0,0,0,133.5,23h-11a12,12,0,0,0-11.67,8.87L106,47.38,88.94,42.88a12,12,0,0,0-12.65,4.41L66.82,60.12,51.52,54.92c-6-1.97-13.11-.81-17.79,3.88A12,12,0,0,0,31.1,71.93l9.86,12.61L25.43,90.61a12,12,0,0,0-7.27,9.6A102.4,102.4,0,0,0,17,112a102.4,102.4,0,0,0,1.16,11.79,12,12,0,0,0,7.27,9.6l15.53,6.07L31,152.79a12,12,0,0,0,2.63,13c4.68,4.68,11.81,5.85,17.79,3.87l15.3-5.19,9.47,12.83a12,12,0,0,0,12.65,4.41l17.06-4.5,4.88,15.51A12,12,0,0,0,122.5,201h11a12,12,0,0,0,11.67-8.87l4.88-15.51,17.06,4.5a12,12,0,0,0,12.65-4.41l9.47-12.83,15.3,5.19c6,2,13.11.81,17.79-3.87a12,12,0,0,0,2.63-13l-9.86-12.62,15.53-6.07a12,12,0,0,0,7.27-9.6A102.4,102.4,0,0,0,239,112,102.4,102.4,0,0,0,237.84,100.21ZM128,152a40,40,0,1,1,40-40A40,40,0,0,1,128,152Z"/></svg>
       <span>Ajustes</span>
     </a>
   </nav>

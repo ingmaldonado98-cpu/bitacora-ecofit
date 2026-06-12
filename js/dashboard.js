@@ -118,7 +118,7 @@ export async function renderDashboard(session, all, allUsers) {
 
   ${isLider(session) ? `
   <button class="fab" onclick="navigate('#nuevo-proyecto')" title="Nuevo proyecto">
-    <ph-icon name="plus" size="28"></ph-icon>
+    ${icon('plus', 28)}
   </button>` : ''}
   `;
 }
