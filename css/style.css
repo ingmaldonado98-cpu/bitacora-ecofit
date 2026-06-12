@@ -399,10 +399,13 @@ body {
 
 /* ── App container ────────────────────────────────────────────────────────── */
 #app {
-  max-width: 640px; margin: 0 auto;
+  width: 100%; margin: 0 auto;
   padding: 0 16px 24px;
   min-height: calc(100dvh - var(--hdr-h) - var(--nav-h));
 }
+@media (min-width: 600px)  { #app { max-width: 720px;  padding: 0 24px 24px; } }
+@media (min-width: 900px)  { #app { max-width: 1000px; padding: 0 32px 24px; } }
+@media (min-width: 1280px) { #app { max-width: 1200px; padding: 0 40px 24px; } }
 
 /* ── View header ──────────────────────────────────────────────────────────── */
 .view-header {
