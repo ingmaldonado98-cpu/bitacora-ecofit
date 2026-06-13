@@ -1,14 +1,15 @@
 // db.js — Capa de datos · redirige a Firebase/Firestore
 // Mantiene la misma API que antes para compatibilidad con todos los módulos
 
-import { fbProjects, fbUsers, fbConfig, fbKV, exportFbBackup } from './firebase.js';
+import { fbProjects, fbUsers, fbConfig, fbKV, fbReminders, exportFbBackup } from './firebase.js';
 
 // ── Re-exportar stores con la misma interfaz ───────────────────────────────
 export const projects  = fbProjects;
 export const users     = fbUsers;
 export const config    = fbConfig;
 export const kv        = fbKV;
-export const inventario = fbKV; // inventario usa el mismo kv store con prefijo
+export const inventario  = fbKV; // inventario usa el mismo kv store con prefijo
+export const reminders   = fbReminders;
 
 // ── Backup ─────────────────────────────────────────────────────────────────
 export async function exportBackup()       { return exportFbBackup(); }

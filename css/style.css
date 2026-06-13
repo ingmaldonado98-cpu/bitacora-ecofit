@@ -626,6 +626,53 @@ body {
   color: var(--text-muted); text-align: center; font-size: .9rem;
 }
 
+/* ── Recordatorio rápido — bottom sheet ─────────────────────────────────── */
+.reminder-sheet-overlay {
+  position: fixed; inset: 0; z-index: 900;
+  background: rgba(0,0,0,.5);
+  display: flex; align-items: flex-end;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.reminder-sheet-overlay.rs-open { opacity: 1; pointer-events: auto; }
+.reminder-sheet {
+  background: var(--surface); border-radius: 16px 16px 0 0;
+  width: 100%; max-width: 600px; margin: 0 auto;
+  padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  transform: translateY(100%); transition: transform .25s cubic-bezier(.32,0,.67,0);
+}
+.reminder-sheet-overlay.rs-open .reminder-sheet { transform: translateY(0); }
+.reminder-sheet-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px; font-weight: 600; font-size: .95rem; color: var(--text);
+}
+.reminder-sheet-close {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 1.1rem; padding: 4px 6px; line-height: 1;
+}
+.reminder-textarea {
+  width: 100%; min-height: 88px; max-height: 180px; box-sizing: border-box;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  font-size: .9rem; color: var(--text); resize: vertical; font-family: inherit;
+}
+.reminder-textarea:focus { outline: none; border-color: var(--g400); }
+.reminder-sheet-footer { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
+
+/* Quick reminder rows in Alertas */
+.qrem-row { display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.qrem-row:last-child { border-bottom: none; }
+.qrem-body { flex: 1; min-width: 0; }
+.qrem-texto { font-size: .88rem; color: var(--text); word-break: break-word; }
+.qrem-meta { font-size: .72rem; color: var(--text-muted); margin-top: 3px; }
+.qrem-fecha { color: var(--solar, #f5c400); font-weight: 600; }
+.qrem-check {
+  flex-shrink: 0; background: none; border: 1.5px solid var(--border);
+  border-radius: 50%; width: 28px; height: 28px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--g300); transition: background .12s, border-color .12s; margin-top: 2px;
+}
+.qrem-check:hover { background: var(--g500); border-color: var(--g400); }
+
 /* ── Sync badge ───────────────────────────────────────────────────────────── */
 .sync-badge { font-size: .75rem; }
 .sync-ok      { color: var(--g300); }
@@ -2151,6 +2198,13 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 }
 .scanner-overlay-counter #scanner-count-num {
   color: #E8640A; font-weight: 700; font-size: 14px;
+}
+
+/* Mensaje mientras se solicita permiso de cámara (antes de cargar el iframe) */
+.scanner-perm-msg {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  gap: 10px; color: rgba(255,255,255,.55); font-size: .85rem; text-align: center;
+  padding: 24px;
 }
 
 .scanner-overlay-iframe {

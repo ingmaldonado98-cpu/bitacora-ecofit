@@ -469,7 +469,7 @@ function renderModulosProgreso(project, id, session, admin) {
     <button class="tool-btn" onclick="navigate('#proyecto/${id}/qr')">
       ${icon('qr-code', 18)}<span>QR Cliente</span>
     </button>
-    ${admin ? `<button class="tool-btn" onclick="navigate('#proyecto/${id}/pdf')">
+    ${isLider(session) ? `<button class="tool-btn" onclick="navigate('#proyecto/${id}/pdf')">
       ${icon('file-arrow-down', 18)}<span>Exportar PDF</span>
     </button>` : ''}
   </div>
@@ -1076,7 +1076,7 @@ window._submitProject = async function(e, editId) {
   btn.textContent = 'Guardando';
 
   const fd = new FormData(e.target);
-  const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
+  const session = await getSession();
 
   const tipoSistema = fd.get('tipoSistema') || null;
   if (!tipoSistema) {

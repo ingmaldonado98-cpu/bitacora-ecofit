@@ -451,6 +451,12 @@ window.setRapido = async function(itemId, val, btn, projectId) {
 
 // ── Rápido: guardar ───────────────────────────────────────────────────────────
 window.guardarRapido = async function(projectId) {
+  const done = CHECKLIST_RAPIDO.filter(i => _rapidoMap[i.id]).length;
+  if (done < CHECKLIST_RAPIDO.length) {
+    toast(`Faltan ${CHECKLIST_RAPIDO.length - done} ítem${CHECKLIST_RAPIDO.length - done !== 1 ? 's' : ''} sin responder`, 'error', 3000);
+    return;
+  }
+
   const btn = document.getElementById('btn-rq-save');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
 

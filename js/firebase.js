@@ -275,6 +275,22 @@ export const fbKV = {
   },
 };
 
+// ── Recordatorios rápidos ─────────────────────────────────────────────────
+export const fbReminders = {
+  getAll: async () => {
+    const snap = await getDocs(query(collection(fbDB, 'reminders'), orderBy('createdAt', 'desc')));
+    return snap.docs.map(d => d.data());
+  },
+
+  add: async (data) => {
+    await setDoc(doc(fbDB, 'reminders', data.id), data);
+  },
+
+  delete: async (id) => {
+    await deleteDoc(doc(fbDB, 'reminders', id));
+  },
+};
+
 // ── Backup completo ────────────────────────────────────────────────────────
 export async function exportFbBackup() {
   const [projs, usrs, cfgSnap, kvSnap] = await Promise.all([

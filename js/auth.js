@@ -179,9 +179,10 @@ export function renderLogin() {
   </div>`;
 }
 
-// ── Rate-limit state (módulo — no persiste entre recargas) ────────────────
+// ── Rate-limit state (persiste en sessionStorage — sobrevive F5, no cierre de pestaña) ─
+const _LS_LOCK = 'ecofit_login_lock';
 let _loginAttempts = 0;
-let _loginLockedUntil = 0;
+let _loginLockedUntil = parseInt(sessionStorage.getItem(_LS_LOCK) || '0');
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS  = 30_000; // 30 segundos
 
@@ -215,6 +216,7 @@ window._submitLogin = async function(e) {
     _loginAttempts++;
     if (_loginAttempts >= LOGIN_MAX_ATTEMPTS) {
       _loginLockedUntil = Date.now() + LOGIN_LOCKOUT_MS;
+      sessionStorage.setItem(_LS_LOCK, _loginLockedUntil);
       _loginAttempts    = 0;
       errEl.textContent   = `Demasiados intentos fallidos. Espera 30 segundos.`;
       // Actualizar contador en vivo
@@ -222,6 +224,7 @@ window._submitLogin = async function(e) {
         const rem = Math.ceil((_loginLockedUntil - Date.now()) / 1000);
         if (rem <= 0) {
           clearInterval(_lockTimer);
+          sessionStorage.removeItem(_LS_LOCK);
           btn.disabled    = false;
           btn.textContent = 'Iniciar sesión';
           errEl.style.display = 'none';

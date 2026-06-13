@@ -582,11 +582,11 @@
     } catch(e) {
       stopScan();
       var msg = e && e.name === 'NotAllowedError'
-        ? '⚠️ Permiso de cámara denegado'
+        ? '⚠️ Permiso denegado — habilita la cámara en Ajustes del navegador'
         : '⚠️ No se pudo acceder a la cámara';
-      showToast(msg, 2500);
+      showToast(msg, 4000);
       setStatus(msg, true);
-      console.error(e);
+      console.error('[Scanner]', e?.name, e?.message);
     }
   }
 

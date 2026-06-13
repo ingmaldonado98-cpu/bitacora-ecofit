@@ -16,7 +16,7 @@ import { renderCalculadora } from './calculadora.js';
 import { renderChecklistModule, renderChecklistsList } from './checklist.js';
 import { renderDimensionamiento } from './dimensionamiento.js';
 import { renderTrayecto } from './trayecto.js';
-import { projects, users } from './db.js';
+import { projects, users, reminders } from './db.js';
 import { toast, esc } from './utils.js';
 import { icon } from './icons.js';
 import { isNative, getPlugin } from './platform.js';
@@ -302,6 +302,83 @@ function updateHeader(session) {
   hdr.style.display = '';
   // Header simplificado — solo texto "Bitácora de Instalaciones" (sin logo img)
 }
+
+// ── Recordatorio rápido ───────────────────────────────────────────────────────
+window._openReminderModal = async function() {
+  const session = await getSession();
+  if (!session) return;
+
+  document.getElementById('reminder-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'reminder-sheet-overlay';
+  overlay.id = 'reminder-overlay';
+  overlay.innerHTML = `
+    <div class="reminder-sheet">
+      <div class="reminder-sheet-hdr">
+        <span>Recordatorio rápido</span>
+        <button class="reminder-sheet-close" id="rem-close-btn">✕</button>
+      </div>
+      <textarea class="reminder-textarea" id="rem-text-input"
+        placeholder="¿Qué debes recordar?" maxlength="280"></textarea>
+      <div style="margin-top:10px">
+        <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:5px">
+          Fecha límite <span style="opacity:.6">— opcional</span>
+        </label>
+        <input type="date" class="form-control" id="rem-date-input" style="max-width:180px" />
+      </div>
+      <div class="reminder-sheet-footer">
+        <button class="btn-outline" id="rem-cancel-btn">Cancelar</button>
+        <button class="btn-primary" id="rem-save-btn">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('rs-open'));
+  setTimeout(() => document.getElementById('rem-text-input')?.focus(), 280);
+
+  function closeModal() {
+    overlay.classList.remove('rs-open');
+    setTimeout(() => overlay.remove(), 250);
+  }
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  document.getElementById('rem-close-btn').onclick  = closeModal;
+  document.getElementById('rem-cancel-btn').onclick = closeModal;
+
+  document.getElementById('rem-save-btn').onclick = async () => {
+    const txt = document.getElementById('rem-text-input').value.trim();
+    if (!txt) { document.getElementById('rem-text-input').focus(); return; }
+    const fecha = document.getElementById('rem-date-input').value || null;
+    const id = 'rem_' + Date.now();
+    try {
+      await reminders.add({
+        id, texto: txt, fecha,
+        createdAt: new Date().toISOString(),
+        createdBy: session.uid,
+        createdByName: session.nombre || session.username,
+      });
+      closeModal();
+      toast('Recordatorio guardado', 'ok', 2000);
+    } catch { toast('Error al guardar', 'error', 3000); }
+  };
+};
+
+window._reminderDelete = async function(id) {
+  try {
+    await reminders.delete(id);
+  } catch { /* ya eliminado */ }
+  const row = document.getElementById('qrem-' + id);
+  if (row) {
+    row.style.transition = 'opacity .2s';
+    row.style.opacity = '0';
+    setTimeout(() => {
+      row.remove();
+      const section = document.getElementById('qrem-section');
+      if (section && !section.querySelector('.qrem-row')) section.remove();
+    }, 200);
+  }
+  toast('Recordatorio eliminado', 'ok', 1500);
+};
 
 // ── Navegación global ─────────────────────────────────────────────────────────
 window.navigate = function(hash) {

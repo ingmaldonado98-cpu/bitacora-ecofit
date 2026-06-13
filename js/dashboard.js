@@ -66,6 +66,11 @@ export async function renderDashboard(session, all, allUsers) {
           <path d="M228.92,49.69a8,8,0,0,0-6.86-1.45L160.93,63.52,99.58,32.84a8,8,0,0,0-6.37-.4L29.21,55.07A8,8,0,0,0,24,62.46V200a8,8,0,0,0,9.94,7.76l61.13-15.28,61.35,30.68A8.15,8.15,0,0,0,160,224a8,8,0,0,0,2.06-.27l64-16A8,8,0,0,0,232,200V56A8,8,0,0,0,228.92,49.69ZM104,52.94l48,24V203.06l-48-24ZM40,74.08l48-17.11V188.17L40,200.33ZM216,181.92l-48,12V62.94l48-12Z"/>
         </svg>
       </button>
+      <button class="btn-icon-hdr" onclick="window._openReminderModal()" title="Recordatorio rápido">
+        <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
+          <path d="M221.8,175.94C216.25,166.38,208,139.35,208,104a80,80,0,1,0-160,0c0,35.35-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.63-16h45.26A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80ZM160,104a8,8,0,0,1-8,8H136v16a8,8,0,0,1-16,0V112H104a8,8,0,0,1,0-16h16V80a8,8,0,0,1,16,0V96h16A8,8,0,0,1,160,104Z"/>
+        </svg>
+      </button>
     </div>
   </div>
 
@@ -187,8 +192,9 @@ window._dashSearch = function(q) {
   clearTimeout(_searchTimer);
   _searchTimer = setTimeout(async () => {
     const all = q.trim() ? await projects.search(q) : await projects.getAll();
-    // El dashboard solo muestra proyectos activos (no cerrados ni cancelados)
-    _allProjects = all.filter(p => !_ARCHIVADOS.includes(p.estado));
+    _allProjects = _showConcluidos
+      ? all.filter(p =>  _ARCHIVADOS.includes(p.estado))
+      : all.filter(p => !_ARCHIVADOS.includes(p.estado));
     _page = 0;
     applyFilters();
   }, 350);

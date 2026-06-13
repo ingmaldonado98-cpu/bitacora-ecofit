@@ -1,6 +1,6 @@
 // recordatorios.js — Vista consolidada de alertas y recordatorios
 
-import { projects } from './db.js';
+import { projects, reminders } from './db.js';
 import { esc, fmtRelativa, ESTADOS } from './utils.js';
 
 const _ARCH = ['cerrado', 'cancelado', 'fuera_garantia'];
@@ -64,7 +64,7 @@ export function calcRecordatoriosCount(all) {
 }
 
 export async function renderRecordatorios(session) {
-  const all     = await projects.getAll();
+  const [all, qrems] = await Promise.all([projects.getAll(), reminders.getAll()]);
   const activos = all.filter(p => !_ARCH.includes(p.estado));
 
   // 1. Plazos próximos o vencidos (≤ 7 días)
@@ -93,7 +93,7 @@ export async function renderRecordatorios(session) {
     .filter(({ d }) => d > 30)
     .sort((a, b) => b.d - a.d);
 
-  const urgente = plazos.length + pendientes.length + garantias.length;
+  const urgente = plazos.length + pendientes.length + garantias.length + qrems.length;
   updateRecordatoriosBadge(urgente);
 
   // Build rows
@@ -119,6 +119,25 @@ export async function renderRecordatorios(session) {
     _row(p, `Sin actividad: ${d} días`, 'rm')
   );
 
+  // Render quick reminders
+  const rowsQrems = qrems.map(r => {
+    const dias = r.fecha ? Math.ceil((new Date(r.fecha + 'T00:00:00') - new Date()) / 86400000) : null;
+    const fechaTxt = dias === null ? ''
+      : dias < 0  ? `<span class="qrem-fecha">Venció hace ${Math.abs(dias)}d</span>`
+      : dias === 0 ? `<span class="qrem-fecha">Vence hoy</span>`
+      :              `<span class="qrem-fecha">Para el ${r.fecha}</span>`;
+    return `
+    <div class="qrem-row" id="qrem-${esc(r.id)}">
+      <div class="qrem-body">
+        <div class="qrem-texto">${esc(r.texto)}</div>
+        <div class="qrem-meta">${fechaTxt}${fechaTxt && r.createdByName ? ' · ' : ''}${esc(r.createdByName || '')}</div>
+      </div>
+      <button class="qrem-check" onclick="window._reminderDelete('${esc(r.id)}')" title="Marcar como hecho">
+        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>
+      </button>
+    </div>`;
+  });
+
   const sinAlertas = urgente === 0 && !inactivos.length;
 
   return `
@@ -126,7 +145,21 @@ export async function renderRecordatorios(session) {
     <div class="header-info" style="flex:1">
       <span class="view-title">Alertas</span>
     </div>
+    <button class="btn-icon-hdr" onclick="window._openReminderModal()" title="Nuevo recordatorio">
+      <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">
+        <path d="M221.8,175.94C216.25,166.38,208,139.35,208,104a80,80,0,1,0-160,0c0,35.35-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.63-16h45.26A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80ZM160,104a8,8,0,0,1-8,8H136v16a8,8,0,0,1-16,0V112H104a8,8,0,0,1,0-16h16V80a8,8,0,0,1,16,0V96h16A8,8,0,0,1,160,104Z"/>
+      </svg>
+    </button>
   </div>
+
+  ${qrems.length ? `
+  <div class="recor-section" id="qrem-section">
+    <div class="recor-hdr">
+      <span class="recor-hdr-title">Notas rápidas</span>
+      <span class="recor-hdr-count">${qrems.length}</span>
+    </div>
+    ${rowsQrems.join('')}
+  </div>` : ''}
 
   ${sinAlertas ? `
   <div class="recor-all-ok">
