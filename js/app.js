@@ -9,6 +9,7 @@ import { renderAuditoria } from './auditoria.js';
 import { renderQR } from './qr.js';
 import { renderPDFExport } from './pdf.js';
 import { renderSettings } from './settings.js';
+import { renderRecordatorios, updateRecordatoriosBadge, calcRecordatoriosCount } from './recordatorios.js';
 import { renderConcluidos } from './concluidos.js';
 import { renderInventario } from './inventario.js';
 import { renderCalculadora } from './calculadora.js';
@@ -173,6 +174,7 @@ async function route() {
       case '': {
         const [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
         initDashboardFilters(all, allUsers);
+        updateRecordatoriosBadge(calcRecordatoriosCount(all));
         // FIX-8: Pasar datos pre-cargados para evitar doble lectura Firestore
         await render(renderDashboard(session, all, allUsers), skeletonDashboard());
         // Poblar select de técnicos ahora que el DOM existe
@@ -253,6 +255,10 @@ async function route() {
 
       case 'concluidos':
         await render(renderConcluidos(session));
+        break;
+
+      case 'recordatorios':
+        await render(renderRecordatorios(session));
         break;
 
       case 'settings':

@@ -584,6 +584,48 @@ body {
 .dash-pag-info { font-size: .75rem; color: var(--text-muted); }
 .pc-arrow   { color: var(--text-muted); }
 
+/* ── Recordatorios / Alertas ─────────────────────────────────────────────── */
+.view-title { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.recor-section { margin-bottom: 24px; }
+.recor-hdr {
+  display: flex; align-items: center; gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+.recor-hdr-title {
+  flex: 1; font-size: .72rem; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em;
+}
+.recor-hdr-count {
+  font-size: .7rem; font-weight: 700;
+  background: var(--surface2); color: var(--text-muted);
+  border-radius: 20px; padding: 1px 8px;
+}
+.recor-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 0; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .12s;
+}
+.recor-row:last-child { border-bottom: none; }
+.recor-row:active { background: var(--surface2); }
+.recor-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.recor-id { font-size: .72rem; font-weight: 700; color: var(--text-muted); }
+.recor-cliente { font-size: .9rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recor-det { font-size: .75rem; }
+.recor-det.rd { color: var(--red); }
+.recor-det.rw { color: var(--solar, #f5c400); }
+.recor-det.ro { color: var(--g300); }
+.recor-det.rm { color: var(--text-muted); }
+.recor-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.recor-estado { font-size: .7rem; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+.recor-arrow { font-size: 1.2rem; color: var(--text-muted); }
+.recor-all-ok {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 14px; padding: 56px 16px;
+  color: var(--text-muted); text-align: center; font-size: .9rem;
+}
+
 /* ── Sync badge ───────────────────────────────────────────────────────────── */
 .sync-badge { font-size: .75rem; }
 .sync-ok      { color: var(--g300); }
