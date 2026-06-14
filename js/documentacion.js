@@ -1,7 +1,7 @@
 // documentacion.js — Módulo 2: Levantamiento dinámico + Fases Antes/Durante/Después
 
 import { projects, logChange } from './db.js';
-import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar, calcFaseEstado, genDisplayId } from './utils.js';
+import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar, calcFaseEstado, genDisplayId, countFotos } from './utils.js';
 import { renderFirmaBlock } from './project.js';
 import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
@@ -32,19 +32,11 @@ export async function renderDocumentacion(projectId, session) {
 
   // Contar fotos por sitio para badges del tab
   const fases = project.documentacion?.fases || {};
-  const _fpGet = (sitio, sub) => {
-    if (fases?.[sitio]?.[sub]?.length) return fases[sitio][sub].length;
-    if (sitio === 'techo') {
-      const m = { antes:'antes', durante:'durante', cierre:'despues' };
-      return (fases?.[m[sub]] || []).length;
-    }
-    return 0;
-  };
-  const cTecho   = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('techo',f), 0)
+  const cTecho   = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(fases,'techo',f), 0)
     + _countCierreExtra(project, 'techo');
-  const cCentros = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('centrosCarga',f), 0)
+  const cCentros = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(fases,'centrosCarga',f), 0)
     + _countCierreExtra(project, 'centrosCarga');
-  const cZona    = ['antes','durante','cierre'].reduce((s,f) => s + _fpGet('zonaDelSistema',f), 0)
+  const cZona    = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(fases,'zonaDelSistema',f), 0)
     + _countCierreExtra(project, 'zonaDelSistema');
   const cNotas   = (project.documentacion?.notas || []).length;
 

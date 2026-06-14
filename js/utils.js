@@ -725,6 +725,19 @@ export function firmaModificada(project, fase) {
   );
 }
 
+// ── Conteo de fotos por sitio/subfase (soporta esquema nuevo y legacy) ─────────
+// fases: project.documentacion?.fases · sitio: 'techo' | 'centrosCarga' | 'zonaDelSistema'
+// sub:   'antes' | 'durante' | 'cierre'
+export function countFotos(fases, sitio, sub) {
+  const n = fases?.[sitio]?.[sub]?.length || 0;
+  if (n > 0) return n;
+  if (sitio === 'techo') {
+    const m = { antes: 'antes', durante: 'durante', cierre: 'despues' };
+    return fases?.[m[sub]]?.length || 0;
+  }
+  return 0;
+}
+
 // ── calcFaseEstado — lógica de desbloqueo por fase ────────────────────────────
 // Retorna { doc, gar, aud } con 'disponible' | 'bloqueada' | 'completa'
 // + porcentajes docPct, garPct, audPct para dashboard y detalle de proyecto.
@@ -735,18 +748,9 @@ export function calcFaseEstado(project) {
   const esPequeno = project.tipoSistema === 'sistema_pequeno';
 
   // ── Documentación ────────────────────────────────────────────────────────────
-  const _fc = (sitio, sub) => {
-    const n = doc.fases?.[sitio]?.[sub]?.length || 0;
-    if (n > 0) return n;
-    if (sitio === 'techo') {
-      const m = { antes: 'antes', durante: 'durante', cierre: 'despues' };
-      return doc.fases?.[m[sub]]?.length || 0;
-    }
-    return 0;
-  };
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f) => s + _fc('techo',f), 0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f) => s + _fc('centrosCarga',f), 0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f) => s + _fc('zonaDelSistema',f), 0);
+  const fTecho   = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(doc.fases,'techo',f), 0);
+  const fCentros = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(doc.fases,'centrosCarga',f), 0);
+  const fZona    = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(doc.fases,'zonaDelSistema',f), 0);
 
   // Sistema pequeño solo necesita levantamiento; no requiere juego completo de fotos
   const docItemsL = esPequeno

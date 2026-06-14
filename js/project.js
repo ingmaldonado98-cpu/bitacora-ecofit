@@ -3,19 +3,11 @@
 import { projects, users, kv, logChange } from './db.js';
 import { esc, fmtFecha, fmtFechaHora, fmtRelativa, fmtProjectId, genDisplayId, uuid, isoNow, toast,
          ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog, inputDialog,
-         capturePhoto, fotoMini, getPendingSrc, calcFaseEstado, firmaModificada } from './utils.js';
+         capturePhoto, fotoMini, getPendingSrc, calcFaseEstado, firmaModificada, countFotos } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } from './auth.js';
 import { icon } from './icons.js';
 import { uploadPhotoQueued } from './firebase.js';
 
-// Conteo de fotos por sitio/subfase con fallback al esquema legacy
-function _countFotos(documentacion, sitio, sub) {
-  const fases = documentacion?.fases;
-  const n = fases?.[sitio]?.[sub]?.length || 0;
-  if (n > 0) return n;
-  if (sitio === 'techo') { const m = { antes:'antes', durante:'durante', cierre:'despues' }; return fases?.[m[sub]]?.length || 0; }
-  return 0;
-}
 
 // Foto de cliente pendiente de subir en el form actual
 let _clienteFotoB64 = null;
@@ -48,9 +40,9 @@ export async function renderProjectDetail(id, session) {
   const _dDoc  = project.documentacion || {};
   const _dGar  = project.garantia || {};
   const _dFt   = _dGar.fotosTecnicas || {};
-  const _fT = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(_dDoc,'techo',f),0);
-  const _fC = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(_dDoc,'centrosCarga',f),0);
-  const _fZ = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(_dDoc,'zonaDelSistema',f),0);
+  const _fT = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'techo',f),0);
+  const _fC = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'centrosCarga',f),0);
+  const _fZ = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'zonaDelSistema',f),0);
   const levPct  = _dDoc.levantamiento?.tipTecho ? 100 : 0;
   const _dItems = _esPeq ? [] : [_fT>0, _fC>0, _fZ>0];
   const docPct  = _dItems.length ? Math.round(_dItems.filter(Boolean).length / _dItems.length * 100) : 0;
@@ -345,9 +337,9 @@ function renderModulosProgreso(project, id, session, admin) {
 
   // Documentación: levantamiento + 3 fases
   // Contar fotos en nueva estructura (sitio/subfase) con fallback legacy
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'techo',f),0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'centrosCarga',f),0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'zonaDelSistema',f),0);
+  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'techo',f),0);
+  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'centrosCarga',f),0);
+  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'zonaDelSistema',f),0);
 
   const esPequenoTipo = project.tipoSistema === 'sistema_pequeno';
 
@@ -487,9 +479,9 @@ function renderQuickCheck(project, id, admin, inline = false) {
   const esPequeno = project.tipoSistema === 'sistema_pequeno';
   const estado = calcFaseEstado(project);
 
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'techo',f),0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'centrosCarga',f),0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'zonaDelSistema',f),0);
+  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'techo',f),0);
+  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'centrosCarga',f),0);
+  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'zonaDelSistema',f),0);
   const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
   const checkDone = aud.checklist?.length || 0;
 
