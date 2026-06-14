@@ -286,6 +286,13 @@ export const fbReminders = {
     await setDoc(doc(fbDB, 'reminders', data.id), data);
   },
 
+  update: async (id, changes) => {
+    const ref  = doc(fbDB, 'reminders', id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('Recordatorio no encontrado');
+    await setDoc(ref, { ...snap.data(), ...changes });
+  },
+
   delete: async (id) => {
     await deleteDoc(doc(fbDB, 'reminders', id));
   },

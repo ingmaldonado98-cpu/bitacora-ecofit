@@ -390,6 +390,61 @@ window._reminderDelete = async function(id) {
   toast('Recordatorio eliminado', 'ok', 1500);
 };
 
+window._reminderEdit = async function(id, textoActual, fechaActual) {
+  const _prev = document.getElementById('reminder-overlay');
+  if (_prev) { _prev.classList.remove('rs-open'); setTimeout(() => _prev.remove(), 250); await new Promise(r => setTimeout(r, 260)); }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'reminder-sheet-overlay';
+  overlay.id = 'reminder-overlay';
+  overlay.innerHTML = `
+    <div class="reminder-sheet">
+      <div class="reminder-sheet-hdr">
+        <span>Editar recordatorio</span>
+        <button class="reminder-sheet-close" id="rem-close-btn">✕</button>
+      </div>
+      <textarea class="reminder-textarea" id="rem-text-input"
+        placeholder="¿Qué debes recordar?" maxlength="280">${esc(textoActual || '')}</textarea>
+      <div style="margin-top:10px">
+        <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:5px">
+          Fecha límite <span style="opacity:.6">— opcional</span>
+        </label>
+        <input type="date" class="form-control" id="rem-date-input" value="${fechaActual || ''}" style="max-width:180px" />
+      </div>
+      <div class="reminder-sheet-footer">
+        <button class="btn-outline" id="rem-cancel-btn">Cancelar</button>
+        <button class="btn-primary" id="rem-save-btn">Guardar cambios</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('rs-open'));
+  setTimeout(() => { const t = document.getElementById('rem-text-input'); if (t) { t.focus(); t.selectionStart = t.value.length; } }, 280);
+
+  function closeModal() { overlay.classList.remove('rs-open'); setTimeout(() => overlay.remove(), 250); }
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  document.getElementById('rem-close-btn').onclick  = closeModal;
+  document.getElementById('rem-cancel-btn').onclick = closeModal;
+
+  document.getElementById('rem-save-btn').onclick = async () => {
+    const txt   = document.getElementById('rem-text-input').value.trim();
+    if (!txt) { document.getElementById('rem-text-input').focus(); return; }
+    const fecha = document.getElementById('rem-date-input').value || null;
+    try {
+      await reminders.update(id, { texto: txt, fecha });
+      closeModal();
+      toast('Recordatorio actualizado', 'ok', 2000);
+      // Actualizar DOM sin recargar la vista
+      const row = document.getElementById('qrem-' + id);
+      if (row) {
+        const textoEl = row.querySelector('.qrem-texto');
+        const metaEl  = row.querySelector('.qrem-meta');
+        if (textoEl) textoEl.textContent = txt;
+        if (metaEl && fecha) metaEl.querySelector('.qrem-fecha')?.remove?.();
+      }
+    } catch { toast('Error al guardar', 'error', 3000); }
+  };
+};
+
 // ── Navegación global ─────────────────────────────────────────────────────────
 window.navigate = function(hash) {
   window._stopScannerGlobal?.();

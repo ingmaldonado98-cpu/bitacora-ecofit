@@ -136,9 +136,14 @@ export async function renderRecordatorios(session) {
         <div class="qrem-texto">${esc(r.texto)}</div>
         <div class="qrem-meta">${fechaTxt}${fechaTxt && r.createdByName ? ' · ' : ''}${esc(r.createdByName || '')}</div>
       </div>
-      <button class="qrem-check" onclick="window._reminderDelete('${esc(r.id)}')" title="Marcar como hecho">
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>
-      </button>
+      <div class="qrem-actions">
+        <button class="qrem-edit" onclick="window._reminderEdit('${esc(r.id)}','${esc(r.texto).replace(/'/g,'&#39;')}','${esc(r.fecha||'')}')" title="Editar recordatorio">
+          <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/></svg>
+        </button>
+        <button class="qrem-check" onclick="window._reminderDelete('${esc(r.id)}')" title="Marcar como hecho">
+          <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>
+        </button>
+      </div>
     </div>`;
   });
 

@@ -646,11 +646,19 @@ body {
 .qrem-texto { font-size: .88rem; color: var(--text); word-break: break-word; }
 .qrem-meta { font-size: .72rem; color: var(--text-muted); margin-top: 3px; }
 .qrem-fecha { color: var(--solar, #f5c400); font-weight: 600; }
+.qrem-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-top: 2px; }
+.qrem-edit {
+  background: none; border: 1.5px solid var(--border); border-radius: 50%;
+  width: 28px; height: 28px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); transition: background .12s, border-color .12s;
+}
+.qrem-edit:hover { background: var(--solar, #f5c400)22; border-color: var(--solar, #f5c400); color: var(--solar, #f5c400); }
 .qrem-check {
   flex-shrink: 0; background: none; border: 1.5px solid var(--border);
   border-radius: 50%; width: 28px; height: 28px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  color: var(--g300); transition: background .12s, border-color .12s; margin-top: 2px;
+  color: var(--g300); transition: background .12s, border-color .12s;
 }
 .qrem-check:hover { background: var(--g500); border-color: var(--g400); }
 
@@ -1298,7 +1306,19 @@ body.scanner-native-active > *:not(.scanner-native-ui) { visibility: hidden; }
 .recibo-promedio { font-size: .82rem; color: var(--text-muted); margin-top: 8px; }
 
 .aparatos-rapidos { margin-bottom: 12px; }
-.aparato-row { display: grid; grid-template-columns: 2fr 1fr 1fr 0.6fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+.aparato-row { display: grid; grid-template-columns: 1.2fr 2fr 1fr 1fr 0.6fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+.aprow-area { font-size: .76rem; padding: 4px 6px; min-width: 0; }
+.aprow-area-ro {
+  font-size: .73rem; color: var(--text-muted); background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.aparatos-resumen { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+.apres-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .78rem; padding: 3px 0; color: var(--text-muted);
+}
+.apres-row strong { color: var(--g300); font-weight: 600; }
 .kwh-total { font-size: .9rem; color: var(--g300); margin-top: 10px; font-weight: 600; }
 
 .carga-row { display: grid; grid-template-columns: 2fr 1fr 1fr 0.6fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
@@ -2862,9 +2882,16 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
                    margin-bottom: 8px; }
 .lev-areas-title { font-size: .78rem; font-weight: 700; color: var(--text-muted);
                    text-transform: uppercase; letter-spacing: .05em; }
-.lev-area-item   { margin-bottom: 8px; padding: 10px 12px;
+.lev-area-item   { position: relative; margin-bottom: 8px; padding: 10px 12px;
                    background: var(--surface2); border-radius: var(--radius-sm);
                    border: 1px solid var(--border); }
+.lev-area-del-btn {
+  position: absolute; top: 6px; right: 8px; z-index: 1;
+  background: none; border: none; cursor: pointer; padding: 4px;
+  color: var(--text-muted); font-size: 1rem; line-height: 1;
+  border-radius: 50%; transition: background .12s, color .12s;
+}
+.lev-area-del-btn:hover { background: var(--red, #e74c3c)22; color: var(--red, #e74c3c); }
 .lev-area-result .input-info-badge { background: rgba(46,189,66,.08); border-color: var(--g500);
                                       color: var(--g300); font-weight: 700; }
 

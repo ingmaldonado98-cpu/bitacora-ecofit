@@ -702,21 +702,33 @@ function renderLevantamiento(project, tipo, edit) {
           </select>
         </div>
       </div>
-      <details class="pd-details" ${lev.marcaTablero ? 'open' : ''}>
+      <details class="pd-details" ${(lev.marcaTablero || lev.tipoTablero) ? 'open' : ''}>
         <summary>Detalles del tablero <span class="pd-caret">▾</span></summary>
         <div class="pd-body">
           <div class="form-row">
             <div class="form-group">
-              <label>Marca del tablero</label>
+              <label>Tipo de tablero</label>
+              <select name="tipoTablero" ${dis}>
+                ${['','Empotrado (flush)','Superficie','Riel DIN','N/A'].map(t=>
+                  `<option ${(lev.tipoTablero||'')===(t)?'selected':''}>${t}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Marca</label>
               <select name="marcaTablero" ${dis}>
                 ${['','Square D','Murray','Siemens','Riel DIN (genérico)','Eaton / Cutler-Hammer','Legrand','ABB','General Electric','IEM','Otro'].map(t=>
                   `<option ${(lev.marcaTablero||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
               </select>
             </div>
+          </div>
+          <div class="form-row">
             <div class="form-group">
-              <label>Capacidad del tablero <span class="form-hint">espacios / polos</span></label>
+              <label>Capacidad <span class="form-hint">polos / espacios</span></label>
               <input type="text" name="capacidadTablero" value="${esc(lev.capacidadTablero||'')}"
-                     placeholder="Ej: 12 polos, 20 esp." ${dis}/>
+                     placeholder="Ej: 12 polos" list="cap-tablero-list" ${dis}/>
+              <datalist id="cap-tablero-list">
+                ${[4,6,8,10,12,16,20,24,30,40].map(n=>`<option value="${n} polos">`).join('')}
+              </datalist>
             </div>
           </div>
         </div>
@@ -757,6 +769,18 @@ function renderCamposDinamicos(tipo, lev, edit, pid) {
     return `
     <div class="card">
       <h3 class="card-title">Tarifa CFE y contrato</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Número de Servicio CFE (NIS)</label>
+          <input type="text" name="nisServicio" value="${esc(lev.nisServicio||'')}"
+                 placeholder="12 dígitos" inputmode="numeric" maxlength="18" ${dis}/>
+        </div>
+        <div class="form-group">
+          <label>Titular del servicio</label>
+          <input type="text" name="titularServicio" value="${esc(lev.titularServicio||'')}"
+                 placeholder="Nombre en el recibo" ${dis}/>
+        </div>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label>Tarifa</label>
@@ -1024,10 +1048,40 @@ const APARATOS_RAPIDOS = [
   {nombre:'Refrigerador residencial',potencia:200,horas:24},{nombre:'Refrigerador comercial',potencia:500,horas:24},
   {nombre:'Lavadora',potencia:500,horas:1},
 ];
+const AREAS_CONSUMO = ['General','Sala/Comedor','Cocina','Habitación 1','Habitación 2','Habitación 3',
+                       'Baño','Cochera','Entrada','Patio/Jardín','Sala de máquinas','Otro'];
+
+function _areaOpts(sel) {
+  return AREAS_CONSUMO.map(a=>`<option ${a===sel?'selected':''}>${a}</option>`).join('');
+}
+function _aparatoRow(a, i, edit) {
+  const area = a.area || 'General';
+  return `<div class="aparato-row" data-idx="${i}">
+    ${edit ? `<select class="aprow-area" onchange="_aparatos[${i}].area=this.value;refreshAparatos()">${_areaOpts(area)}</select>` : `<span class="aprow-area-ro">${esc(area)}</span>`}
+    <input type="text" value="${esc(a.nombre)}" placeholder="Nombre" ${edit?`oninput="_aparatos[${i}].nombre=this.value"`:'disabled'}/>
+    <input type="number" value="${a.potencia}" placeholder="W" min="0" ${edit?`oninput="_aparatos[${i}].potencia=parseFloat(this.value)||0"`:'disabled'}/>
+    <input type="number" value="${a.horas}" placeholder="h/día" min="0" step="0.5" ${edit?`oninput="_aparatos[${i}].horas=parseFloat(this.value)||0"`:'disabled'}/>
+    <input type="number" value="${a.cantidad||1}" placeholder="Cant." min="1" ${edit?`oninput="_aparatos[${i}].cantidad=parseInt(this.value)||1"`:'disabled'}/>
+    ${edit?`<button type="button" class="btn-del-sm" onclick="delAparato(${i})">✕</button>`:''}
+  </div>`;
+}
+function _aparatosResumen() {
+  const map = {};
+  _aparatos.forEach(a => {
+    const k = a.area || 'General';
+    if (!map[k]) map[k] = 0;
+    map[k] += (a.potencia * a.horas * 30 / 1000) * (a.cantidad || 1);
+  });
+  const items = Object.entries(map).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  if (items.length <= 1) return '';
+  return `<div class="aparatos-resumen">
+    ${items.map(([k,v])=>`<div class="apres-row"><span>${esc(k)}</span><strong>${v.toFixed(0)} kWh/mes</strong></div>`).join('')}
+  </div>`;
+}
 
 function renderAparatos(aparatos, edit) {
-  _aparatos = [...aparatos];
-  const totalKwh = _aparatos.reduce((s,a)=>s+(a.potencia*a.horas*30/1000),0);
+  _aparatos = aparatos.map(a => ({...a, area: a.area || 'General'}));
+  const totalKwh = _aparatos.reduce((s,a)=>s+(a.potencia*a.horas*(a.cantidad||1)*30/1000),0);
   return `
     ${edit?`<div class="aparatos-rapidos">
       <p class="hint">Acceso rápido:</p>
@@ -1036,40 +1090,27 @@ function renderAparatos(aparatos, edit) {
       </div>
     </div>`:''}
     <div id="lista-aparatos">
-      ${_aparatos.map((a,i)=>`
-        <div class="aparato-row">
-          <input type="text" value="${esc(a.nombre)}" placeholder="Nombre" ${edit?`oninput="_aparatos[${i}].nombre=this.value"`:'disabled'}/>
-          <input type="number" value="${a.potencia}" placeholder="W" min="0" ${edit?`oninput="_aparatos[${i}].potencia=parseFloat(this.value)||0"`:'disabled'}/>
-          <input type="number" value="${a.horas}" placeholder="h/día" min="0" step="0.5" ${edit?`oninput="_aparatos[${i}].horas=parseFloat(this.value)||0"`:'disabled'}/>
-          <input type="number" value="${a.cantidad||1}" placeholder="Cant." min="1" ${edit?`oninput="_aparatos[${i}].cantidad=parseInt(this.value)||1"`:'disabled'}/>
-          ${edit?`<button type="button" class="btn-del-sm" onclick="delAparato(${i})">✕</button>`:''}
-        </div>`).join('')}
+      ${_aparatos.map((a,i)=>_aparatoRow(a,i,edit)).join('')}
     </div>
     ${edit?`<button type="button" class="btn-outline btn-sm" onclick="addAparato()">+ Aparato</button>`:''}
     <p class="kwh-total">Total estimado: <strong>${totalKwh.toFixed(0)} kWh/mes</strong></p>
+    <div id="aparatos-resumen-wrap">${_aparatosResumen()}</div>
   `;
 }
 
 const _triggerLevSave = () => { if (_levPid) window._levAutoSave(_levPid); };
-window.addAparatoRapido = function(a) { _aparatos.push({...a,cantidad:1}); refreshAparatos(); _triggerLevSave(); };
-window.addAparato = function() { _aparatos.push({nombre:'',potencia:0,horas:0,cantidad:1}); refreshAparatos(); };
+window.addAparatoRapido = function(a) { _aparatos.push({...a,cantidad:1,area:'General'}); refreshAparatos(); _triggerLevSave(); };
+window.addAparato = function() { _aparatos.push({nombre:'',potencia:0,horas:0,cantidad:1,area:'General'}); refreshAparatos(); };
 window.delAparato = function(i) { _aparatos.splice(i,1); refreshAparatos(); _triggerLevSave(); };
 function refreshAparatos() {
   const el = document.getElementById('lista-aparatos');
   if (el) {
-    // Reemplazar solo el contenido del contenedor padre para mantener referencias del DOM
-    el.innerHTML = _aparatos.map((a,i) => `
-      <div class="aparato-row">
-        <input type="text" value="${esc(a.nombre)}" placeholder="Nombre" oninput="_aparatos[${i}].nombre=this.value"/>
-        <input type="number" value="${a.potencia}" placeholder="W" min="0" oninput="_aparatos[${i}].potencia=parseFloat(this.value)||0"/>
-        <input type="number" value="${a.horas}" placeholder="h/día" min="0" step="0.5" oninput="_aparatos[${i}].horas=parseFloat(this.value)||0"/>
-        <input type="number" value="${a.cantidad||1}" placeholder="Cant." min="1" oninput="_aparatos[${i}].cantidad=parseInt(this.value)||1"/>
-        <button type="button" class="btn-del-sm" onclick="delAparato(${i})">✕</button>
-      </div>`).join('');
-    // Actualizar total
-    const totalKwh = _aparatos.reduce((s,a) => s + (a.potencia * a.horas * 30 / 1000), 0);
+    el.innerHTML = _aparatos.map((a,i) => _aparatoRow(a,i,true)).join('');
+    const totalKwh = _aparatos.reduce((s,a) => s + (a.potencia * a.horas * (a.cantidad||1) * 30 / 1000), 0);
     const totEl = el.closest('.card, [id^="panel-aparatos"]')?.querySelector('.kwh-total');
     if (totEl) totEl.innerHTML = `Total estimado: <strong>${totalKwh.toFixed(0)} kWh/mes</strong>`;
+    const resWrap = el.closest('.card, [id^="panel-aparatos"]')?.querySelector('#aparatos-resumen-wrap');
+    if (resWrap) resWrap.innerHTML = _aparatosResumen();
   }
 }
 
@@ -1206,7 +1247,8 @@ window.guardarLevantamiento = async function(e, projectId) {
     tipoServicioCFE:     fd.get('tipoServicioCFE'),
     tierraFisica:        fd.get('tierraFisica'),
     centroCarga:         fd.get('centroCarga'),
-    marcaTablero:        fd.get('marcaTablero')    || null,
+    tipoTablero:         fd.get('tipoTablero')      || null,
+    marcaTablero:        fd.get('marcaTablero')     || null,
     capacidadTablero:    fd.get('capacidadTablero') || null,
     gpsLat:              lev.gpsLat  ?? null,
     gpsLng:              lev.gpsLng  ?? null,
@@ -1218,6 +1260,8 @@ window.guardarLevantamiento = async function(e, projectId) {
   };
 
   if (tipo==='interconectado'||tipo==='hibrido'||tipo==='hibrido_respaldo') {
+    newLev.nisServicio    = fd.get('nisServicio')    || null;
+    newLev.titularServicio= fd.get('titularServicio') || null;
     newLev.tarifaCFE      = fd.get('tarifaCFE');
     newLev.demandaKW      = parseFloat(fd.get('demandaKW')) || null;
     newLev.factorPotencia = parseFloat(fd.get('factorPotencia')) || null;
@@ -1752,6 +1796,8 @@ function _renderAreasTecho(areas, edit, pid) {
     const totalFotos = fotos.length;
     return `
   <div class="lev-area-item" id="lev-area-${i}">
+    ${edit ? `<button type="button" class="lev-area-del-btn"
+      onclick="window._removeAreaTecho(${i})" title="Eliminar área">✕</button>` : ''}
     <div class="form-row" style="align-items:flex-end">
       <div class="form-group" style="flex:2">
         <label>Nombre del área</label>
@@ -1775,8 +1821,6 @@ function _renderAreasTecho(areas, edit, pid) {
           ${a.ancho && a.largo ? `<strong>${(a.ancho*a.largo).toFixed(1)} m²</strong>` : '—'}
         </div>
       </div>
-      ${edit ? `<button type="button" class="btn-icon-sm" style="margin-bottom:4px;color:var(--red)"
-        onclick="window._removeAreaTecho(${i})" title="Eliminar área">✕</button>` : ''}
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -1838,7 +1882,10 @@ window._addAreaTecho = function() {
   if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true, _levPid);
 };
 
-window._removeAreaTecho = function(idx) {
+window._removeAreaTecho = async function(idx) {
+  const nombre = _areasTecho[idx]?.nombre || `Área ${idx + 1}`;
+  const ok = await confirmDialog(`¿Eliminar "${nombre}"? Se perderán sus medidas y fotos.`);
+  if (!ok) return;
   _areasTecho.splice(idx, 1);
   const list = document.getElementById('lev-areas-list');
   if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true, _levPid);
