@@ -1,7 +1,7 @@
 // documentacion.js — Módulo 2: Levantamiento dinámico + Fases Antes/Durante/Después
 
 import { projects, logChange } from './db.js';
-import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar, calcFaseEstado, genDisplayId, countFotos } from './utils.js';
+import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar, calcFaseEstado, genDisplayId, countFotos, getFotosTecnicas } from './utils.js';
 import { renderFirmaBlock } from './project.js';
 import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
@@ -236,13 +236,6 @@ const SLOTS_CIERRE_SITIO = {
 };
 
 // Obtener fotos técnicas (soporta legacy string y nuevo array)
-function _getFT(g, key) {
-  const v = (g.fotosTecnicas || {})[key];
-  if (!v) return [];
-  if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
-  return Array.isArray(v) ? v : [];
-}
-
 // Sitio al que pertenece cada slot técnico (para navegar de regreso)
 function _sitioForFTKey(key) {
   return SLOTS_CIERRE_SITIO.centrosCarga.some(s => s.key === key) ? 'centrosCarga' : 'zonaDelSistema';
@@ -254,7 +247,7 @@ function _countCierreExtra(project, sitio) {
   if (sitio === 'techo') {
     return (g.fotoSistema ? 1 : 0) + (g.fotosAdicionales || []).length;
   }
-  return (SLOTS_CIERRE_SITIO[sitio] || []).reduce((s, slot) => s + _getFT(g, slot.key).length, 0);
+  return (SLOTS_CIERRE_SITIO[sitio] || []).reduce((s, slot) => s + getFotosTecnicas(g.fotosTecnicas, slot.key).length, 0);
 }
 
 // Bloque de cierre específico del sitio (se muestra arriba del grid de fotos libres)
@@ -304,7 +297,7 @@ function renderCierreSitio(project, sitio, edit, projectId) {
   <div class="card">
     <h3 class="card-title">Fotos técnicas de cierre</h3>
     ${slots.map(s => {
-      const fotos = _getFT(g, s.key);
+      const fotos = getFotosTecnicas(g.fotosTecnicas, s.key);
       const tiene = fotos.length > 0;
       return `
       <div class="foto-tecnica-row">

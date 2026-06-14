@@ -725,6 +725,14 @@ export function firmaModificada(project, fase) {
   );
 }
 
+// Normaliza fotosTecnicas[key]: soporta string legacy, array nuevo, o vacío
+export function getFotosTecnicas(ft, key) {
+  const v = (ft || {})[key];
+  if (!v) return [];
+  if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
+  return Array.isArray(v) ? v : [];
+}
+
 // ── Conteo de fotos por sitio/subfase (soporta esquema nuevo y legacy) ─────────
 // fases: project.documentacion?.fases · sitio: 'techo' | 'centrosCarga' | 'zonaDelSistema'
 // sub:   'antes' | 'durante' | 'cierre'

@@ -3,7 +3,7 @@
 import { projects, logChange, kv } from './db.js';
 import { esc, fmtFechaHora, fotoMini, capturePhoto, compressImage, toast, confirmDialog, inputDialog,
          uploadProgressBar, uuid, isoNow, MARCAS_EQUIPOS, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION,
-         openScannerOverlay, calcFaseEstado } from './utils.js';
+         openScannerOverlay, calcFaseEstado, getFotosTecnicas } from './utils.js';
 import { canEdit, isAdmin, isLider, getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
@@ -603,12 +603,6 @@ window.editFotoAdicionalNota = async function(projectId, idx) {
 
 // ── 1B Fotos técnicas ─────────────────────────────────────────────────────────
 // Retrocompat: el campo puede ser string (viejo) o array [{url,id,createdAt}] (nuevo)
-function getFotosTecnicas(ft, key) {
-  const v = ft[key];
-  if (!v) return [];
-  if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
-  return Array.isArray(v) ? v : [];
-}
 
 function renderFotosTecnicas(ft, projectId, edit) {
   const slots = [
