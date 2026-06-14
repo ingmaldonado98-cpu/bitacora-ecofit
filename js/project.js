@@ -579,6 +579,7 @@ function renderNotasRapidas(project, id, edit) {
           <span class="nota-texto nota-texto-done">${esc(n.texto)}</span>
           <div class="nota-meta">
             <span class="nota-fecha">Hecho ${fmtRelativa(n.hechoAt)}${n.hechoPor ? ` · ${esc(n.hechoPor)}` : ''}</span>
+            <button class="nota-del-hist-btn" onclick="window._deleteNotaHist('${id}','${esc(n.id)}')" title="Eliminar del historial">✕</button>
           </div>
         </div>`).join('')}
       </div>
@@ -600,6 +601,13 @@ window._addNota = async function(pid) {
   const project = await projects.getById(pid);
   const notas = [...(project.notasRapidas || []), { id: uuid(), texto, creadaAt: isoNow() }];
   await projects.setField(pid, 'notasRapidas', notas);
+  navigate(`#proyecto/${pid}`);
+};
+
+window._deleteNotaHist = async function(pid, notaId) {
+  const project = await projects.getById(pid);
+  const historial = (project.notasHistorial || []).filter(n => n.id !== notaId);
+  await projects.setField(pid, 'notasHistorial', historial);
   navigate(`#proyecto/${pid}`);
 };
 

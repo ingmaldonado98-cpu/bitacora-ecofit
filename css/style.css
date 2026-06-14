@@ -3041,6 +3041,12 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 }
 .notas-hist-toggle::-webkit-details-marker { display: none; }
 .notas-hist { margin-top: 6px; opacity: .8; }
+.nota-del-hist-btn {
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  font-size: .8rem; padding: 2px 4px; border-radius: 4px; line-height: 1;
+  transition: color .12s, background .12s;
+}
+.nota-del-hist-btn:hover { color: var(--red, #e74c3c); background: var(--red, #e74c3c)18; }
 
 .qc-card { padding: 14px 16px; }
 .qc-count {
