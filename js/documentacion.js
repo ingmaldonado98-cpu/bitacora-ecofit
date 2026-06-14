@@ -707,16 +707,18 @@ function renderLevantamiento(project, tipo, edit) {
         <div class="pd-body">
           <div class="form-row">
             <div class="form-group">
-              <label>Tipo de tablero</label>
+              <label>Tipo de montaje</label>
               <select name="tipoTablero" ${dis}>
-                ${['','Empotrado (flush)','Superficie','Riel DIN','N/A'].map(t=>
+                ${['','Empotrado (flush)','Superficie','N/A'].map(t=>
                   `<option ${(lev.tipoTablero||'')===(t)?'selected':''}>${t}</option>`).join('')}
               </select>
             </div>
             <div class="form-group">
-              <label>Marca</label>
+              <label>Sistema / breakers compatibles
+                <span class="form-hint">define qué breakers comprar</span>
+              </label>
               <select name="marcaTablero" ${dis}>
-                ${['','Square D','Murray','Siemens','Riel DIN (genérico)','Eaton / Cutler-Hammer','Legrand','ABB','General Electric','IEM','Otro'].map(t=>
+                ${['','Square D','Murray','Riel DIN','Siemens','Eaton / Cutler-Hammer','Legrand','ABB','General Electric','IEM','Otro'].map(t=>
                   `<option ${(lev.marcaTablero||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
               </select>
             </div>
