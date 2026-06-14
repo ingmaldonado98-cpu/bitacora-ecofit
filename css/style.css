@@ -235,42 +235,23 @@ body.theme-light .prog-chip {
   border-color: var(--border);
 }
 
-/* Toggle sol/luna */
+/* Botón de ciclo de tema (oscuro → claro → auto) */
 .hdr-theme-toggle {
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  width: 34px; height: 34px;
+  width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: #fff; transition: background .15s;
+  cursor: pointer; color: var(--text-muted); transition: background .15s, color .15s;
   flex-shrink: 0;
 }
-.hdr-theme-toggle:hover { background: rgba(255,255,255,.22); }
-.hdr-theme-auto {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  width: 34px; height: 34px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: rgba(255,255,255,.7); transition: background .15s, color .15s;
-  flex-shrink: 0;
-}
-.hdr-theme-auto:hover { background: rgba(255,255,255,.18); color: #fff; }
-/* Mostrar sol en dark, luna en light */
-body:not(.theme-light) .ico-moon { display: none; }
-body.theme-light .ico-sun        { display: none; }
-body.theme-light .ico-moon       { display: flex; }
-/* Theme buttons en light — iconos oscuros sobre fondo claro */
+.hdr-theme-toggle:hover { background: var(--surface3); color: var(--text); }
+/* Light theme */
 body.theme-light .hdr-theme-toggle {
   background: #ffffff; border-color: var(--border); color: var(--text);
   box-shadow: 0 1px 2px rgba(0,0,0,.05);
 }
 body.theme-light .hdr-theme-toggle:hover { background: var(--surface3); }
-body.theme-light .hdr-theme-auto {
-  background: #ffffff; border-color: var(--border); color: var(--text-muted);
-  box-shadow: 0 1px 2px rgba(0,0,0,.05);
-}
-body.theme-light .hdr-theme-auto:hover { background: var(--surface3); color: var(--text); }
 
 /* ── Reset ────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -341,7 +322,7 @@ body {
 .hdr-logout-btn {
   background: none; border: none; cursor: pointer;
   color: var(--text-muted);
-  width: 34px; height: 34px;
+  width: 44px; height: 44px;
   border-radius: var(--radius-sm); transition: color .15s, background .15s;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
@@ -908,7 +889,7 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 .btn-sm { padding: 6px 14px; font-size: .8rem; }
 .btn-icon-hdr {
   background: var(--surface2); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); width: 36px; height: 36px;
+  border-radius: var(--radius-sm); width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted); cursor: pointer; transition: all .15s;
 }
@@ -3216,4 +3197,48 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 @media (max-width:400px) {
   .dim-modelo-row { flex-direction:column; gap:2px; }
   .dim-modelo-key { flex:none; }
+}
+
+/* ── Trayectorias de canalización ─────────────────────────────────────────── */
+.tray-seg { padding: 12px 14px; }
+.tray-seg-head {
+  display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;
+}
+.tray-seg-idx {
+  min-width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(46,189,66,.18); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .74rem; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+}
+.tray-seg-info { flex: 1; min-width: 0; }
+.tray-seg-nom  {
+  display: block; font-weight: 600; font-size: .88rem;
+  color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tray-seg-ruta {
+  display: block; font-size: .75rem; color: var(--text-muted);
+  margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tray-chips    { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.tray-chip     {
+  background: var(--surface3); border: 1px solid var(--border);
+  border-radius: 4px; font-size: .72rem; padding: 2px 8px; color: var(--text-muted);
+}
+.tray-chip-m   { color: var(--accent); border-color: rgba(46,189,66,.3); }
+.tray-notas    { font-size: .8rem; color: var(--text-muted); margin: 0 0 8px; line-height: 1.4; }
+.tray-fotos    { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.tray-thumb    { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; cursor: pointer; }
+.tray-foto-btn { font-size: .78rem; margin-top: 2px; }
+
+.tray-add-form  { padding: 14px 16px; margin-top: 8px; }
+.tray-form-title {
+  font-size: .9rem; font-weight: 600; margin: 0 0 12px;
+  display: flex; align-items: center; gap: 6px; color: var(--text);
+}
+.tray-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tray-row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
+.tray-save-btn { width: 100%; margin-top: 10px; }
+
+@media (max-width: 380px) {
+  .tray-row-2, .tray-row-3 { grid-template-columns: 1fr; }
 }

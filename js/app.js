@@ -561,20 +561,50 @@ window._applyScheduledTheme = function() {
   // Aplicar horario programado (tiene prioridad) y revisar cada minuto
   window._applyScheduledTheme();
   setInterval(window._applyScheduledTheme, 60_000);
+
+  // Sync theme button icon with current state (runs after DOM is ready)
+  requestAnimationFrame(_updateThemeBtn);
 })();
 
-window._toggleTheme = function () {
-  const isLight = document.body.classList.toggle('theme-light');
-  localStorage.setItem('ecofit-theme', isLight ? 'light' : 'dark');
-};
+function _updateThemeBtn() {
+  const btn = document.getElementById('hdr-theme-cycle-btn');
+  if (!btn) return;
+  const saved = localStorage.getItem('ecofit-theme');
+  let icon, label;
+  if (saved === 'dark') {
+    // Dark active → show moon
+    icon = `<svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M235.54,150.21a104.84,104.84,0,0,1-37,52.91A104,104,0,0,1,32,120,103.09,103.09,0,0,1,52.85,57.11,104.84,104.84,0,0,1,105.75,20.26,8,8,0,0,1,115.5,33.47a88.07,88.07,0,0,0,104,109.22,8,8,0,0,1,16.07,7.52Z"/></svg>`;
+    label = 'Oscuro';
+  } else if (saved === 'light') {
+    // Light active → show sun
+    icon = `<svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></svg>`;
+    label = 'Claro';
+  } else {
+    // Auto → show device icon
+    icon = `<svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M176,16H80A24,24,0,0,0,56,40V216a24,24,0,0,0,24,24h96a24,24,0,0,0,24-24V40A24,24,0,0,0,176,16Zm8,200a8,8,0,0,1-8,8H80a8,8,0,0,1-8-8V40a8,8,0,0,1,8-8h96a8,8,0,0,1,8,8ZM120,184a8,8,0,1,0,16,0A8,8,0,0,0,120,184Z"/></svg>`;
+    label = 'Auto';
+  }
+  btn.innerHTML = icon;
+  btn.title = `Tema: ${label}`;
+}
 
-window._setThemeAuto = function () {
-  localStorage.removeItem('ecofit-theme');
-  localStorage.removeItem('ecofit-theme-sched');
-  document.body.classList.remove('theme-sched');
-  const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-  document.body.classList.toggle('theme-light', prefersLight);
-  toast('Tema automático activado');
+window._cycleTheme = function () {
+  const saved = localStorage.getItem('ecofit-theme');
+  if (!saved) {
+    // auto → dark
+    localStorage.setItem('ecofit-theme', 'dark');
+    document.body.classList.remove('theme-light');
+  } else if (saved === 'dark') {
+    // dark → light
+    localStorage.setItem('ecofit-theme', 'light');
+    document.body.classList.add('theme-light');
+  } else {
+    // light → auto
+    localStorage.removeItem('ecofit-theme');
+    const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+    document.body.classList.toggle('theme-light', prefersLight);
+  }
+  _updateThemeBtn();
 };
 
 // ── Skeleton screens ──────────────────────────────────────────────────────────
