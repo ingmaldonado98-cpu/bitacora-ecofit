@@ -16,6 +16,7 @@ import { renderCalculadora } from './calculadora.js';
 import { renderChecklistModule, renderChecklistsList } from './checklist.js';
 import { renderDimensionamiento } from './dimensionamiento.js';
 import { renderTrayecto } from './trayecto.js';
+import { renderTrayectorias } from './trayectorias.js';
 import { projects, users, reminders } from './db.js';
 import { toast, esc } from './utils.js';
 import { icon } from './icons.js';
@@ -174,7 +175,7 @@ async function route() {
       case '': {
         const [all, allUsers] = await Promise.all([projects.getAll(), users.getAll()]);
         initDashboardFilters(all, allUsers);
-        updateRecordatoriosBadge(calcRecordatoriosCount(all));
+        calcRecordatoriosCount(all).then(n => updateRecordatoriosBadge(n));
         // FIX-8: Pasar datos pre-cargados para evitar doble lectura Firestore
         await render(renderDashboard(session, all, allUsers), skeletonDashboard());
         // Poblar select de técnicos ahora que el DOM existe
@@ -220,6 +221,8 @@ async function route() {
           await render(renderAuditoria(id, session));
         } else if (sub === 'trayecto') {
           await render(renderTrayecto(id, session));
+        } else if (sub === 'trayectorias') {
+          await render(renderTrayectorias(id, session));
         } else if (sub === 'qr') {
           await render(renderQR(id, session));
         } else if (sub === 'pdf') {
@@ -308,7 +311,8 @@ window._openReminderModal = async function() {
   const session = await getSession();
   if (!session) return;
 
-  document.getElementById('reminder-overlay')?.remove();
+  const _prev = document.getElementById('reminder-overlay');
+  if (_prev) { _prev.classList.remove('rs-open'); setTimeout(() => _prev.remove(), 250); await new Promise(r => setTimeout(r, 260)); }
 
   const overlay = document.createElement('div');
   overlay.className = 'reminder-sheet-overlay';
@@ -354,7 +358,7 @@ window._openReminderModal = async function() {
       await reminders.add({
         id, texto: txt, fecha,
         createdAt: new Date().toISOString(),
-        createdBy: session.uid,
+        createdBy: session.id,
         createdByName: session.nombre || session.username,
       });
       closeModal();
@@ -364,9 +368,7 @@ window._openReminderModal = async function() {
 };
 
 window._reminderDelete = async function(id) {
-  try {
-    await reminders.delete(id);
-  } catch { /* ya eliminado */ }
+  try { await reminders.delete(id); } catch { /* ya eliminado */ }
   const row = document.getElementById('qrem-' + id);
   if (row) {
     row.style.transition = 'opacity .2s';
@@ -375,6 +377,13 @@ window._reminderDelete = async function(id) {
       row.remove();
       const section = document.getElementById('qrem-section');
       if (section && !section.querySelector('.qrem-row')) section.remove();
+      // Decrementar badge
+      const badge = document.getElementById('nav-badge-recor');
+      if (badge) {
+        const next = Math.max(0, (parseInt(badge.textContent) || 0) - 1);
+        badge.textContent = next > 9 ? '9+' : String(next);
+        badge.style.display = next > 0 ? '' : 'none';
+      }
     }, 200);
   }
   toast('Recordatorio eliminado', 'ok', 1500);

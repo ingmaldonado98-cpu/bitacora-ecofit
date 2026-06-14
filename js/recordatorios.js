@@ -54,12 +54,17 @@ function _section(titulo, rows) {
 }
 
 // Calcula el total urgente sin cargar la vista (usado desde dashboard)
-export function calcRecordatoriosCount(all) {
+export async function calcRecordatoriosCount(all) {
   const activos = all.filter(p => !_ARCH.includes(p.estado));
   let n = 0;
   n += activos.filter(p => p.fechaEstimada && (_dias(p.fechaEstimada) ?? 999) <= 7).length;
   n += activos.filter(p => p.estado === 'pendiente_revision').length;
   n += activos.filter(p => _vencProximos(p.garantia?.fechaInstalacion, 90).length > 0).length;
+  try {
+    const { reminders } = await import('./db.js');
+    const qrems = await reminders.getAll();
+    n += qrems.length;
+  } catch { /* silencioso */ }
   return n;
 }
 
