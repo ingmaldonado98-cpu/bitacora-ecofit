@@ -1,0 +1,87 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install acorn
+        run: npm install -g acorn
+
+      # ── 1. Sintaxis ES module en todos los archivos propios ──────────────────
+      - name: Check JS syntax
+        run: |
+          ERRORS=0
+          for f in js/*.js; do
+            [[ "$f" == *"vendor"* ]] && continue
+            if ! acorn --ecma2022 --module "$f" > /dev/null 2>&1; then
+              echo "❌ Syntax error: $f"
+              acorn --ecma2022 --module "$f" 2>&1 | head -5
+              ERRORS=$((ERRORS+1))
+            fi
+          done
+          COUNT=$(ls js/*.js | grep -v vendor | wc -l)
+          [ $ERRORS -eq 0 ] && echo "✅ Sintaxis OK — $COUNT archivos" || true
+          exit $ERRORS
+
+      # ── 2. Todos los .js de /js/ están en APP_SHELL de sw.js ────────────────
+      - name: Verify APP_SHELL completeness
+        run: |
+          node -e "
+          const fs = require('fs');
+          const sw = fs.readFileSync('sw.js', 'utf8');
+          const shell = [...sw.matchAll(/'\.\/js\/([^']+)'/g)].map(m => 'js/' + m[1]);
+          const shellSet = new Set(shell);
+          const files = fs.readdirSync('js').filter(f => f.endsWith('.js') && !f.includes('vendor'));
+          const missing = files.filter(f => !shellSet.has('js/' + f));
+          if (missing.length) {
+            console.error('❌ Sin cachear en APP_SHELL:', missing.join(', '));
+            process.exit(1);
+          }
+          console.log('✅ APP_SHELL OK —', shell.length, 'archivos cacheados');
+          "
+
+      # ── 3. CACHE_NAME bumpeado cuando hay cambios en app shell ──────────────
+      - name: Check SW version bumped
+        run: |
+          PREV=$(git rev-parse HEAD~1 2>/dev/null) || { echo "Primer commit, skip"; exit 0; }
+          CHANGED=$(git diff "$PREV" HEAD --name-only | grep -v '^sw\.js$' | grep -cE '\.(js|html|css)$' || true)
+          if [ "$CHANGED" -gt "0" ]; then
+            BUMPED=$(git diff "$PREV" HEAD -- sw.js | grep -c '^+const CACHE_NAME' || true)
+            if [ "$BUMPED" -eq "0" ]; then
+              echo "::warning file=sw.js::CACHE_NAME no fue bumpeado — usuarios pueden quedar en caché viejo"
+            else
+              echo "✅ SW version bumpeado"
+            fi
+          else
+            echo "ℹ️ Solo cambió sw.js — skip bump check"
+          fi
+
+      # ── 4. Verificar imports de app.js resuelven a archivos existentes ───────
+      - name: Check import paths
+        run: |
+          node -e "
+          const fs = require('fs');
+          const src = fs.readFileSync('js/app.js', 'utf8');
+          const imports = [...src.matchAll(/from '\.\/([^']+)'/g)].map(m => 'js/' + m[1]);
+          const broken = imports.filter(f => !fs.existsSync(f));
+          if (broken.length) {
+            console.error('❌ Imports rotos:', broken.join(', '));
+            process.exit(1);
+          }
+          console.log('✅ Imports OK —', imports.length, 'resueltos');
+          "
