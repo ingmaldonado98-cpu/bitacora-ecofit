@@ -1138,6 +1138,22 @@ const CARGAS_RAPIDAS = [
   {nombre:'Lavadora',           potencia:500,  horas:1 },
 ];
 
+function _cargaAreaOpts(sel) {
+  return AREAS_CONSUMO.map(a=>`<option ${(a===(sel||'General'))?'selected':''}>${a}</option>`).join('');
+}
+function _cargasResumen(tipo) {
+  const map = {};
+  _cargas[tipo].forEach(c => {
+    const k = c.area || 'General';
+    if (!map[k]) map[k] = 0;
+    map[k] += (c.potencia * c.horas * (c.cantidad||1)) / 1000;
+  });
+  const items = Object.entries(map).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  if (items.length <= 1) return '';
+  return `<div class="aparatos-resumen">
+    ${items.map(([k,v])=>`<div class="apres-row"><span>${esc(k)}</span><strong>${v.toFixed(2)} kWh/día</strong></div>`).join('')}
+  </div>`;
+}
 function renderCargas(cargas, edit, tipo) {
   _cargas[tipo] = [...cargas];
   const totalW   = _cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
@@ -1152,15 +1168,19 @@ function renderCargas(cargas, edit, tipo) {
     </div>` : ''}
     ${_cargas[tipo].length > 0 ? `
     <div class="carga-row carga-row-header">
+      <span>Área</span>
       <span>Equipo</span>
-      <span title="Potencia en watts del aparato">Watts (W)</span>
-      <span title="Horas de uso al día">Horas/día</span>
+      <span title="Potencia en watts">W</span>
+      <span title="Horas de uso al día">h/día</span>
       <span title="Número de unidades">Cant.</span>
       ${edit ? '<span></span>' : ''}
     </div>` : ''}
     <div id="lista-cargas-${tipo}">
       ${_cargas[tipo].map((c,i)=>`
         <div class="carga-row">
+          ${edit
+            ? `<select class="aprow-area" onchange="_cargas['${tipo}'][${i}].area=this.value;_refreshCargasResumen('${tipo}')">${_cargaAreaOpts(c.area)}</select>`
+            : `<span class="aprow-area-ro">${esc(c.area||'General')}</span>`}
           <input type="text" value="${esc(c.nombre)}" placeholder="Nombre del equipo" ${edit?`oninput="_cargas['${tipo}'][${i}].nombre=this.value"`:'disabled'}/>
           <input type="number" value="${c.potencia}" placeholder="0" min="0" ${edit?`oninput="_cargas['${tipo}'][${i}].potencia=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
           <input type="number" value="${c.horas}" placeholder="0" min="0" step="0.5" ${edit?`oninput="_cargas['${tipo}'][${i}].horas=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
@@ -1168,19 +1188,25 @@ function renderCargas(cargas, edit, tipo) {
           ${edit?`<button type="button" class="btn-del-sm" onclick="delCarga('${tipo}',${i})">✕</button>`:''}
         </div>`).join('')}
     </div>
+    <div id="cargas-resumen-${tipo}">${_cargasResumen(tipo)}</div>
     ${edit?`<button type="button" class="btn-outline btn-sm" style="margin-top:6px" onclick="addCarga('${tipo}')">${labelBtn}</button>`:''}
     <p class="kwh-total" id="cargas-total-${tipo}">Total: <strong>${totalW} W</strong> — <strong>${(totalWh/1000).toFixed(2)} kWh/día</strong></p>
   `;
 }
-window.addCargaRapida = function(tipo, a) { _cargas[tipo].push({...a, cantidad:1}); refreshCargas(tipo); _triggerLevSave(); };
-window.addCarga = function(tipo) { _cargas[tipo].push({nombre:'',potencia:0,horas:0,cantidad:1}); refreshCargas(tipo); };
+window.addCargaRapida = function(tipo, a) { _cargas[tipo].push({...a, cantidad:1, area:'General'}); refreshCargas(tipo); _triggerLevSave(); };
+window.addCarga = function(tipo) { _cargas[tipo].push({nombre:'',potencia:0,horas:0,cantidad:1,area:'General'}); refreshCargas(tipo); };
 window.delCarga = function(tipo,i) { _cargas[tipo].splice(i,1); refreshCargas(tipo); _triggerLevSave(); };
+window._refreshCargasResumen = function(tipo) {
+  const el = document.getElementById(`cargas-resumen-${tipo}`);
+  if (el) el.innerHTML = _cargasResumen(tipo);
+};
 window.refreshCargasTotales = function(tipo) {
   const el = document.getElementById(`cargas-total-${tipo}`);
   if (!el) return;
   const totalW  = _cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
   const totalWh = _cargas[tipo].reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1), 0);
   el.innerHTML = `Total: <strong>${totalW} W</strong> — <strong>${(totalWh/1000).toFixed(2)} kWh/día</strong>`;
+  window._refreshCargasResumen(tipo);
 };
 function refreshCargas(tipo) { const el=document.getElementById(`cargas-${tipo}`); if(el) el.innerHTML=renderCargas(_cargas[tipo],true,tipo); }
 

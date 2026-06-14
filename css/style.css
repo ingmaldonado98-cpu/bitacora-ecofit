@@ -1321,7 +1321,7 @@ body.scanner-native-active > *:not(.scanner-native-ui) { visibility: hidden; }
 .apres-row strong { color: var(--g300); font-weight: 600; }
 .kwh-total { font-size: .9rem; color: var(--g300); margin-top: 10px; font-weight: 600; }
 
-.carga-row { display: grid; grid-template-columns: 2fr 1fr 1fr 0.6fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+.carga-row { display: grid; grid-template-columns: 1.2fr 2fr 1fr 1fr 0.6fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
 .carga-row-header { margin-bottom: 2px; }
 .carga-row-header span { font-size: .7rem; font-weight: 600; color: var(--g400); text-transform: uppercase; letter-spacing: .04em; padding: 0 2px; }
 .campo-libre-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 8px; }
@@ -2017,6 +2017,7 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
   .card-row, .form-row { grid-template-columns: 1fr; }
   .modules-grid { grid-template-columns: 1fr; }
   .aparato-row, .carga-row { grid-template-columns: 1fr 1fr; }
+  .carga-row-header { display: none; }
 }
 
 /* ── Tablet: centrar como columna angosta ─────────────────────────────────── */
