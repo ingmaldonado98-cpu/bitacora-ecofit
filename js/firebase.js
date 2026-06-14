@@ -291,6 +291,14 @@ export const fbReminders = {
   },
 };
 
+// ── Errores de runtime (write-only para usuarios, read para admin) ─────────
+export const fbErrors = {
+  add: async (data) => {
+    const id = `err_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    await setDoc(doc(fbDB, 'errors', id), data);
+  },
+};
+
 // ── Backup completo ────────────────────────────────────────────────────────
 export async function exportFbBackup() {
   const [projs, usrs, cfgSnap, kvSnap] = await Promise.all([

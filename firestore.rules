@@ -81,6 +81,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Recordatorios globales ────────────────────────────────────────────────
+    match /reminders/{id} {
+      allow read, write: if isActive();
+    }
+
+    // ── Errores de runtime ────────────────────────────────────────────────────
+    // write-only para la app; solo admin puede leer
+    match /errors/{id} {
+      allow create: if isActive();
+      allow read:   if isAdmin();
+    }
+
     // ── Denegar todo lo demás por defecto ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

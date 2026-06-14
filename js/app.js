@@ -18,6 +18,7 @@ import { renderDimensionamiento } from './dimensionamiento.js';
 import { renderTrayecto } from './trayecto.js';
 import { renderTrayectorias } from './trayectorias.js';
 import { projects, users, reminders } from './db.js';
+import { fbErrors } from './firebase.js';
 import { toast, esc, uuid } from './utils.js';
 import { icon } from './icons.js';
 import { isNative, getPlugin } from './platform.js';
@@ -510,6 +511,37 @@ if ('serviceWorker' in navigator && !isNative()) {
     }
   });
 }
+
+// ── Error monitoring — reporta JS runtime errors a Firestore ─────────────────
+const APP_VERSION = '6.61.0';
+let _errCount = 0;
+
+function _reportError(msg, src, line, col, stack) {
+  if (_errCount++ >= 5 || !navigator.onLine) return;
+  try {
+    const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
+    fbErrors.add({
+      msg:   String(msg).slice(0, 300),
+      src:   src ? String(src).replace(location.origin, '') : null,
+      line, col,
+      stack: stack ? String(stack).slice(0, 500) : null,
+      user:  session?.nombre || null,
+      rol:   session?.rol || null,
+      hash:  location.hash,
+      v:     APP_VERSION,
+      ts:    new Date().toISOString(),
+    });
+  } catch { /* nunca interrumpir el flujo por el error reporter */ }
+}
+
+window.onerror = (msg, src, line, col, err) =>
+  _reportError(msg, src, line, col, err?.stack);
+
+window.onunhandledrejection = e =>
+  _reportError(
+    e.reason?.message || String(e.reason) || 'unhandledrejection',
+    null, null, null, e.reason?.stack
+  );
 
 // ── Theme: auto por OS + override manual + horario programado ────────────────
 function _parseSched() {
