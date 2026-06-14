@@ -241,9 +241,12 @@ function applyFilters() {
 function _calcProgress(p) {
   const e = calcFaseEstado(p);
   const { docPct, garPct, audPct } = e;
-  const base = audPct !== null ? 300 : 200;
-  const sum  = docPct + garPct + (audPct ?? 0);
-  const pct  = Math.round(sum / base * 100);
+  const esPequeno = p.tipoSistema === 'sistema_pequeno';
+  // levPct: mismo criterio que el donut en project.js (solo tipTecho)
+  const levPct = p.documentacion?.levantamiento?.tipTecho ? 100 : 0;
+  const pct = esPequeno
+    ? Math.round((levPct + garPct) / 2)
+    : Math.round((levPct + docPct + garPct) / 3);
   return { pct, docPct, garPct, audPct, garEstado: e.gar, audEstado: e.aud };
 }
 

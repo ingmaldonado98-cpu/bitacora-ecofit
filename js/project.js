@@ -252,7 +252,7 @@ export async function firmarFase(projectId, fase) {
   )) return;
 
   const firma = {
-    firmado_por: session.uid,
+    firmado_por: session.id,
     nombre:      quien,
     firmado_en:  isoNow(),
   };
@@ -456,6 +456,9 @@ function renderModulosProgreso(project, id, session, admin) {
   <div class="tools-row">
     <button class="tool-btn" onclick="navigate('#proyecto/${id}/trayecto')">
       ${icon('list-numbers', 18)}<span>Trayecto</span>
+    </button>
+    <button class="tool-btn" onclick="navigate('#proyecto/${id}/trayectorias')">
+      ${icon('path', 18)}<span>Trayectorias</span>
     </button>
     <button class="tool-btn" onclick="navigate('#calculadora/${id}')">
       ${icon('calculator', 18)}<span>Calculadora</span>
@@ -675,14 +678,17 @@ function renderStatusLog(log) {
 // ── Check requisitos para revisión ────────────────────────────────────────────
 function _getFaltantes(project) {
   const faltantes = [];
+  const esPequeno = project.tipoSistema === 'sistema_pequeno';
   if (!project.garantia?.fotoSistema) faltantes.push('Foto general del sistema');
-  const f = project.documentacion?.fases;
-  const hayFotosCierre = (f?.techo?.cierre?.length || f?.despues?.length || 0) > 0;
-  if (!hayFotosCierre) faltantes.push('Al menos una foto de Cierre en Documentación');
   const totalPaneles = (project.garantia?.paneles?.strings||[]).reduce((s,str)=>s+(str.paneles?.length||0),0);
   if (totalPaneles === 0) faltantes.push('Al menos un panel registrado con número de serie');
-  if (!project.garantia?.fotosTecnicas?.tableroAC) faltantes.push('Foto del tablero AC terminado');
-  if (!project.garantia?.fotosTecnicas?.inversorEnergizado) faltantes.push('Foto del inversor energizado');
+  if (!esPequeno) {
+    const f = project.documentacion?.fases;
+    const hayFotosCierre = (f?.techo?.cierre?.length || f?.despues?.length || 0) > 0;
+    if (!hayFotosCierre) faltantes.push('Al menos una foto de Cierre en Documentación');
+    if (!project.garantia?.fotosTecnicas?.tableroAC) faltantes.push('Foto del tablero AC terminado');
+    if (!project.garantia?.fotosTecnicas?.inversorEnergizado) faltantes.push('Foto del inversor energizado');
+  }
   return faltantes;
 }
 
@@ -738,8 +744,7 @@ window._submitObs = async function(id) {
   const texto = document.getElementById('obs-texto').value.trim();
   if (!texto) return;
   const prio = document.getElementById('obs-prio').value;
-  const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
-  const project = await projects.getById(id);
+  const [session, project] = await Promise.all([getSession(), projects.getById(id)]);
   const obs = [...(project.observaciones || []), {
     texto, prioridad: prio, autorId: session?.id, autorNombre: session?.nombre,
     timestamp: isoNow(),
@@ -753,10 +758,9 @@ window._submitObs = async function(id) {
 
 window._delObs = async function(id, idx) {
   if (!await confirmDialog('¿Eliminar esta observación?')) return;
-  const project = await projects.getById(id);
+  const [session, project] = await Promise.all([getSession(), projects.getById(id)]);
   const obs = (project.observaciones || []).filter((_,i) => i !== idx);
   await projects.update(id, { observaciones: obs });
-  const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
   _refreshObsList(obs, session, id, project);
 };
 
