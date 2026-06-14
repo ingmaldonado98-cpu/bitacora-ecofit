@@ -368,8 +368,9 @@ window._openReminderModal = async function() {
   };
 };
 
-window._reminderDelete = async function(id) {
-  try { await reminders.delete(id); } catch { /* ya eliminado */ }
+window._reminderComplete = async function(id) {
+  const session = await getSession();
+  try { await reminders.complete(id, session?.nombre || session?.username); } catch { /* ya completado */ }
   const row = document.getElementById('qrem-' + id);
   if (row) {
     row.style.transition = 'opacity .2s';
@@ -378,16 +379,25 @@ window._reminderDelete = async function(id) {
       row.remove();
       const section = document.getElementById('qrem-section');
       if (section && !section.querySelector('.qrem-row')) section.remove();
-      // Decrementar badge
       const badge = document.getElementById('nav-badge-recor');
       if (badge) {
         const next = Math.max(0, (parseInt(badge.textContent) || 0) - 1);
         badge.textContent = next > 9 ? '9+' : String(next);
         badge.style.display = next > 0 ? '' : 'none';
       }
+      // Refrescar sección historial si existe
+      const hist = document.getElementById('qrem-hist-section');
+      if (hist) navigate(window.location.hash);
     }, 200);
   }
-  toast('Recordatorio eliminado', 'ok', 1500);
+  toast('Marcado como hecho — guardado en historial', 'ok', 2000);
+};
+
+window._reminderDelete = async function(id) {
+  try { await reminders.delete(id); } catch { /* ya eliminado */ }
+  const row = document.getElementById('qrem-hist-' + id);
+  if (row) { row.style.transition = 'opacity .15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 160); }
+  toast('Eliminado del historial', 'ok', 1500);
 };
 
 window._reminderEdit = async function(id, textoActual, fechaActual) {

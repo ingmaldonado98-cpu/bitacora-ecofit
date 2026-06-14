@@ -570,6 +570,19 @@ function renderNotasRapidas(project, id, edit) {
         </div>
       </div>`).join('')}
     </div>` : `<p class="notas-empty">Sin recordatorios activos</p>`}
+    ${(project.notasHistorial?.length) ? `
+    <details class="notas-hist-wrap">
+      <summary class="notas-hist-toggle">Historial (${project.notasHistorial.length})</summary>
+      <div class="notas-list notas-hist">
+        ${project.notasHistorial.slice().reverse().map(n => `
+        <div class="nota-item nota-item-done">
+          <span class="nota-texto nota-texto-done">${esc(n.texto)}</span>
+          <div class="nota-meta">
+            <span class="nota-fecha">Hecho ${fmtRelativa(n.hechoAt)}${n.hechoPor ? ` · ${esc(n.hechoPor)}` : ''}</span>
+          </div>
+        </div>`).join('')}
+      </div>
+    </details>` : ''}
     ${edit ? `
     <div class="nota-add-row">
       <input type="text" id="nota-input-${id}" class="input-field nota-input"
@@ -591,9 +604,18 @@ window._addNota = async function(pid) {
 };
 
 window._doneNota = async function(pid, idx) {
+  const session = await import('./auth.js').then(m => m.getSession());
   const project = await projects.getById(pid);
-  const notas = (project.notasRapidas || []).filter((_, i) => i !== idx);
-  await projects.setField(pid, 'notasRapidas', notas);
+  const nota    = (project.notasRapidas || [])[idx];
+  if (!nota) return;
+  const notas    = (project.notasRapidas || []).filter((_, i) => i !== idx);
+  const historial = [...(project.notasHistorial || []), {
+    ...nota, hechoAt: new Date().toISOString(), hechoPor: session?.nombre || session?.username || null,
+  }];
+  await Promise.all([
+    projects.setField(pid, 'notasRapidas',   notas),
+    projects.setField(pid, 'notasHistorial', historial),
+  ]);
   navigate(`#proyecto/${pid}`);
 };
 

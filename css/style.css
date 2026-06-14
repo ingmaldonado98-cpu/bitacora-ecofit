@@ -654,6 +654,15 @@ body {
   color: var(--text-muted); transition: background .12s, border-color .12s;
 }
 .qrem-edit:hover { background: var(--solar, #f5c400)22; border-color: var(--solar, #f5c400); color: var(--solar, #f5c400); }
+.qrem-del {
+  background: none; border: none; cursor: pointer; padding: 4px 6px;
+  color: var(--text-muted); border-radius: 4px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: color .12s, background .12s;
+}
+.qrem-del:hover { color: var(--red, #e74c3c); background: var(--red, #e74c3c)18; }
+.qrem-done { opacity: .7; }
+.qrem-texto-done { text-decoration: line-through; color: var(--text-muted); }
 .qrem-check {
   flex-shrink: 0; background: none; border: 1.5px solid var(--border);
   border-radius: 50%; width: 28px; height: 28px; cursor: pointer;
@@ -3023,6 +3032,15 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
 .notas-empty   { font-size: .8rem; color: var(--text-muted); padding: 4px 0; margin: 0; }
 .nota-add-row  { display: flex; gap: 8px; margin-top: 10px; }
 .nota-input    { flex: 1; }
+.nota-item-done { border-left-color: var(--border); opacity: .65; }
+.nota-texto-done { text-decoration: line-through; color: var(--text-muted); }
+.notas-hist-wrap { margin-top: 10px; }
+.notas-hist-toggle {
+  font-size: .74rem; font-weight: 600; color: var(--text-muted);
+  cursor: pointer; user-select: none; padding: 4px 0; list-style: none;
+}
+.notas-hist-toggle::-webkit-details-marker { display: none; }
+.notas-hist { margin-top: 6px; opacity: .8; }
 
 .qc-card { padding: 14px 16px; }
 .qc-count {

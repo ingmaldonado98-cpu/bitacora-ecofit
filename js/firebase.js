@@ -293,6 +293,13 @@ export const fbReminders = {
     await setDoc(ref, { ...snap.data(), ...changes });
   },
 
+  complete: async (id, byName) => {
+    const ref  = doc(fbDB, 'reminders', id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('Recordatorio no encontrado');
+    await setDoc(ref, { ...snap.data(), completado: true, completadoAt: new Date().toISOString(), completadoPor: byName || null });
+  },
+
   delete: async (id) => {
     await deleteDoc(doc(fbDB, 'reminders', id));
   },
