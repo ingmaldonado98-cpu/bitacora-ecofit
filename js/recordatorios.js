@@ -61,7 +61,6 @@ export async function calcRecordatoriosCount(all) {
   n += activos.filter(p => p.estado === 'pendiente_revision').length;
   n += activos.filter(p => _vencProximos(p.garantia?.fechaInstalacion, 90).length > 0).length;
   try {
-    const { reminders } = await import('./db.js');
     const qrems = await reminders.getAll();
     n += qrems.length;
   } catch { /* silencioso */ }

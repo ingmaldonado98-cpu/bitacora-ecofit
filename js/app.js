@@ -18,7 +18,7 @@ import { renderDimensionamiento } from './dimensionamiento.js';
 import { renderTrayecto } from './trayecto.js';
 import { renderTrayectorias } from './trayectorias.js';
 import { projects, users, reminders } from './db.js';
-import { toast, esc } from './utils.js';
+import { toast, esc, uuid } from './utils.js';
 import { icon } from './icons.js';
 import { isNative, getPlugin } from './platform.js';
 import { renderMapView } from './map.js';
@@ -353,7 +353,7 @@ window._openReminderModal = async function() {
     const txt = document.getElementById('rem-text-input').value.trim();
     if (!txt) { document.getElementById('rem-text-input').focus(); return; }
     const fecha = document.getElementById('rem-date-input').value || null;
-    const id = 'rem_' + Date.now();
+    const id = 'rem_' + uuid();
     try {
       await reminders.add({
         id, texto: txt, fecha,
