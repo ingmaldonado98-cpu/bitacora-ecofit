@@ -1432,7 +1432,7 @@ window._showNotaGarantia = function(projectId) {
 window._submitNotaGarantia = async function(projectId) {
   const texto = document.getElementById('gnotas-texto').value.trim();
   if (!texto) { toast('Escribe una nota','error'); return; }
-  const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
+  const session = await getSession();
   const p = await projects.getById(projectId);
   const nota = { id: uuid(), texto, autorId: session?.id, autorNombre: session?.nombre || session?.username, createdAt: isoNow() };
   p.garantia.notas = [...(p.garantia.notas || []), nota];
@@ -1448,7 +1448,7 @@ window._submitNotaGarantia = async function(projectId) {
 
 window._delNota = async function(projectId, scope, idx) {
   if (!await confirmDialog('¿Eliminar esta nota?')) return;
-  const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
+  const session = await getSession();
   const p = await projects.getById(projectId);
   if (scope === 'garantia') {
     p.garantia.notas = (p.garantia.notas || []).filter((_,i) => i !== idx);

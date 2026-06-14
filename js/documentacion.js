@@ -1658,7 +1658,7 @@ window._showNotaDoc = function(projectId) {
 window._submitNotaDoc = async function(projectId) {
   const texto = document.getElementById('dnotas-texto').value.trim();
   if (!texto) { toast('Escribe una nota', 'error'); return; }
-  const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
+  const session = await getSession();
   const p = await projects.getById(projectId);
   const nota = { id: uuid(), texto, autorId: session?.id, autorNombre: session?.nombre || session?.username, createdAt: isoNow() };
   p.documentacion.notas = [...(p.documentacion.notas || []), nota];
@@ -1674,7 +1674,7 @@ window._submitNotaDoc = async function(projectId) {
 
 window._delNotaDoc = async function(projectId, idx) {
   if (!await confirmDialog('¿Eliminar esta nota?')) return;
-  const session = JSON.parse(sessionStorage.getItem('ecofit_session') || 'null');
+  const session = await getSession();
   const p = await projects.getById(projectId);
   p.documentacion.notas = (p.documentacion.notas || []).filter((_,i) => i !== idx);
   await projects.update(projectId, { documentacion: p.documentacion });

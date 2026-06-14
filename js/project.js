@@ -8,6 +8,15 @@ import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } fro
 import { icon } from './icons.js';
 import { uploadPhotoQueued } from './firebase.js';
 
+// Conteo de fotos por sitio/subfase con fallback al esquema legacy
+function _countFotos(documentacion, sitio, sub) {
+  const fases = documentacion?.fases;
+  const n = fases?.[sitio]?.[sub]?.length || 0;
+  if (n > 0) return n;
+  if (sitio === 'techo') { const m = { antes:'antes', durante:'durante', cierre:'despues' }; return fases?.[m[sub]]?.length || 0; }
+  return 0;
+}
+
 // Foto de cliente pendiente de subir en el form actual
 let _clienteFotoB64 = null;
 let _clienteFotoUrl = null;
@@ -39,15 +48,9 @@ export async function renderProjectDetail(id, session) {
   const _dDoc  = project.documentacion || {};
   const _dGar  = project.garantia || {};
   const _dFt   = _dGar.fotosTecnicas || {};
-  const _pfc   = (sitio, sub) => {
-    const n = _dDoc.fases?.[sitio]?.[sub]?.length || 0;
-    if (n > 0) return n;
-    if (sitio === 'techo') { const m={antes:'antes',durante:'durante',cierre:'despues'}; return _dDoc.fases?.[m[sub]]?.length||0; }
-    return 0;
-  };
-  const _fT = ['antes','durante','cierre'].reduce((s,f)=>s+_pfc('techo',f),0);
-  const _fC = ['antes','durante','cierre'].reduce((s,f)=>s+_pfc('centrosCarga',f),0);
-  const _fZ = ['antes','durante','cierre'].reduce((s,f)=>s+_pfc('zonaDelSistema',f),0);
+  const _fT = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(_dDoc,'techo',f),0);
+  const _fC = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(_dDoc,'centrosCarga',f),0);
+  const _fZ = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(_dDoc,'zonaDelSistema',f),0);
   const levPct  = _dDoc.levantamiento?.tipTecho ? 100 : 0;
   const _dItems = _esPeq ? [] : [_fT>0, _fC>0, _fZ>0];
   const docPct  = _dItems.length ? Math.round(_dItems.filter(Boolean).length / _dItems.length * 100) : 0;
@@ -342,15 +345,9 @@ function renderModulosProgreso(project, id, session, admin) {
 
   // Documentación: levantamiento + 3 fases
   // Contar fotos en nueva estructura (sitio/subfase) con fallback legacy
-  const _fc = (sitio, sub) => {
-    const n = doc.fases?.[sitio]?.[sub]?.length || 0;
-    if (n > 0) return n;
-    if (sitio === 'techo') { const m={antes:'antes',durante:'durante',cierre:'despues'}; return doc.fases?.[m[sub]]?.length||0; }
-    return 0;
-  };
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('techo',f),0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('centrosCarga',f),0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('zonaDelSistema',f),0);
+  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'techo',f),0);
+  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'centrosCarga',f),0);
+  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'zonaDelSistema',f),0);
 
   const esPequenoTipo = project.tipoSistema === 'sistema_pequeno';
 
@@ -490,15 +487,9 @@ function renderQuickCheck(project, id, admin, inline = false) {
   const esPequeno = project.tipoSistema === 'sistema_pequeno';
   const estado = calcFaseEstado(project);
 
-  const _fc = (sitio, sub) => {
-    const n = doc.fases?.[sitio]?.[sub]?.length || 0;
-    if (n > 0) return n;
-    if (sitio === 'techo') { const m={antes:'antes',durante:'durante',cierre:'despues'}; return doc.fases?.[m[sub]]?.length||0; }
-    return 0;
-  };
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('techo',f),0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('centrosCarga',f),0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('zonaDelSistema',f),0);
+  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'techo',f),0);
+  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'centrosCarga',f),0);
+  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_countFotos(doc,'zonaDelSistema',f),0);
   const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
   const checkDone = aud.checklist?.length || 0;
 
