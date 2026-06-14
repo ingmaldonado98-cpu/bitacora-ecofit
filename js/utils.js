@@ -66,7 +66,7 @@ export function uuid() {
 }
 
 // ── Compresión de imagen ───────────────────────────────────────────────────────
-export function compressImage(file, maxDim = 1280, quality = 0.72) {
+export function compressImage(file, maxDim = 1000, quality = 0.68) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -367,6 +367,7 @@ export function fotoMini(src, alt = '', onClick, isPending = false) {
 
   const imgHtml = resolvedSrc
     ? `<img id="${id}" src="${resolvedSrc}" alt="${esc(alt)}" class="foto-mini"
+         loading="lazy" decoding="async"
          ${pendingAttr}
          onclick="${onClick || `window._viewPhoto('${id}')`}" />`
     : `<div class="foto-mini foto-mini-placeholder" title="Foto pendiente de subir">⬆</div>`;
