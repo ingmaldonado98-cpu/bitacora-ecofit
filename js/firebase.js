@@ -30,6 +30,26 @@ export const fbDB   = initializeFirestore(_app, {
 });
 const _storage = getStorage(_app);
 
+// ── Generar miniatura (400px, quality 0.55) desde data URL ────────────────
+function _makeThumb(dataUrl, maxDim = 400, quality = 0.55) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+        else                { width = Math.round(width * maxDim / height); height = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
 // ── Subir foto a Firebase Storage ─────────────────────────────────────────
 export async function uploadPhoto(base64DataUrl, path) {
   if (!navigator.onLine) {
@@ -39,7 +59,17 @@ export async function uploadPhoto(base64DataUrl, path) {
   }
   const sRef = storageRef(_storage, path);
   await uploadString(sRef, base64DataUrl, 'data_url');
-  return getDownloadURL(sRef);
+  const url = await getDownloadURL(sRef);
+
+  // Subir miniatura fire-and-forget (no bloquea el flujo principal)
+  _makeThumb(base64DataUrl).then(async thumbB64 => {
+    if (!thumbB64) return;
+    const thumbPath = path.replace(/(\.\w{2,5})$/, '_t$1');
+    const tRef = storageRef(_storage, thumbPath);
+    await uploadString(tRef, thumbB64, 'data_url');
+  }).catch(() => {});
+
+  return url;
 }
 
 // ── Subir foto con cola offline ────────────────────────────────────────────

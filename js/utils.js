@@ -355,6 +355,14 @@ export function getPendingSrc(item) {
 }
 
 // ── Render foto miniatura ──────────────────────────────────────────────────────
+// Deriva la URL del thumb desde la URL completa: archivo.jpg → archivo_t.jpg
+// Solo aplica a URLs de Firebase Storage (http); data URLs y fotos pendientes
+// no tienen thumb y muestran la imagen completa directamente.
+function _thumbUrl(url) {
+  if (!url || !url.startsWith('http')) return null;
+  return url.replace(/(\.\w{2,5})(\?|$)/, '_t$1$2');
+}
+
 // src: string URL, data URL, u objeto foto {url?, data?, pending?, pendingId?}
 export function fotoMini(src, alt = '', onClick, isPending = false) {
   const resolvedSrc = getPendingSrc(src);
@@ -365,10 +373,13 @@ export function fotoMini(src, alt = '', onClick, isPending = false) {
   const pendingBadge = pendingAttr
     ? `<span class="foto-pending-badge" title="Pendiente de subir">⬆</span>` : '';
 
+  const thumbSrc = _thumbUrl(resolvedSrc) || resolvedSrc;
+
   const imgHtml = resolvedSrc
-    ? `<img id="${id}" src="${resolvedSrc}" alt="${esc(alt)}" class="foto-mini"
+    ? `<img id="${id}" src="${thumbSrc}" data-fullsrc="${resolvedSrc}" alt="${esc(alt)}" class="foto-mini"
          loading="lazy" decoding="async"
          ${pendingAttr}
+         onerror="if(this.src!==this.dataset.fullsrc)this.src=this.dataset.fullsrc"
          onclick="${onClick || `window._viewPhoto('${id}')`}" />`
     : `<div class="foto-mini foto-mini-placeholder" title="Foto pendiente de subir">⬆</div>`;
 
@@ -384,7 +395,7 @@ window._viewPhoto = function(imgId) {
   // Recopilar todas las fotos del mismo contenedor
   const grid = img.closest('.fotos-grid') || img.closest('.card') || document.body;
   const siblings = [...grid.querySelectorAll('.foto-mini')];
-  const srcs  = siblings.map(i => i.src).filter(Boolean);
+  const srcs  = siblings.map(i => i.dataset.fullsrc || i.src).filter(Boolean);
   let idx     = siblings.indexOf(img);
   if (idx < 0) { idx = 0; }
 
