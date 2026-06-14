@@ -113,7 +113,19 @@ function buildPasos(project, id) {
     });
   }
 
-  // ── Paso 7: Foto del sistema ───────────────────────────────────────────────
+  // ── Paso 7: Trayectorias de canalización ──────────────────────────────────
+  const nTray = (project.trayectorias || []).length;
+  pasos.push({
+    id:       'trayectorias',
+    emoji:    '🔌',
+    titulo:   'Trayectorias de cable',
+    desc:     'Documenta los recorridos físicos de cable: tipo de conduit, calibre y longitud por tramo.',
+    ok:       nTray > 0,
+    link:     `#proyecto/${id}/trayectorias`,
+    hint:     nTray > 0 ? `${nTray} tramo${nTray !== 1 ? 's' : ''} registrado${nTray !== 1 ? 's' : ''}` : 'Sin trayectorias registradas',
+  });
+
+  // ── Paso 8: Foto del sistema ───────────────────────────────────────────────
   pasos.push({
     id:       'foto-sistema',
     emoji:    '📸',
