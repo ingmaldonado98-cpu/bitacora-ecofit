@@ -718,7 +718,7 @@ function renderLevantamiento(project, tipo, edit) {
                 <span class="form-hint">define qué breakers comprar</span>
               </label>
               <select name="marcaTablero" ${dis}>
-                ${['','Square D','Murray','Riel DIN','Siemens','Eaton / Cutler-Hammer','Legrand','ABB','General Electric','IEM','Otro'].map(t=>
+                ${['','Square D','Murray','Riel DIN','Otro'].map(t=>
                   `<option ${(lev.marcaTablero||'')===(t||'')?'selected':''}>${t}</option>`).join('')}
               </select>
             </div>
