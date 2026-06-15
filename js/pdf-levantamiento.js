@@ -102,64 +102,141 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
     if (sombras.foto) html += wImg(sombras.foto);
   }
 
-  // Eléctrico y consumo
-  const tieneElec = !['sistema_pequeno', 'otro'].includes(project.tipoSistema);
-  if (tieneElec && (lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga || lev.tarifaCFE)) {
-    html += wSec('Eléctrico y consumo');
-    html += wCampo('Servicio CFE', lev.tipoServicioCFE);
-    html += wCampo('Tierra física', lev.tierraFisica);
-    html += wCampo('Centro de carga', lev.centroCarga);
-    html += wCampo('Tarifa CFE', lev.tarifaCFE);
-    if (lev.demandaKW)      html += wCampo('Demanda contratada', `${lev.demandaKW} kW`);
-    if (lev.factorPotencia) html += wCampo('Factor de potencia', `${lev.factorPotencia}`);
-    if (lev.horarioUso)     html += wCampo('Horario de uso', lev.horarioUso);
+  // Eléctrico, consumo y cargas
+  const tipoSis   = project.tipoSistema || '';
+  const tieneElec = !['sistema_pequeno', 'otro', 'bombeo'].includes(tipoSis);
+  const tieneCFE  = tipoSis !== 'aislado';
+  const recibos   = lev.recibos  || [];
+  const aparatos  = lev.aparatos || [];
+  const cCrit     = lev.cargasCriticas || lev.cargasRespaldo || [];
+  const cSec      = lev.cargasSecundarias || [];
+  const hayBaterias = lev.autonomia || lev.bancoBaterias;
+  const AREAS_ORDER = ['General','Sala/Comedor','Cocina','Habitación 1','Habitación 2','Habitación 3',
+                       'Baño','Cochera','Entrada','Patio/Jardín','Sala de máquinas','Otro'];
 
-    const recibos = lev.recibos || [];
+  if (tieneElec) {
+    html += wSec('Eléctrico, consumo y cargas');
+
+    // CFE y contrato
+    if (tieneCFE && (lev.nisServicio || lev.titularServicio || lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga || lev.tarifaCFE)) {
+      if (lev.nisServicio)     html += wCampo('NIS (Núm. de Servicio CFE)', lev.nisServicio);
+      if (lev.titularServicio) html += wCampo('Titular del servicio', lev.titularServicio);
+      html += wCampo('Servicio CFE', lev.tipoServicioCFE);
+      html += wCampo('Tierra física', lev.tierraFisica);
+      html += wCampo('Centro de carga', lev.centroCarga);
+      html += wCampo('Tarifa CFE', lev.tarifaCFE);
+      if (lev.demandaKW)      html += wCampo('Demanda contratada', `${lev.demandaKW} kW`);
+      if (lev.factorPotencia) html += wCampo('Factor de potencia', `${lev.factorPotencia}`);
+      if (lev.horarioUso)     html += wCampo('Horario de uso', lev.horarioUso);
+    }
+
+    // Recibos CFE
     if (recibos.length) {
+      const conKwh = recibos.filter(r => r.kwh > 0);
       html += `<p style="font-weight:bold;margin:10pt 0 4pt">Recibos CFE</p>`;
       html += `<table style="width:100%;border-collapse:collapse">
-        <tr><th ${TH}>Mes</th><th ${TH}>kWh</th><th ${TH}>Importe</th></tr>`;
+        <tr><th ${TH}>Mes</th><th ${TH}>Año</th><th ${TH}>kWh</th><th ${TH}>Importe</th></tr>`;
       for (const r of recibos) {
+        const mesLbl = r.mesLabel || (r.mes ? String(r.mes) : '—');
         html += `<tr>
-          <td ${TD}>${esc(r.mes || '—')}</td>
+          <td ${TD}>${esc(mesLbl)}</td>
+          <td ${TD}>${r.anio || '—'}</td>
           <td ${TD}>${r.kwh != null ? r.kwh : '—'}</td>
-          <td ${TD}>${r.importe ? `$${r.importe}` : '—'}</td>
+          <td ${TD}>${r.importe ? `$${r.importe.toLocaleString('es-MX')}` : '—'}</td>
         </tr>`;
+      }
+      if (conKwh.length >= 2) {
+        const avg  = Math.round(conKwh.reduce((s,r)=>s+r.kwh,0)/conKwh.length);
+        const peak = conKwh.reduce((a,b)=>a.kwh>b.kwh?a:b);
+        const low  = conKwh.reduce((a,b)=>a.kwh<b.kwh?a:b);
+        html += `<tr style="background:#f0fdf4;font-weight:bold">
+          <td ${TD} colspan="2">Promedio mensual</td><td ${TD}>${avg} kWh</td><td ${TD}></td></tr>
+        <tr><td ${TD} colspan="2">Mes pico</td>
+          <td ${TD}>${peak.kwh} kWh</td>
+          <td ${TD}>${esc(peak.mesLabel||String(peak.mes||''))} ${peak.anio||''}</td></tr>
+        <tr><td ${TD} colspan="2">Mes bajo</td>
+          <td ${TD}>${low.kwh} kWh</td>
+          <td ${TD}>${esc(low.mesLabel||String(low.mes||''))} ${low.anio||''}</td></tr>`;
       }
       html += '</table>';
     }
 
-    const aparatos = lev.aparatos || [];
+    // Aparatos por zona
     if (aparatos.length) {
-      html += `<p style="font-weight:bold;margin:10pt 0 4pt">Inventario de aparatos</p>`;
-      html += `<table style="width:100%;border-collapse:collapse">
-        <tr><th ${TH}>Aparato</th><th ${TH}>Cant.</th><th ${TH}>Watts</th><th ${TH}>Hrs/día</th><th ${TH}>Wh/día</th></tr>`;
-      for (const ap of aparatos) {
-        const whDia = (ap.watts && ap.horas) ? (ap.watts * ap.horas * (ap.cantidad || 1)).toFixed(0) : '—';
-        html += `<tr>
-          <td ${TD}>${esc(ap.nombre || '—')}</td><td ${TD}>${ap.cantidad || 1}</td>
-          <td ${TD}>${ap.watts != null ? ap.watts : '—'}</td><td ${TD}>${ap.horas != null ? ap.horas : '—'}</td>
-          <td ${TD}>${whDia}</td>
-        </tr>`;
+      html += `<p style="font-weight:bold;margin:10pt 0 4pt">Consumo por zona</p>`;
+      const zoneMap = {};
+      aparatos.forEach(ap => { const z = ap.area||'General'; if (!zoneMap[z]) zoneMap[z]=[]; zoneMap[z].push(ap); });
+      const zones = [...AREAS_ORDER.filter(z=>zoneMap[z]), ...Object.keys(zoneMap).filter(z=>!AREAS_ORDER.includes(z))];
+      let totalKwhMes = 0;
+      for (const zone of zones) {
+        const items = zoneMap[zone];
+        const zKwh  = items.reduce((s,ap)=>s+ap.potencia*ap.horas*(ap.cantidad||1)*30/1000, 0);
+        totalKwhMes += zKwh;
+        html += `<p style="background:#f0fdf4;padding:3pt 8pt;margin:6pt 0 2pt;font-weight:bold;font-size:10pt;color:#15803d">${esc(zone)} — ${zKwh.toFixed(0)} kWh/mes</p>`;
+        html += `<table style="width:100%;border-collapse:collapse;margin-bottom:4pt">
+          <tr><th ${TH}>Aparato</th><th ${TH}>Cant.</th><th ${TH}>W</th><th ${TH}>Hrs/día</th><th ${TH}>kWh/mes</th></tr>`;
+        for (const ap of items) {
+          const kWhMes = (ap.potencia*ap.horas*(ap.cantidad||1)*30/1000).toFixed(1);
+          html += `<tr>
+            <td ${TD}>${esc(ap.nombre||'—')}</td><td ${TD}>${ap.cantidad||1}</td>
+            <td ${TD}>${ap.potencia!=null?ap.potencia:'—'}</td>
+            <td ${TD}>${ap.horas!=null?ap.horas:'—'}</td>
+            <td ${TD}>${kWhMes}</td>
+          </tr>`;
+        }
+        html += '</table>';
       }
-      html += '</table>';
+      html += `<p style="font-weight:bold;color:#15803d;text-align:right;margin:2pt 0 8pt">Total estimado: ${totalKwhMes.toFixed(0)} kWh/mes</p>`;
     }
 
-    const cCrit = lev.cargasCriticas || lev.cargasRespaldo || [];
-    const cSec  = lev.cargasSecundarias || [];
+    // Cargas a respaldar (críticas y secundarias)
     if (cCrit.length || cSec.length) {
-      html += `<p style="font-weight:bold;margin:10pt 0 4pt">Cargas</p>`;
-      html += `<table style="width:100%;border-collapse:collapse">
-        <tr><th ${TH}>Tipo</th><th ${TH}>Carga</th><th ${TH}>Watts</th><th ${TH}>Hrs/día</th></tr>`;
-      for (const c of cCrit) html += `<tr><td ${TD} style="color:#dc2626;font-weight:bold">Crítica</td><td ${TD}>${esc(c.nombre||'—')}</td><td ${TD}>${c.watts||'—'}</td><td ${TD}>${c.horas||'—'}</td></tr>`;
-      for (const c of cSec)  html += `<tr><td ${TD} style="color:#2563eb">Secundaria</td><td ${TD}>${esc(c.nombre||'—')}</td><td ${TD}>${c.watts||'—'}</td><td ${TD}>${c.horas||'—'}</td></tr>`;
-      html += '</table>';
+      html += `<p style="font-weight:bold;margin:10pt 0 4pt">Cargas a respaldar</p>`;
+      const _wCargas = (lista, label, color, bgColor) => {
+        if (!lista.length) return '';
+        let tw = 0, twh = 0;
+        let rows = lista.map(c => {
+          const kd = (c.potencia*c.horas*(c.cantidad||1)/1000).toFixed(2);
+          tw  += c.potencia*(c.cantidad||1);
+          twh += c.potencia*c.horas*(c.cantidad||1);
+          return `<tr>
+            <td ${TD}>${esc(c.area||'General')}</td>
+            <td ${TD}>${esc(c.nombre||'—')}</td>
+            <td ${TD}>${c.potencia||'—'}</td>
+            <td ${TD}>${c.horas||'—'}</td>
+            <td ${TD}>${c.cantidad||1}</td>
+            <td ${TD}>${kd}</td>
+          </tr>`;
+        }).join('');
+        return `<p style="color:${color};font-size:10pt;margin:4pt 0 2pt;font-weight:bold">${label}</p>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:4pt">
+          <tr><th ${TH}>Zona</th><th ${TH}>Equipo</th><th ${TH}>W</th><th ${TH}>Hrs/día</th><th ${TH}>Cant.</th><th ${TH}>kWh/día</th></tr>
+          ${rows}
+          <tr style="font-weight:bold;background:${bgColor}">
+            <td ${TD} colspan="2">Total</td>
+            <td ${TD}>${tw} W</td><td ${TD}></td><td ${TD}></td>
+            <td ${TD}>${(twh/1000).toFixed(2)} kWh/día</td>
+          </tr>
+        </table>`;
+      };
+      html += _wCargas(cCrit, 'Cargas críticas (alta prioridad)', '#dc2626', '#fef2f2');
+      html += _wCargas(cSec,  'Cargas secundarias (baja prioridad)', '#2563eb', '#eff6ff');
     }
 
-    if (lev.autonomia || lev.bancoBaterias) {
-      html += `<p style="font-weight:bold;margin:10pt 0 4pt">Configuración híbrida</p>`;
+    // Configuración de baterías
+    if (hayBaterias) {
+      html += `<p style="font-weight:bold;margin:10pt 0 4pt">Configuración de baterías</p>`;
       html += wCampo('Autonomía requerida', lev.autonomia ? `${lev.autonomia} horas` : null);
       html += wCampo('Banco de baterías', lev.bancoBaterias ? `${lev.bancoBaterias} kWh` : null);
+    }
+
+    // Off-grid específico
+    if (tipoSis === 'aislado') {
+      if (lev.generador && lev.generador !== 'no') {
+        html += wCampo('Generador de respaldo', `${lev.generador} — ${lev.generadorArranque||'manual'}${lev.generadorKw ? ` · ${lev.generadorKw} kW` : ''}`);
+      }
+      if (lev.crecimientoFuturo) html += wCampo('Crecimiento futuro esperado', lev.crecimientoFuturo);
+      if (lev.condicionesAmbientales?.length) html += wCampo('Condiciones ambientales', lev.condicionesAmbientales.join(', '));
     }
   }
 

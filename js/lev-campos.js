@@ -157,6 +157,34 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
   if (tipo === 'respaldo') {
     return `
     <div class="card">
+      <h3 class="card-title">Tarifa CFE y contrato</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Número de Servicio CFE (NIS)</label>
+          <input type="text" name="nisServicio" value="${esc(lev.nisServicio||'')}"
+                 placeholder="12 dígitos" inputmode="numeric" maxlength="18" ${dis}/>
+        </div>
+        <div class="form-group">
+          <label>Titular del servicio</label>
+          <input type="text" name="titularServicio" value="${esc(lev.titularServicio||'')}"
+                 placeholder="Nombre en el recibo" ${dis}/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tarifa</label>
+          <select name="tarifaCFE" ${dis}>
+            ${['DAC','1','1A','1B','1C','1D','1E','1F','OM','OMF','PDBT','GDMT','Otra'].map(t=>
+              `<option ${lev.tarifaCFE===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Demanda contratada (kW) <span class="form-hint">opcional</span></label>
+          <input type="number" name="demandaKW" value="${lev.demandaKW||''}" min="0" step="0.5" placeholder="Ej. 5" ${dis}/>
+        </div>
+      </div>
+    </div>
+    <div class="card">
       <h3 class="card-title">Sistema de respaldo / Cargas</h3>
       <div class="form-row">
         <div class="form-group"><label>Autonomía requerida (horas)</label>
