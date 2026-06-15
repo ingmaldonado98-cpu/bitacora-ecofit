@@ -156,7 +156,7 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
       <div class="form-group"><label>Tiempo de respaldo requerido (horas)</label>
         <input type="number" name="tiempoRespaldo" value="${lev.tiempoRespaldo||''}" min="0" step="0.5" ${dis}/></div>
       <div class="form-group"><label>Cargas a respaldar</label>
-        <div id="cargas-criticas">${renderCargas(lev.cargasRespaldo||[],edit,'critica')}</div>
+        <div id="cargas-criticas">${renderCargas(lev.cargasCriticas||[],edit,'critica')}</div>
       </div>
     </div>`;
   }

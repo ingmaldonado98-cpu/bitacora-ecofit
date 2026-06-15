@@ -241,24 +241,15 @@ function renderLevantamiento(project, tipo, edit) {
   const dis = edit ? '' : 'disabled';
   const pid = project.id;
   _lev.pid = pid;
-  // Sincronizar state de áreas del techo (preserva fotos si existen)
-  _lev.areasTecho = (lev.areasTecho || []).map(a => {
-    let fotos;
-    if (Array.isArray(a.fotos)) {
-      fotos = [...a.fotos];
-    } else if (a.fotos && typeof a.fotos === 'object') {
-      // Migrar estructura antigua {antes,durante,cierre} → array plano
-      fotos = [...(a.fotos.antes||[]), ...(a.fotos.durante||[]), ...(a.fotos.cierre||[])];
-    } else {
-      fotos = [];
-    }
-    return { ...a, fotos };
-  });
+  // Sincronizar state de áreas del techo (docs migrados por _migrateProject en firebase.js)
+  _lev.areasTecho = (lev.areasTecho || []).map(a => ({
+    ...a, fotos: Array.isArray(a.fotos) ? [...a.fotos] : [],
+  }));
 
   // Reinicializar estado de módulo con datos del proyecto (evita estado stale entre navegaciones)
   _lev.camposLibres = [...(lev.camposLibres || [])];
   _lev.cargas = {
-    critica:    [...(lev.cargasCriticas   || lev.cargasRespaldo || [])],
+    critica:    [...(lev.cargasCriticas    || [])],
     secundaria: [...(lev.cargasSecundarias || [])],
   };
 

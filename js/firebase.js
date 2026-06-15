@@ -174,21 +174,65 @@ function _dispatchWriteError(label, err) {
   console.error('[FB write]', label, err);
 }
 
+// ── Schema versioning ─────────────────────────────────────────────────────
+// Bump cuando el formato del documento cambia. Los docs antiguos (sin _v o
+// con _v < SCHEMA_VERSION) se migran al leerlos y se reescriben en Firestore.
+const SCHEMA_VERSION = 1;
+
+function _migrateProject(data) {
+  if ((data._v || 0) >= SCHEMA_VERSION) return data;
+
+  const lev = data.documentacion?.levantamiento;
+  if (lev) {
+    // v0→v1: areasTecho.fotos {antes,durante,cierre} → array plano
+    if (Array.isArray(lev.areasTecho)) {
+      lev.areasTecho = lev.areasTecho.map(a => {
+        if (!Array.isArray(a.fotos) && a.fotos && typeof a.fotos === 'object') {
+          return { ...a, fotos: [...(a.fotos.antes||[]), ...(a.fotos.durante||[]), ...(a.fotos.cierre||[])] };
+        }
+        return a;
+      });
+    }
+    // v0→v1: cargasRespaldo → cargasCriticas (campo renombrado en tipo 'respaldo')
+    if (lev.cargasRespaldo && !lev.cargasCriticas) {
+      lev.cargasCriticas = lev.cargasRespaldo;
+      delete lev.cargasRespaldo;
+    }
+  }
+
+  return { ...data, _v: SCHEMA_VERSION };
+}
+
 // ── Proyectos ──────────────────────────────────────────────────────────────
 export const fbProjects = {
   getAll: async () => {
     const snap = await getDocs(collection(fbDB, 'projects'));
-    return snap.docs.map(d => d.data());
+    return snap.docs.map(d => {
+      const data = d.data();
+      if ((data._v || 0) < SCHEMA_VERSION) {
+        const migrated = _migrateProject(data);
+        setDoc(doc(fbDB, 'projects', data.id), migrated).catch(() => {});
+        return migrated;
+      }
+      return data;
+    });
   },
 
   getById: async (id) => {
     const snap = await getDoc(doc(fbDB, 'projects', id));
-    return snap.exists() ? snap.data() : null;
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    if ((data._v || 0) < SCHEMA_VERSION) {
+      const migrated = _migrateProject(data);
+      setDoc(doc(fbDB, 'projects', id), migrated).catch(() => {});
+      return migrated;
+    }
+    return data;
   },
 
   add: async (data) => {
     try {
-      await setDoc(doc(fbDB, 'projects', data.id), data);
+      await setDoc(doc(fbDB, 'projects', data.id), { ...data, _v: SCHEMA_VERSION });
     } catch (err) {
       _dispatchWriteError('Error al crear proyecto', err);
       throw err;
@@ -199,7 +243,7 @@ export const fbProjects = {
     const ref  = doc(fbDB, 'projects', id);
     const snap = await getDoc(ref);
     if (!snap.exists()) throw new Error('Proyecto no encontrado');
-    const updated = { ...snap.data(), ...changes, updatedAt: new Date().toISOString() };
+    const updated = { ...snap.data(), ...changes, _v: SCHEMA_VERSION, updatedAt: new Date().toISOString() };
     try {
       await setDoc(ref, updated);
     } catch (err) {
