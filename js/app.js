@@ -3,7 +3,8 @@
 import { renderLogin, getSession, logout, requireAuth } from './auth.js';
 import { renderDashboard, initDashboardFilters, populateTecnicoFilter, updateNavBadge } from './dashboard.js';
 import { renderProjectDetail, renderProjectForm, calcFaseEstado } from './project.js';
-import { renderGarantia, renderEstructuraForm } from './garantia.js';
+import { renderGarantia } from './garantia.js';
+import { renderEstructuraForm } from './gar-estructura.js';
 import { renderDocumentacion, renderLevantamientoView } from './documentacion.js';
 import { renderAuditoria } from './auditoria.js';
 import { renderQR } from './qr.js';
