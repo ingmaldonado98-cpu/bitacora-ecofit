@@ -1,17 +1,16 @@
 // documentacion.js — Módulo 2: Levantamiento dinámico + Fases Antes/Durante/Después
 
-import { projects, logChange } from './db.js';
-import { esc, fmtFechaHora, fotoMini, capturePhoto, toast, uuid, isoNow, confirmDialog, inputDialog, uploadProgressBar, calcFaseEstado, genDisplayId, countFotos, getFotosTecnicas } from './utils.js';
+import { projects } from './db.js';
+import { esc, fotoMini, toast, calcFaseEstado, countFotos } from './utils.js';
 import { renderFirmaBlock } from './project.js';
-import { canEdit, isAdmin, isLider, getSession } from './auth.js';
-import { uploadPhotoQueued } from './firebase.js';
+import { canEdit } from './auth.js';
 import { icon } from './icons.js';
-import { TMIN_ESTADOS, TMIN_ZONAS, TMIN_ZONA_DESC } from './clima.js';
-import { calcVocPuro } from './garantia.js';
 import { getExecBlocks } from '../modules/checklist/index.js';
-import { renderSitio, _countCierreExtra, SITIO_TAB } from './doc-sitio.js';
-import { renderRecibos, renderAparatos, renderCargas } from './lev-consumo.js';
+import { renderSitio, _countCierreExtra } from './doc-sitio.js';
+import { renderCamposDinamicos } from './lev-campos.js';
 import { _renderAreasTecho, _sujecionPorTecho } from './lev-areas.js';
+import { _TMIN_CIUDADES, _TMIN_ZONAS, _TMIN_ZONA_DESC, _tminDescripcion } from './lev-tmin.js';
+import { renderNotasDoc } from './lev-notas.js';
 import './lev-guardar.js';
 
 // ── Estado centralizado del levantamiento ─────────────────────────────────────
@@ -560,166 +559,6 @@ function renderLevantamiento(project, tipo, edit) {
   </form>`;
 }
 
-function renderCamposDinamicos(tipo, lev, edit, pid) {
-  const dis = edit ? '' : 'disabled';
-  if (tipo === 'interconectado' || tipo === 'hibrido' || tipo === 'hibrido_respaldo') {
-    return `
-    <div class="card">
-      <h3 class="card-title">Tarifa CFE y contrato</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Número de Servicio CFE (NIS)</label>
-          <input type="text" name="nisServicio" value="${esc(lev.nisServicio||'')}"
-                 placeholder="12 dígitos" inputmode="numeric" maxlength="18" ${dis}/>
-        </div>
-        <div class="form-group">
-          <label>Titular del servicio</label>
-          <input type="text" name="titularServicio" value="${esc(lev.titularServicio||'')}"
-                 placeholder="Nombre en el recibo" ${dis}/>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Tarifa</label>
-          <select name="tarifaCFE" ${dis}>
-            ${['DAC','1','1A','1B','1C','1D','1E','1F','OM','OMF','PDBT','GDMT','Otra'].map(t=>
-              `<option ${lev.tarifaCFE===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Demanda contratada (kW) <span class="form-hint">opcional</span></label>
-          <input type="number" name="demandaKW" value="${lev.demandaKW||''}" min="0" step="0.5" placeholder="Ej. 5" ${dis}/>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Factor de potencia <span class="form-hint">opcional</span></label>
-          <input type="number" name="factorPotencia" value="${lev.factorPotencia||''}" min="0.5" max="1" step="0.01" placeholder="Ej. 0.90" ${dis}/>
-        </div>
-        <div class="form-group">
-          <label>Horario de uso</label>
-          <select name="horarioUso" ${dis}>
-            ${['Residencial 24h','Comercial diurno (9–19h)','Comercial nocturno','Agropecuario / rancho','Industrial'].map(t=>
-              `<option ${lev.horarioUso===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <h3 class="card-title">Consumo del cliente</h3>
-      <div class="chip-group" id="chip-consumo">
-        <button type="button" class="chip ${(lev.modoConsumo||'recibo')==='recibo'?'chip-active':''}"
-          onclick="setModoConsumo('recibo')">Con recibo CFE</button>
-        <button type="button" class="chip ${lev.modoConsumo==='aparatos'?'chip-active':''}"
-          onclick="setModoConsumo('aparatos')">Por aparatos</button>
-      </div>
-      <div id="panel-recibos" style="${lev.modoConsumo==='aparatos'?'display:none':''}">
-        ${renderRecibos(lev.recibos||[], edit, pid)}
-      </div>
-      <div id="panel-aparatos" style="${lev.modoConsumo==='aparatos'?'':'display:none'}">
-        ${renderAparatos(lev.aparatos||[], edit)}
-      </div>
-    </div>
-    ${(tipo==='hibrido'||tipo==='hibrido_respaldo')?`
-    <div class="card">
-      <h3 class="card-title">Configuración híbrida</h3>
-      <div class="form-row">
-        <div class="form-group"><label>Autonomía requerida (horas)</label>
-          <input type="number" name="autonomia" value="${lev.autonomia||''}" min="0" step="0.5" ${dis}/></div>
-        <div class="form-group"><label>Banco de baterías (kWh)</label>
-          <input type="number" name="bancoBaterias" value="${lev.bancoBaterias||''}" min="0" step="0.1" ${dis}/></div>
-      </div>
-    </div>`:''}`;
-  }
-
-  if (tipo === 'aislado') {
-    return `
-    <div class="card">
-      <h3 class="card-title">Configuración Off-grid</h3>
-      <div class="form-group"><label>Autonomía requerida (horas) <span class="req-badge">CRÍTICO</span></label>
-        <input type="number" name="autonomia" value="${lev.autonomia||''}" min="0" step="0.5" ${dis}/></div>
-      <div class="form-group"><label>Cargas críticas (Alta prioridad)</label>
-        <div id="cargas-criticas">${renderCargas(lev.cargasCriticas||[],edit,'critica')}</div>
-      </div>
-      <div class="form-group"><label>Cargas secundarias (Baja prioridad)</label>
-        <div id="cargas-secundarias">${renderCargas(lev.cargasSecundarias||[],edit,'secundaria')}</div>
-      </div>
-      <div class="form-group"><label>Generador de respaldo</label>
-        <select name="generador" ${dis} onchange="toggleGenerador(this.value)">
-          <option ${!lev.generador?'selected':''} value="no">No</option>
-          <option ${lev.generador==='gasolina'?'selected':''} value="gasolina">Sí — Gasolina</option>
-          <option ${lev.generador==='diesel'?'selected':''} value="diesel">Sí — Diésel</option>
-          <option ${lev.generador==='gas'?'selected':''} value="gas">Sí — Gas LP</option>
-        </select>
-      </div>
-      <div id="gen-extra" style="${!lev.generador?'display:none':''}">
-        <div class="form-row">
-          <div class="form-group"><label>Arranque</label>
-            <select name="generadorArranque" ${dis}>
-              <option ${lev.generadorArranque==='automatico'?'selected':''} value="automatico">Automático</option>
-              <option ${lev.generadorArranque==='manual'?'selected':''} value="manual">Manual</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Potencia (kW)</label>
-            <input type="number" name="generadorKw" value="${lev.generadorKw||''}" min="0" step="0.1" ${dis}/></div>
-        </div>
-      </div>
-      <div class="form-group"><label>Crecimiento futuro esperado <span class="req-badge">CRÍTICO</span></label>
-        <textarea name="crecimientoFuturo" rows="2" ${dis} placeholder="Ej: después pondrán minisplit…">${esc(lev.crecimientoFuturo||'')}</textarea>
-      </div>
-      <div class="form-group"><label>Condiciones ambientales</label>
-        <div class="sombras-check">
-          ${['Polvo','Salinidad costera','Calor extremo','Humedad alta','Viento fuerte','Otra'].map(c=>`
-            <label class="check-chip ${(lev.condicionesAmbientales||[]).includes(c)?'check-active':''}">
-              <input type="checkbox" name="cond_${c}" ${dis} value="${c}"
-                ${(lev.condicionesAmbientales||[]).includes(c)?'checked':''}
-                onchange="this.closest('.check-chip').classList.toggle('check-active',this.checked)"> ${c}
-            </label>`).join('')}
-        </div>
-      </div>
-    </div>`;
-  }
-
-  if (tipo === 'bombeo') {
-    return `
-    <div class="card">
-      <h3 class="card-title">Bombeo solar</h3>
-      <div class="form-row">
-        <div class="form-group"><label>Tipo de bomba</label>
-          <select name="tipoBomba" ${dis}>
-            ${['Sumergible','Superficial','Periférica','Otra'].map(t=>
-              `<option ${lev.tipoBomba===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group"><label>Caudal requerido (L/h)</label>
-          <input type="number" name="caudal" value="${lev.caudal||''}" min="0" ${dis}/></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Profundidad del pozo (m)</label>
-          <input type="number" name="profundidadPozo" value="${lev.profundidadPozo||''}" min="0" ${dis}/></div>
-        <div class="form-group"><label>Horas de bombeo/día</label>
-          <input type="number" name="horasBombeo" value="${lev.horasBombeo||''}" min="0" step="0.5" ${dis}/></div>
-      </div>
-    </div>`;
-  }
-
-  // 'respaldo' es legacy — los nuevos proyectos usan 'hibrido_respaldo'
-  // Se mantiene por compatibilidad con datos anteriores
-  if (tipo === 'respaldo') {
-    return `
-    <div class="card">
-      <h3 class="card-title">Sistema de respaldo / Cargas</h3>
-      <div class="form-group"><label>Tiempo de respaldo requerido (horas)</label>
-        <input type="number" name="tiempoRespaldo" value="${lev.tiempoRespaldo||''}" min="0" step="0.5" ${dis}/></div>
-      <div class="form-group"><label>Cargas a respaldar</label>
-        <div id="cargas-criticas">${renderCargas(lev.cargasRespaldo||[],edit,'critica')}</div>
-      </div>
-    </div>`;
-  }
-
-  return ''; // tipo 'otro' — solo campos libres
-}
-
 // ── Campos libres ─────────────────────────────────────────────────────────────
 // state en window._lev.camposLibres
 window.addCampoLibre = function() {
@@ -736,105 +575,6 @@ window.addCampoLibre = function() {
 };
 window.updCampoLibre = function(i,k,v) { if(_lev.camposLibres[i]) _lev.camposLibres[i][k]=v; };
 window.delCampoLibre = function(i) { _lev.camposLibres.splice(i,1); navigate(window.location.hash); };
-
-// ── Notas de documentación ─────────────────────────────────────────────────────
-function renderNotasDoc(notas, session, projectId) {
-  if (!notas.length) return '<p class="empty-msg-sm">Sin notas aún.</p>';
-  return notas.map((n, i) => `
-    <div class="nota-item">
-      <div class="nota-header">
-        <span class="nota-autor">${esc(n.autorNombre || '—')}</span>
-        <span class="nota-fecha">${fmtFechaHora(n.createdAt)}</span>
-        ${isAdmin(session) || session?.id === n.autorId
-          ? `<button class="btn-del-sm" onclick="_delNotaDoc('${projectId}',${i})">✕</button>` : ''}
-      </div>
-      <p class="nota-texto">${esc(n.texto)}</p>
-    </div>
-  `).join('');
-}
-
-window._showNotaDoc = function(projectId) {
-  document.getElementById('dnotas-form').style.display = 'block';
-  document.getElementById('dnotas-texto').focus();
-};
-
-window._submitNotaDoc = async function(projectId) {
-  const texto = document.getElementById('dnotas-texto').value.trim();
-  if (!texto) { toast('Escribe una nota', 'error'); return; }
-  const session = await getSession();
-  const p = await projects.getById(projectId);
-  const nota = { id: uuid(), texto, autorId: session?.id, autorNombre: session?.nombre || session?.username, createdAt: isoNow() };
-  p.documentacion.notas = [...(p.documentacion.notas || []), nota];
-  await projects.update(projectId, { documentacion: p.documentacion });
-  document.getElementById('dnotas-list').innerHTML = renderNotasDoc(p.documentacion.notas, session, projectId);
-  document.getElementById('dnotas-form').style.display = 'none';
-  document.getElementById('dnotas-texto').value = '';
-  // Actualizar badge del tab
-  const tabBtn = document.querySelector('[data-tab="d-notas"]');
-  if (tabBtn) tabBtn.innerHTML = `Notas<span class="tab-badge tab-ok">${p.documentacion.notas.length}</span>`;
-  toast('✅ Nota guardada');
-};
-
-window._delNotaDoc = async function(projectId, idx) {
-  if (!await confirmDialog('¿Eliminar esta nota?')) return;
-  const session = await getSession();
-  const p = await projects.getById(projectId);
-  p.documentacion.notas = (p.documentacion.notas || []).filter((_,i) => i !== idx);
-  await projects.update(projectId, { documentacion: p.documentacion });
-  document.getElementById('dnotas-list').innerHTML = renderNotasDoc(p.documentacion.notas, session, projectId);
-  const tabBtn = document.querySelector('[data-tab="d-notas"]');
-  if (tabBtn) tabBtn.innerHTML = p.documentacion.notas.length
-    ? `Notas<span class="tab-badge tab-ok">${p.documentacion.notas.length}</span>` : 'Notas';
-  toast('Nota eliminada');
-};
-
-// Alias locales para compatibilidad con el código existente en este módulo
-const _TMIN_CIUDADES  = TMIN_ESTADOS;
-const _TMIN_ZONAS     = TMIN_ZONAS;
-const _TMIN_ZONA_DESC = TMIN_ZONA_DESC;
-
-function _tminDescripcion(estado, zona, tMinFinal) {
-  if (!estado || estado === 'otro') return '';
-  const c = _TMIN_CIUDADES.find(x => x.nombre === estado);
-  const z = _TMIN_ZONAS.find(x => x.key === (zona || 'valle'));
-  if (!c || !z) return '';
-  const base   = c.tMin;
-  const offset = z.offset;
-  const signo  = offset >= 0 ? `+${offset}` : `${offset}`;
-  return `${base}°C (estado) ${signo}°C (zona) = ${tMinFinal ?? (base + offset)}°C`;
-}
-
-window._onTMinRecalc = function() {
-  const selCiudad = document.querySelector('[name="tMinCiudad"]');
-  const selZona   = document.querySelector('[name="tMinZona"]');
-  const inp       = document.getElementById('lev-tmin-input');
-  const desglose  = document.getElementById('lev-tmin-desglose');
-  const desc      = document.getElementById('lev-tmin-desc');
-  if (!selCiudad || !inp) return;
-
-  const ciudad = selCiudad.value;
-  const zona   = selZona?.value || 'valle';
-
-  if (!ciudad || ciudad === 'otro') {
-    // Manual: desbloquear campo
-    inp.removeAttribute('readonly');
-    inp.style.background = '';
-    if (!ciudad) inp.value = '3';
-    if (desglose) desglose.style.display = 'none';
-  } else {
-    // Auto: calcular ciudad + zona
-    const optC  = selCiudad.options[selCiudad.selectedIndex];
-    const optZ  = selZona?.options[selZona.selectedIndex];
-    const base  = parseFloat(optC?.dataset?.tmin || '3');
-    const off   = parseFloat(optZ?.dataset?.offset || '0');
-    const final = base + off;
-    inp.value = final;
-    inp.setAttribute('readonly', true);
-    inp.style.background = 'var(--surface2)';
-    if (desglose) desglose.style.display = 'flex';
-    if (desc) desc.textContent = _tminDescripcion(ciudad, zona, final);
-  }
-};
 
 // ── Exec toggle — disponibles aquí para cuando Progreso de obra se carga sin checklist.js
 {
