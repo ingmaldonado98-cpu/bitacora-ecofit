@@ -219,8 +219,32 @@ async function _tryOneDriveSave(doc, filename) {
   } catch { /* OneDrive es opcional — no interrumpir si falla */ }
 }
 
+// ── Helpers de estado de generación ──────────────────────────────────────────
+// Yield dos frames antes de la operación bloqueante → permite que el toast
+// y el spinner aparezcan antes del freeze de jsPDF en móviles lentos.
+async function _pdfYield() {
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+}
+
+function _btnLoading(btn, label) {
+  if (!btn) return;
+  btn.disabled = true;
+  btn._origLabel = btn.innerHTML;
+  btn.innerHTML = `<span class="spinner-sm"></span> ${label}`;
+}
+function _btnDone(btn) {
+  if (!btn) return;
+  btn.disabled = false;
+  if (btn._origLabel) { btn.innerHTML = btn._origLabel; delete btn._origLabel; }
+}
+
 // ── PDF Cliente ───────────────────────────────────────────────────────────────
 window.exportarPDFCliente = async function(projectId) {
+  const btn = document.querySelector('.pdf-card .btn-primary');
+  _btnLoading(btn, 'Generando…');
+  toast('Generando PDF cliente…', 'info', 0);
+  await _pdfYield();
+  try {
   const [project, contacto] = await Promise.all([
     projects.getById(projectId),
     config.get('contactoEcofit'),
@@ -296,10 +320,21 @@ window.exportarPDFCliente = async function(projectId) {
 
   const filenameC = `EFS-Cliente-${project.displayId}-${project.clientName?.replace(/\s+/g,'_')}.pdf`;
   await _savePDF(doc, filenameC);
+  } catch (err) {
+    console.error('[PDF] Cliente:', err);
+    toast('Error al generar PDF — intenta de nuevo', 'error');
+  } finally {
+    _btnDone(btn);
+  }
 };
 
 // ── PDF Técnico ───────────────────────────────────────────────────────────────
 window.exportarPDFTecnico = async function(projectId) {
+  const btn = document.querySelector('.pdf-card:last-child .btn-primary');
+  _btnLoading(btn, 'Generando…');
+  toast('Generando PDF técnico…', 'info', 0);
+  await _pdfYield();
+  try {
   const [project] = await Promise.all([projects.getById(projectId), getLogoB64()]);
   const doc = newDoc(); if (!doc) return;
 
@@ -647,6 +682,12 @@ window.exportarPDFTecnico = async function(projectId) {
 
   const filenameT = `EFS-Tecnico-${project.displayId}.pdf`;
   await _savePDF(doc, filenameT);
+  } catch (err) {
+    console.error('[PDF] Técnico:', err);
+    toast('Error al generar PDF — intenta de nuevo', 'error');
+  } finally {
+    _btnDone(btn);
+  }
 };
 
 // ── Word Técnico (HTML-as-doc, editable en Word/LibreOffice/Google Docs) ──────

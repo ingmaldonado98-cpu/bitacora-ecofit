@@ -1156,6 +1156,12 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
   margin-left: 8px; vertical-align: middle;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.spinner-sm {
+  display: inline-block; width: 13px; height: 13px;
+  border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+  border-radius: 50%; animation: spin .6s linear infinite;
+  vertical-align: middle; margin-right: 4px;
+}
 
 /* ── Barra de progreso de subida ─────────────────────────────────────────── */
 .upload-progress-bar {
