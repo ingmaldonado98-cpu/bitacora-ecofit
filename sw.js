@@ -20,6 +20,7 @@ const APP_SHELL = [
   './js/documentacion.js',
   './js/doc-sitio.js',
   './js/lev-consumo.js',
+  './js/lev-areas.js',
   './js/garantia.js',
   './js/inventario.js',
   './js/map.js',
