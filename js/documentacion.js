@@ -336,25 +336,6 @@ function renderLevantamiento(project, tipo, edit) {
         </div>
         ${(lev.areasTecho||[]).length === 0 && !edit ? `<p style="font-size:.78rem;color:var(--text-muted);padding:8px 0">Sin áreas registradas</p>` : ''}
       </div>
-      <!-- Ubicación GPS -->
-      <div class="form-row" style="align-items:flex-end;gap:10px;margin-top:8px">
-        <div class="form-group" style="flex:1;margin:0">
-          <label>${icon('map-pin',14)} Ubicación GPS <span class="form-hint">opcional</span></label>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            ${lev.gpsLat && lev.gpsLng
-              ? `<span class="input-info-badge" style="font-size:.75rem">${lev.gpsLat.toFixed(5)}, ${lev.gpsLng.toFixed(5)}</span>
-                 <a href="https://maps.google.com/?q=${lev.gpsLat},${lev.gpsLng}" target="_blank" rel="noopener"
-                    class="btn-outline btn-sm" style="text-decoration:none">
-                   ${icon('map-trifold',14)} Ver en mapa
-                 </a>
-                 ${edit ? `<button type="button" class="btn-del-sm" onclick="_clearGps('${pid}')" title="Quitar GPS">✕</button>` : ''}`
-              : (edit ? `<button type="button" class="btn-outline btn-sm" onclick="_captureGps('${pid}')">
-                   ${icon('map-pin',14)} Capturar ubicación
-                 </button>` : '<span style="color:var(--text-muted);font-size:.8rem">Sin GPS</span>')}
-          </div>
-        </div>
-      </div>
-
       <!-- Fotos del levantamiento -->
       <div class="foto-tecnica-row" style="margin-top:12px">
         <div class="ft-label">${icon('camera',14)} Fotos del levantamiento</div>

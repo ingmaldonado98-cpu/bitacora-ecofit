@@ -137,9 +137,8 @@ function _areaOpts(sel) {
   return AREAS_CONSUMO.map(a=>`<option ${a===sel?'selected':''}>${a}</option>`).join('');
 }
 function _aparatoRow(a, i, edit) {
-  const area = a.area || 'General';
   return `<div class="aparato-row" data-idx="${i}">
-    ${edit ? `<select class="aprow-area" onchange="window._lev.aparatos[${i}].area=this.value;refreshAparatos()">${_areaOpts(area)}</select>` : `<span class="aprow-area-ro">${esc(area)}</span>`}
+    ${edit ? `<select class="aprow-area" onchange="window._lev.aparatos[${i}].area=this.value;refreshAparatos()">${_areaOpts(a.area||'General')}</select>` : ''}
     <input type="text" value="${esc(a.nombre)}" placeholder="Nombre" ${edit?`oninput="window._lev.aparatos[${i}].nombre=this.value"`:'disabled'}/>
     <input type="number" value="${a.potencia}" placeholder="W" min="0" ${edit?`oninput="window._lev.aparatos[${i}].potencia=parseFloat(this.value)||0"`:'disabled'}/>
     <input type="number" value="${a.horas}" placeholder="h/día" min="0" step="0.5" ${edit?`oninput="window._lev.aparatos[${i}].horas=parseFloat(this.value)||0"`:'disabled'}/>
@@ -147,18 +146,25 @@ function _aparatoRow(a, i, edit) {
     ${edit?`<button type="button" class="btn-del-sm" onclick="delAparato(${i})">✕</button>`:''}
   </div>`;
 }
-function _aparatosResumen() {
-  const map = {};
-  window._lev.aparatos.forEach(a => {
-    const k = a.area || 'General';
-    if (!map[k]) map[k] = 0;
-    map[k] += (a.potencia * a.horas * 30 / 1000) * (a.cantidad || 1);
-  });
-  const items = Object.entries(map).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  if (items.length <= 1) return '';
-  return `<div class="aparatos-resumen">
-    ${items.map(([k,v])=>`<div class="apres-row"><span>${esc(k)}</span><strong>${v.toFixed(0)} kWh/mes</strong></div>`).join('')}
-  </div>`;
+
+function _renderAparatosByZone(edit) {
+  if (!window._lev.aparatos.length) {
+    return '<p class="empty-msg-sm">Sin aparatos. Usa los accesos rápidos o agrega uno.</p>';
+  }
+  const inOrder  = AREAS_CONSUMO.filter(z => window._lev.aparatos.some(a => (a.area||'General') === z));
+  const custom   = [...new Set(window._lev.aparatos.map(a => a.area||'General').filter(z => !AREAS_CONSUMO.includes(z)))];
+  const zones    = [...inOrder, ...custom];
+  return zones.map(zone => {
+    const items = window._lev.aparatos.map((a,i)=>({a,i})).filter(({a})=>(a.area||'General')===zone);
+    const zKwh  = items.reduce((s,{a})=>s+a.potencia*a.horas*(a.cantidad||1)*30/1000, 0);
+    return `<div class="aparatos-zona">
+      <div class="zona-hdr">
+        <span class="zona-name">${esc(zone)}</span>
+        <span class="zona-kwh">${zKwh.toFixed(0)} kWh/mes</span>
+      </div>
+      ${items.map(({a,i})=>_aparatoRow(a,i,edit)).join('')}
+    </div>`;
+  }).join('');
 }
 
 export function renderAparatos(aparatos, edit) {
@@ -172,11 +178,10 @@ export function renderAparatos(aparatos, edit) {
       </div>
     </div>`:''}
     <div id="lista-aparatos">
-      ${window._lev.aparatos.map((a,i)=>_aparatoRow(a,i,edit)).join('')}
+      ${_renderAparatosByZone(edit)}
     </div>
     ${edit?`<button type="button" class="btn-outline btn-sm" onclick="addAparato()">+ Aparato</button>`:''}
     <p class="kwh-total">Total estimado: <strong>${totalKwh.toFixed(0)} kWh/mes</strong></p>
-    <div id="aparatos-resumen-wrap">${_aparatosResumen()}</div>
   `;
 }
 
@@ -187,12 +192,10 @@ window.delAparato = function(i) { window._lev.aparatos.splice(i,1); refreshApara
 window.refreshAparatos = function() {
   const el = document.getElementById('lista-aparatos');
   if (el) {
-    el.innerHTML = window._lev.aparatos.map((a,i) => _aparatoRow(a,i,true)).join('');
+    el.innerHTML = _renderAparatosByZone(true);
     const totalKwh = window._lev.aparatos.reduce((s,a) => s + (a.potencia * a.horas * (a.cantidad||1) * 30 / 1000), 0);
     const totEl = el.closest('.card, [id^="panel-aparatos"]')?.querySelector('.kwh-total');
     if (totEl) totEl.innerHTML = `Total estimado: <strong>${totalKwh.toFixed(0)} kWh/mes</strong>`;
-    const resWrap = el.closest('.card, [id^="panel-aparatos"]')?.querySelector('#aparatos-resumen-wrap');
-    if (resWrap) resWrap.innerHTML = _aparatosResumen();
   }
 };
 

@@ -64,16 +64,21 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
         ${renderAparatos(lev.aparatos||[], edit)}
       </div>
     </div>
-    ${(tipo==='hibrido'||tipo==='hibrido_respaldo')?`
     <div class="card">
-      <h3 class="card-title">Configuración híbrida</h3>
+      <h3 class="card-title">Configuración de baterías${tipo==='interconectado'?' <span class="form-hint">opcional</span>':''}</h3>
       <div class="form-row">
         <div class="form-group"><label>Autonomía requerida (horas)</label>
-          <input type="number" name="autonomia" value="${lev.autonomia||''}" min="0" step="0.5" ${dis}/></div>
+          <input type="number" name="autonomia" value="${lev.autonomia||''}" min="0" step="0.5" placeholder="Ej. 4" ${dis}/></div>
         <div class="form-group"><label>Banco de baterías (kWh)</label>
-          <input type="number" name="bancoBaterias" value="${lev.bancoBaterias||''}" min="0" step="0.1" ${dis}/></div>
+          <input type="number" name="bancoBaterias" value="${lev.bancoBaterias||''}" min="0" step="0.1" placeholder="Ej. 10" ${dis}/></div>
       </div>
-    </div>`:''}`;
+      <div class="form-group"><label>Cargas críticas a respaldar</label>
+        <div id="cargas-criticas">${renderCargas(lev.cargasCriticas||[],edit,'critica')}</div>
+      </div>
+      <div class="form-group"><label>Cargas secundarias</label>
+        <div id="cargas-secundarias">${renderCargas(lev.cargasSecundarias||[],edit,'secundaria')}</div>
+      </div>
+    </div>`;
   }
 
   if (tipo === 'aislado') {
@@ -153,10 +158,17 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
     return `
     <div class="card">
       <h3 class="card-title">Sistema de respaldo / Cargas</h3>
-      <div class="form-group"><label>Tiempo de respaldo requerido (horas)</label>
-        <input type="number" name="tiempoRespaldo" value="${lev.tiempoRespaldo||''}" min="0" step="0.5" ${dis}/></div>
-      <div class="form-group"><label>Cargas a respaldar</label>
+      <div class="form-row">
+        <div class="form-group"><label>Autonomía requerida (horas)</label>
+          <input type="number" name="autonomia" value="${lev.autonomia||lev.tiempoRespaldo||''}" min="0" step="0.5" placeholder="Ej. 4" ${dis}/></div>
+        <div class="form-group"><label>Banco de baterías (kWh)</label>
+          <input type="number" name="bancoBaterias" value="${lev.bancoBaterias||''}" min="0" step="0.1" placeholder="Ej. 10" ${dis}/></div>
+      </div>
+      <div class="form-group"><label>Cargas críticas a respaldar</label>
         <div id="cargas-criticas">${renderCargas(lev.cargasCriticas||[],edit,'critica')}</div>
+      </div>
+      <div class="form-group"><label>Cargas secundarias</label>
+        <div id="cargas-secundarias">${renderCargas(lev.cargasSecundarias||[],edit,'secundaria')}</div>
       </div>
     </div>`;
   }
