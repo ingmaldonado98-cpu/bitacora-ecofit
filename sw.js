@@ -25,6 +25,8 @@ const APP_SHELL = [
   './js/lev-campos.js',
   './js/lev-notas.js',
   './js/lev-tmin.js',
+  './js/lev-gps.js',
+  './js/doc-exec.js',
   './js/garantia.js',
   './js/inventario.js',
   './js/map.js',

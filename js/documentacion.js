@@ -1,7 +1,7 @@
 // documentacion.js — Módulo 2: Levantamiento dinámico + Fases Antes/Durante/Después
 
 import { projects } from './db.js';
-import { esc, fotoMini, toast, calcFaseEstado, countFotos } from './utils.js';
+import { esc, fotoMini, calcFaseEstado, countFotos } from './utils.js';
 import { renderFirmaBlock } from './project.js';
 import { canEdit } from './auth.js';
 import { icon } from './icons.js';
@@ -11,7 +11,9 @@ import { renderCamposDinamicos } from './lev-campos.js';
 import { _renderAreasTecho, _sujecionPorTecho } from './lev-areas.js';
 import { _TMIN_CIUDADES, _TMIN_ZONAS, _TMIN_ZONA_DESC, _tminDescripcion } from './lev-tmin.js';
 import { renderNotasDoc } from './lev-notas.js';
+import { EXEC_POR_SITIO, renderExecPorSitio } from './doc-exec.js';
 import './lev-guardar.js';
+import './lev-gps.js';
 
 // ── Estado centralizado del levantamiento ─────────────────────────────────────
 // Expuesto en window._lev para que los inline handlers del HTML puedan mutar
@@ -26,13 +28,6 @@ const _lev = {
   pid:         '',
 };
 window._lev = _lev;
-
-// ── Secciones de ejecución por sitio ──────────────────────────────────────────
-const EXEC_POR_SITIO = {
-  techo:          ['struct', 'canal', 'cable-dc'],
-  centrosCarga:   ['cfe'],
-  zonaDelSistema: ['prot-dc', 'inversor', 'controlador', 'equipo', 'baterias', 'bomba', 'cierre'],
-};
 
 // ── Vista principal — Progreso de obra ────────────────────────────────────────
 export async function renderDocumentacion(projectId, session) {
@@ -163,74 +158,6 @@ export async function renderDocumentacion(projectId, session) {
   </script>
   `;
 }
-
-// ── Ejecución por sección (bloques del checklist integrados en Progreso de obra) ─
-function renderExecPorSitio(project, sitio, allExecBlocks, edit) {
-  const cl     = project.checklistData || {};
-  const blocks = allExecBlocks.filter(b => EXEC_POR_SITIO[sitio]?.includes(b.id));
-  if (!blocks.length) return '';
-  const allItems = blocks.flatMap(b => b.items);
-  const done     = allItems.filter(it => cl.exec?.[it.id]).length;
-  const total    = allItems.length;
-  const pct      = total ? Math.round(done / total * 100) : 0;
-  const pid      = project.id;
-
-  const _item = (it) => {
-    const savedVal = cl.execText?.[it.id] || '';
-    if (it.isNav) return `
-      <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
-        <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
-          onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${pid}','${it.id}',this.checked)">
-        <div class="cl-item-text" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <span class="cl-item-name">${esc(it.n)}</span>
-          <button class="btn-outline btn-sm" style="flex-shrink:0"
-            onclick="event.preventDefault();event.stopPropagation();navigate('#${esc(it.navRoute)}/${pid}')">Ir →</button>
-        </div>
-      </label>`;
-    return `
-      <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
-        <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
-          onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${pid}','${it.id}',this.checked)">
-        <div class="cl-item-text" style="width:100%">
-          <span class="cl-item-name">${esc(it.n)}</span>
-          ${it.hasInput ? `<div style="margin-top:6px">
-            <input type="text" class="torq-input" style="max-width:180px"
-              placeholder="${esc(it.inputPlaceholder||'Valor medido')}" ${!edit ? 'disabled' : ''}
-              value="${esc(savedVal)}"
-              onchange="clSaveExecText('${pid}','${it.id}',this.value)"
-              onclick="event.stopPropagation()">
-          </div>` : ''}
-        </div>
-      </label>`;
-  };
-
-  return `
-  <div class="card exec-section">
-    <div class="card-title-row">
-      <h3 class="card-title">Ejecución</h3>
-      <span class="cl-prog-lbl">${done}/${total}</span>
-    </div>
-    <div class="cl-prog-bar-wrap">
-      <div class="cl-prog-bar${pct===100?' cl-prog-done':''}" style="width:${pct}%"></div>
-    </div>
-    ${blocks.map(block => {
-      const bd = block.items.filter(it => cl.exec?.[it.id]).length;
-      const bt = block.items.length;
-      const ok = bd === bt;
-      return `
-      <details class="cl-exec-block" ${ok ? '' : 'open'}>
-        <summary class="cl-exec-block-hdr">
-          <span class="cl-exec-block-title">${esc(block.label)}</span>
-          <span class="cl-exec-block-badge ${ok ? 'cl-exec-ok' : ''}">${ok ? '✓' : `${bd}/${bt}`}</span>
-          <span class="cl-exec-caret">▾</span>
-        </summary>
-        <div class="cl-item-list" style="padding:0 4px 8px">
-          ${block.items.map(_item).join('')}
-        </div>
-      </details>`;
-    }).join('')}
-  </div>`
-;}
 
 // ── Verificación de cierre — renderSitio y handlers viven en doc-sitio.js ─────
 
@@ -601,33 +528,3 @@ export async function renderLevantamientoView(projectId, session) {
   </div>`;
 }
 
-// ── GPS capture / clear ────────────────────────────────────────────────────────
-window._captureGps = function(projectId) {
-  if (!navigator.geolocation) { toast('GPS no disponible en este dispositivo', 'warn'); return; }
-  toast('Obteniendo ubicación…');
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      const lat = parseFloat(pos.coords.latitude.toFixed(6));
-      const lng = parseFloat(pos.coords.longitude.toFixed(6));
-      const p   = await projects.getById(projectId);
-      p.documentacion = p.documentacion || {};
-      p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-      p.documentacion.levantamiento.gpsLat = lat;
-      p.documentacion.levantamiento.gpsLng = lng;
-      await projects.update(projectId, { documentacion: p.documentacion });
-      toast(`📍 GPS guardado: ${lat}, ${lng}`, 'success');
-      navigate(window.location.hash);
-    },
-    () => toast('No se pudo obtener la ubicación — verifica los permisos', 'warn'),
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
-};
-
-window._clearGps = async function(projectId) {
-  const p = await projects.getById(projectId);
-  if (!p.documentacion?.levantamiento) return;
-  p.documentacion.levantamiento.gpsLat = null;
-  p.documentacion.levantamiento.gpsLng = null;
-  await projects.update(projectId, { documentacion: p.documentacion });
-  navigate(window.location.hash);
-};
