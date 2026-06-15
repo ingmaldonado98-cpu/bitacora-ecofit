@@ -11,6 +11,20 @@ import { calcVocPuro } from './garantia.js';
 import { getExecBlocks } from '../modules/checklist/index.js';
 import { renderSitio, _countCierreExtra, SITIO_TAB } from './doc-sitio.js';
 
+// ── Estado centralizado del levantamiento ─────────────────────────────────────
+// Expuesto en window._lev para que los inline handlers del HTML puedan mutar
+// los arrays directamente (oninput="_lev.aparatos[0].nombre=this.value").
+// NUNCA reasignar _lev — solo mutar sus propiedades.
+const _lev = {
+  aparatos:    [],
+  cargas:      { critica: [], secundaria: [] },
+  recibos:     [],
+  camposLibres:[],
+  areasTecho:  [],
+  pid:         '',
+};
+window._lev = _lev;
+
 // ── Secciones de ejecución por sitio ──────────────────────────────────────────
 const EXEC_POR_SITIO = {
   techo:          ['struct', 'canal', 'cable-dc'],
@@ -224,9 +238,9 @@ function renderLevantamiento(project, tipo, edit) {
   const lev = project.documentacion?.levantamiento || {};
   const dis = edit ? '' : 'disabled';
   const pid = project.id;
-  _levPid = pid;
+  _lev.pid = pid;
   // Sincronizar state de áreas del techo (preserva fotos si existen)
-  _areasTecho = (lev.areasTecho || []).map(a => {
+  _lev.areasTecho = (lev.areasTecho || []).map(a => {
     let fotos;
     if (Array.isArray(a.fotos)) {
       fotos = [...a.fotos];
@@ -240,8 +254,8 @@ function renderLevantamiento(project, tipo, edit) {
   });
 
   // Reinicializar estado de módulo con datos del proyecto (evita estado stale entre navegaciones)
-  _camposLibres = [...(lev.camposLibres || [])];
-  _cargas = {
+  _lev.camposLibres = [...(lev.camposLibres || [])];
+  _lev.cargas = {
     critica:    [...(lev.cargasCriticas   || lev.cargasRespaldo || [])],
     secundaria: [...(lev.cargasSecundarias || [])],
   };
@@ -708,19 +722,19 @@ const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct'
 const MESES_FULL  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 window.MESES_FULL = MESES_FULL; // exponer para onchange inline
 
-let _recibos = [];
+// state en window._lev.recibos
 function renderRecibos(recibos, edit, pid) {
-  _recibos = [...recibos];
+  _lev.recibos = [...recibos];
   const limite   = 12;
-  const puedeAgregar = edit && _recibos.length < limite;
+  const puedeAgregar = edit && _lev.recibos.length < limite;
   const anioActual   = new Date().getFullYear();
   const anios        = [anioActual, anioActual-1, anioActual-2, anioActual-3];
 
   if (!recibos.length && !edit) return '<p class="empty-msg-sm">Sin recibos CFE capturados.</p>';
 
   // Resumen estadístico (a partir de 2 registros con kWh)
-  const conKwh    = _recibos.filter(r => r.kwh > 0);
-  const conImp    = _recibos.filter(r => r.importe > 0);
+  const conKwh    = _lev.recibos.filter(r => r.kwh > 0);
+  const conImp    = _lev.recibos.filter(r => r.importe > 0);
   const resumen   = conKwh.length >= 2 ? (() => {
     const avgKwh  = Math.round(conKwh.reduce((s,r)=>s+r.kwh,0)/conKwh.length);
     const avgImp  = conImp.length ? Math.round(conImp.reduce((s,r)=>s+r.importe,0)/conImp.length) : 0;
@@ -749,25 +763,25 @@ function renderRecibos(recibos, edit, pid) {
 
   return `
   <div class="recibos-header">
-    <span class="recibo-count">${_recibos.length} / ${limite} recibos</span>
+    <span class="recibo-count">${_lev.recibos.length} / ${limite} recibos</span>
     ${puedeAgregar ? `<button type="button" class="btn-outline btn-sm" onclick="addRecibo()">+ Recibo</button>` : ''}
   </div>
-  ${_recibos.map((r,i)=>`
+  ${_lev.recibos.map((r,i)=>`
     <div class="recibo-card">
       <div class="recibo-top">
         <div class="recibo-fecha">
-          <select class="sel-mes" ${edit?`onchange="(function(v){_recibos[${i}].mes=parseInt(v)||null;_recibos[${i}].mesLabel=MESES_FULL[(parseInt(v)||1)-1];}).call(this,this.value)"`:'disabled'}>
+          <select class="sel-mes" ${edit?`onchange="(function(v){_lev.recibos[${i}].mes=parseInt(v)||null;_lev.recibos[${i}].mesLabel=MESES_FULL[(parseInt(v)||1)-1];}).call(this,this.value)"`:'disabled'}>
             <option value="">Mes</option>
             ${MESES_CORTO.map((m,mi)=>`<option value="${mi+1}" ${r.mes===mi+1?'selected':''}>${m}</option>`).join('')}
           </select>
-          <select class="sel-anio" ${edit?`onchange="_recibos[${i}].anio=parseInt(this.value)||null"`:'disabled'}>
+          <select class="sel-anio" ${edit?`onchange="_lev.recibos[${i}].anio=parseInt(this.value)||null"`:'disabled'}>
             <option value="">Año</option>
             ${anios.map(a=>`<option value="${a}" ${r.anio===a?'selected':''}>${a}</option>`).join('')}
           </select>
         </div>
         <div class="recibo-foto-slot">
           ${r.foto
-            ? `${fotoMini(r.foto,'Recibo')}${edit?`<button type="button" class="btn-del-foto" onclick="_recibos[${i}].foto=null;refreshRecibos()">✕</button>`:''}`
+            ? `${fotoMini(r.foto,'Recibo')}${edit?`<button type="button" class="btn-del-foto" onclick="_lev.recibos[${i}].foto=null;refreshRecibos()">✕</button>`:''}`
             : (edit ? `<button type="button" class="btn-foto-sm" onclick="capReciboFoto(${i})">${icon('receipt', 14)} Foto</button>` : '<span style="color:var(--text-muted);font-size:.75rem">Sin foto</span>')}
         </div>
         ${edit?`<button type="button" class="btn-del-sm" onclick="delRecibo(${i})" title="Eliminar">✕</button>`:''}
@@ -776,12 +790,12 @@ function renderRecibos(recibos, edit, pid) {
         <label class="recibo-num-group">
           <span>kWh / mes</span>
           <input type="number" placeholder="0" value="${r.kwh||''}" min="0" step="1"
-            ${edit?`oninput="_recibos[${i}].kwh=parseFloat(this.value)||0"`:'disabled'}/>
+            ${edit?`oninput="_lev.recibos[${i}].kwh=parseFloat(this.value)||0"`:'disabled'}/>
         </label>
         <label class="recibo-num-group">
           <span>$ Importe</span>
           <input type="number" placeholder="0" value="${r.importe||''}" min="0" step="1"
-            ${edit?`oninput="_recibos[${i}].importe=parseFloat(this.value)||0"`:'disabled'}/>
+            ${edit?`oninput="_lev.recibos[${i}].importe=parseFloat(this.value)||0"`:'disabled'}/>
         </label>
       </div>
     </div>`).join('')}
@@ -790,18 +804,18 @@ function renderRecibos(recibos, edit, pid) {
 }
 
 window.addRecibo = function() {
-  if (_recibos.length >= 12) { toast('Máximo 12 recibos', 'error'); return; }
+  if (_lev.recibos.length >= 12) { toast('Máximo 12 recibos', 'error'); return; }
   // Auto-sugerir: retroceder un mes desde el último capturado
-  const ultimo = _recibos.slice().reverse().find(r => r.mes && r.anio);
+  const ultimo = _lev.recibos.slice().reverse().find(r => r.mes && r.anio);
   let mes = null, anio = null;
   if (ultimo) {
     mes  = ultimo.mes === 1 ? 12 : ultimo.mes - 1;
     anio = ultimo.mes === 1 ? ultimo.anio - 1 : ultimo.anio;
   }
-  _recibos.push({ foto:null, mes, anio, mesLabel: mes ? MESES_FULL[mes-1] : '', kwh:0, importe:0 });
+  _lev.recibos.push({ foto:null, mes, anio, mesLabel: mes ? MESES_FULL[mes-1] : '', kwh:0, importe:0 });
   refreshRecibos();
 };
-window.delRecibo = function(i) { _recibos.splice(i,1); refreshRecibos(); };
+window.delRecibo = function(i) { _lev.recibos.splice(i,1); refreshRecibos(); };
 window.capReciboFoto = function(i) {
   capturePhoto(async b64 => {
     toast('Subiendo foto del recibo…');
@@ -809,18 +823,18 @@ window.capReciboFoto = function(i) {
     const fid = uuid();
     const result = await uploadPhotoQueued(b64, `levantamiento/recibo_${fid}.jpg`,
       'levantamiento_temp', 'reciboFoto');
-    _recibos[i].foto = result.url || (result.pending ? b64 : null);
+    _lev.recibos[i].foto = result.url || (result.pending ? b64 : null);
     refreshRecibos();
     if (result.url) toast('✅ Foto del recibo guardada');
   });
 };
 function refreshRecibos() {
   const panel = document.getElementById('panel-recibos');
-  if (panel) panel.innerHTML = renderRecibos(_recibos, true, null);
+  if (panel) panel.innerHTML = renderRecibos(_lev.recibos, true, null);
 }
 
 // ── Aparatos eléctricos ───────────────────────────────────────────────────────
-let _aparatos = [];
+// state en window._lev.aparatos
 const APARATOS_RAPIDOS = [
   {nombre:'Minisplit 1 ton',potencia:900,horas:8},{nombre:'Minisplit 1.5 ton',potencia:1350,horas:8},
   {nombre:'Minisplit 2 ton',potencia:1800,horas:8},{nombre:'Calentador eléctrico',potencia:1200,horas:2},
@@ -837,17 +851,17 @@ function _areaOpts(sel) {
 function _aparatoRow(a, i, edit) {
   const area = a.area || 'General';
   return `<div class="aparato-row" data-idx="${i}">
-    ${edit ? `<select class="aprow-area" onchange="_aparatos[${i}].area=this.value;refreshAparatos()">${_areaOpts(area)}</select>` : `<span class="aprow-area-ro">${esc(area)}</span>`}
-    <input type="text" value="${esc(a.nombre)}" placeholder="Nombre" ${edit?`oninput="_aparatos[${i}].nombre=this.value"`:'disabled'}/>
-    <input type="number" value="${a.potencia}" placeholder="W" min="0" ${edit?`oninput="_aparatos[${i}].potencia=parseFloat(this.value)||0"`:'disabled'}/>
-    <input type="number" value="${a.horas}" placeholder="h/día" min="0" step="0.5" ${edit?`oninput="_aparatos[${i}].horas=parseFloat(this.value)||0"`:'disabled'}/>
-    <input type="number" value="${a.cantidad||1}" placeholder="Cant." min="1" ${edit?`oninput="_aparatos[${i}].cantidad=parseInt(this.value)||1"`:'disabled'}/>
+    ${edit ? `<select class="aprow-area" onchange="_lev.aparatos[${i}].area=this.value;refreshAparatos()">${_areaOpts(area)}</select>` : `<span class="aprow-area-ro">${esc(area)}</span>`}
+    <input type="text" value="${esc(a.nombre)}" placeholder="Nombre" ${edit?`oninput="_lev.aparatos[${i}].nombre=this.value"`:'disabled'}/>
+    <input type="number" value="${a.potencia}" placeholder="W" min="0" ${edit?`oninput="_lev.aparatos[${i}].potencia=parseFloat(this.value)||0"`:'disabled'}/>
+    <input type="number" value="${a.horas}" placeholder="h/día" min="0" step="0.5" ${edit?`oninput="_lev.aparatos[${i}].horas=parseFloat(this.value)||0"`:'disabled'}/>
+    <input type="number" value="${a.cantidad||1}" placeholder="Cant." min="1" ${edit?`oninput="_lev.aparatos[${i}].cantidad=parseInt(this.value)||1"`:'disabled'}/>
     ${edit?`<button type="button" class="btn-del-sm" onclick="delAparato(${i})">✕</button>`:''}
   </div>`;
 }
 function _aparatosResumen() {
   const map = {};
-  _aparatos.forEach(a => {
+  _lev.aparatos.forEach(a => {
     const k = a.area || 'General';
     if (!map[k]) map[k] = 0;
     map[k] += (a.potencia * a.horas * 30 / 1000) * (a.cantidad || 1);
@@ -860,8 +874,8 @@ function _aparatosResumen() {
 }
 
 function renderAparatos(aparatos, edit) {
-  _aparatos = aparatos.map(a => ({...a, area: a.area || 'General'}));
-  const totalKwh = _aparatos.reduce((s,a)=>s+(a.potencia*a.horas*(a.cantidad||1)*30/1000),0);
+  _lev.aparatos = aparatos.map(a => ({...a, area: a.area || 'General'}));
+  const totalKwh = _lev.aparatos.reduce((s,a)=>s+(a.potencia*a.horas*(a.cantidad||1)*30/1000),0);
   return `
     ${edit?`<div class="aparatos-rapidos">
       <p class="hint">Acceso rápido:</p>
@@ -870,7 +884,7 @@ function renderAparatos(aparatos, edit) {
       </div>
     </div>`:''}
     <div id="lista-aparatos">
-      ${_aparatos.map((a,i)=>_aparatoRow(a,i,edit)).join('')}
+      ${_lev.aparatos.map((a,i)=>_aparatoRow(a,i,edit)).join('')}
     </div>
     ${edit?`<button type="button" class="btn-outline btn-sm" onclick="addAparato()">+ Aparato</button>`:''}
     <p class="kwh-total">Total estimado: <strong>${totalKwh.toFixed(0)} kWh/mes</strong></p>
@@ -878,15 +892,15 @@ function renderAparatos(aparatos, edit) {
   `;
 }
 
-const _triggerLevSave = () => { if (_levPid) window._levAutoSave(_levPid); };
-window.addAparatoRapido = function(a) { _aparatos.push({...a,cantidad:1,area:'General'}); refreshAparatos(); _triggerLevSave(); };
-window.addAparato = function() { _aparatos.push({nombre:'',potencia:0,horas:0,cantidad:1,area:'General'}); refreshAparatos(); };
-window.delAparato = function(i) { _aparatos.splice(i,1); refreshAparatos(); _triggerLevSave(); };
+const _triggerLevSave = () => { if (_lev.pid) window._levAutoSave(_lev.pid); };
+window.addAparatoRapido = function(a) { _lev.aparatos.push({...a,cantidad:1,area:'General'}); refreshAparatos(); _triggerLevSave(); };
+window.addAparato = function() { _lev.aparatos.push({nombre:'',potencia:0,horas:0,cantidad:1,area:'General'}); refreshAparatos(); };
+window.delAparato = function(i) { _lev.aparatos.splice(i,1); refreshAparatos(); _triggerLevSave(); };
 function refreshAparatos() {
   const el = document.getElementById('lista-aparatos');
   if (el) {
-    el.innerHTML = _aparatos.map((a,i) => _aparatoRow(a,i,true)).join('');
-    const totalKwh = _aparatos.reduce((s,a) => s + (a.potencia * a.horas * (a.cantidad||1) * 30 / 1000), 0);
+    el.innerHTML = _lev.aparatos.map((a,i) => _aparatoRow(a,i,true)).join('');
+    const totalKwh = _lev.aparatos.reduce((s,a) => s + (a.potencia * a.horas * (a.cantidad||1) * 30 / 1000), 0);
     const totEl = el.closest('.card, [id^="panel-aparatos"]')?.querySelector('.kwh-total');
     if (totEl) totEl.innerHTML = `Total estimado: <strong>${totalKwh.toFixed(0)} kWh/mes</strong>`;
     const resWrap = el.closest('.card, [id^="panel-aparatos"]')?.querySelector('#aparatos-resumen-wrap');
@@ -904,7 +918,7 @@ window.setModoConsumo = function(modo) {
 };
 
 // ── Cargas (off-grid/respaldo) ────────────────────────────────────────────────
-let _cargas = { critica: [], secundaria: [] };
+// state en window._lev.cargas
 
 const CARGAS_RAPIDAS = [
   {nombre:'Minisplit 1 ton',    potencia:900,  horas:8 },
@@ -921,7 +935,7 @@ function _cargaAreaOpts(sel) {
 }
 function _cargasResumen(tipo) {
   const map = {};
-  _cargas[tipo].forEach(c => {
+  _lev.cargas[tipo].forEach(c => {
     const k = c.area || 'General';
     if (!map[k]) map[k] = 0;
     map[k] += (c.potencia * c.horas * (c.cantidad||1)) / 1000;
@@ -933,9 +947,9 @@ function _cargasResumen(tipo) {
   </div>`;
 }
 function renderCargas(cargas, edit, tipo) {
-  _cargas[tipo] = [...cargas];
-  const totalW   = _cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
-  const totalWh  = _cargas[tipo].reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1), 0);
+  _lev.cargas[tipo] = [...cargas];
+  const totalW   = _lev.cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
+  const totalWh  = _lev.cargas[tipo].reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1), 0);
   const labelBtn = tipo === 'critica' ? '+ Carga crítica' : tipo === 'secundaria' ? '+ Carga secundaria' : '+ Carga';
   return `
     ${edit ? `<div class="aparatos-rapidos">
@@ -944,7 +958,7 @@ function renderCargas(cargas, edit, tipo) {
         ${CARGAS_RAPIDAS.map(a=>`<button type="button" class="chip chip-sm" onclick="addCargaRapida('${tipo}',${JSON.stringify(a).replace(/"/g,'&quot;')})">${a.nombre}</button>`).join('')}
       </div>
     </div>` : ''}
-    ${_cargas[tipo].length > 0 ? `
+    ${_lev.cargas[tipo].length > 0 ? `
     <div class="carga-row carga-row-header">
       <span>Área</span>
       <span>Equipo</span>
@@ -954,15 +968,15 @@ function renderCargas(cargas, edit, tipo) {
       ${edit ? '<span></span>' : ''}
     </div>` : ''}
     <div id="lista-cargas-${tipo}">
-      ${_cargas[tipo].map((c,i)=>`
+      ${_lev.cargas[tipo].map((c,i)=>`
         <div class="carga-row">
           ${edit
-            ? `<select class="aprow-area" onchange="_cargas['${tipo}'][${i}].area=this.value;_refreshCargasResumen('${tipo}')">${_cargaAreaOpts(c.area)}</select>`
+            ? `<select class="aprow-area" onchange="_lev.cargas['${tipo}'][${i}].area=this.value;_refreshCargasResumen('${tipo}')">${_cargaAreaOpts(c.area)}</select>`
             : `<span class="aprow-area-ro">${esc(c.area||'General')}</span>`}
-          <input type="text" value="${esc(c.nombre)}" placeholder="Nombre del equipo" ${edit?`oninput="_cargas['${tipo}'][${i}].nombre=this.value"`:'disabled'}/>
-          <input type="number" value="${c.potencia}" placeholder="0" min="0" ${edit?`oninput="_cargas['${tipo}'][${i}].potencia=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
-          <input type="number" value="${c.horas}" placeholder="0" min="0" step="0.5" ${edit?`oninput="_cargas['${tipo}'][${i}].horas=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
-          <input type="number" value="${c.cantidad||1}" placeholder="1" min="1" ${edit?`oninput="_cargas['${tipo}'][${i}].cantidad=parseInt(this.value)||1;refreshCargasTotales('${tipo}')"`:'disabled'}/>
+          <input type="text" value="${esc(c.nombre)}" placeholder="Nombre del equipo" ${edit?`oninput="_lev.cargas['${tipo}'][${i}].nombre=this.value"`:'disabled'}/>
+          <input type="number" value="${c.potencia}" placeholder="0" min="0" ${edit?`oninput="_lev.cargas['${tipo}'][${i}].potencia=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
+          <input type="number" value="${c.horas}" placeholder="0" min="0" step="0.5" ${edit?`oninput="_lev.cargas['${tipo}'][${i}].horas=parseFloat(this.value)||0;refreshCargasTotales('${tipo}')"`:'disabled'}/>
+          <input type="number" value="${c.cantidad||1}" placeholder="1" min="1" ${edit?`oninput="_lev.cargas['${tipo}'][${i}].cantidad=parseInt(this.value)||1;refreshCargasTotales('${tipo}')"`:'disabled'}/>
           ${edit?`<button type="button" class="btn-del-sm" onclick="delCarga('${tipo}',${i})">✕</button>`:''}
         </div>`).join('')}
     </div>
@@ -971,9 +985,9 @@ function renderCargas(cargas, edit, tipo) {
     <p class="kwh-total" id="cargas-total-${tipo}">Total: <strong>${totalW} W</strong> — <strong>${(totalWh/1000).toFixed(2)} kWh/día</strong></p>
   `;
 }
-window.addCargaRapida = function(tipo, a) { _cargas[tipo].push({...a, cantidad:1, area:'General'}); refreshCargas(tipo); _triggerLevSave(); };
-window.addCarga = function(tipo) { _cargas[tipo].push({nombre:'',potencia:0,horas:0,cantidad:1,area:'General'}); refreshCargas(tipo); };
-window.delCarga = function(tipo,i) { _cargas[tipo].splice(i,1); refreshCargas(tipo); _triggerLevSave(); };
+window.addCargaRapida = function(tipo, a) { _lev.cargas[tipo].push({...a, cantidad:1, area:'General'}); refreshCargas(tipo); _triggerLevSave(); };
+window.addCarga = function(tipo) { _lev.cargas[tipo].push({nombre:'',potencia:0,horas:0,cantidad:1,area:'General'}); refreshCargas(tipo); };
+window.delCarga = function(tipo,i) { _lev.cargas[tipo].splice(i,1); refreshCargas(tipo); _triggerLevSave(); };
 window._refreshCargasResumen = function(tipo) {
   const el = document.getElementById(`cargas-resumen-${tipo}`);
   if (el) el.innerHTML = _cargasResumen(tipo);
@@ -981,33 +995,33 @@ window._refreshCargasResumen = function(tipo) {
 window.refreshCargasTotales = function(tipo) {
   const el = document.getElementById(`cargas-total-${tipo}`);
   if (!el) return;
-  const totalW  = _cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
-  const totalWh = _cargas[tipo].reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1), 0);
+  const totalW  = _lev.cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
+  const totalWh = _lev.cargas[tipo].reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1), 0);
   el.innerHTML = `Total: <strong>${totalW} W</strong> — <strong>${(totalWh/1000).toFixed(2)} kWh/día</strong>`;
   window._refreshCargasResumen(tipo);
 };
-function refreshCargas(tipo) { const el=document.getElementById(`cargas-${tipo}`); if(el) el.innerHTML=renderCargas(_cargas[tipo],true,tipo); }
+function refreshCargas(tipo) { const el=document.getElementById(`cargas-${tipo}`); if(el) el.innerHTML=renderCargas(_lev.cargas[tipo],true,tipo); }
 
 window.toggleGenerador = function(val) {
   document.getElementById('gen-extra').style.display = val==='no' ? 'none' : '';
 };
 
 // ── Campos libres ─────────────────────────────────────────────────────────────
-let _camposLibres = [];
+// state en window._lev.camposLibres
 window.addCampoLibre = function() {
-  _camposLibres.push({nombre:'',valor:''});
+  _lev.camposLibres.push({nombre:'',valor:''});
   const el = document.getElementById('campos-libres');
-  const i = _camposLibres.length - 1;
+  const i = _lev.camposLibres.length - 1;
   const div = document.createElement('div');
   div.className = 'campo-libre-row';
   div.innerHTML = `
-    <input type="text" placeholder="Nombre" oninput="_camposLibres[${i}].nombre=this.value"/>
-    <input type="text" placeholder="Valor" oninput="_camposLibres[${i}].valor=this.value"/>
+    <input type="text" placeholder="Nombre" oninput="_lev.camposLibres[${i}].nombre=this.value"/>
+    <input type="text" placeholder="Valor" oninput="_lev.camposLibres[${i}].valor=this.value"/>
     <button type="button" class="btn-del-sm" onclick="delCampoLibre(${i})">✕</button>`;
   el.appendChild(div);
 };
-window.updCampoLibre = function(i,k,v) { if(_camposLibres[i]) _camposLibres[i][k]=v; };
-window.delCampoLibre = function(i) { _camposLibres.splice(i,1); navigate(window.location.hash); };
+window.updCampoLibre = function(i,k,v) { if(_lev.camposLibres[i]) _lev.camposLibres[i][k]=v; };
+window.delCampoLibre = function(i) { _lev.camposLibres.splice(i,1); navigate(window.location.hash); };
 
 // ── Guardar levantamiento ─────────────────────────────────────────────────────
 window.guardarLevantamiento = async function(e, projectId) {
@@ -1023,10 +1037,10 @@ window.guardarLevantamiento = async function(e, projectId) {
 
   const tipTechoVal = fd.get('tipTecho');
   // Áreas: leer del state en memoria (ya actualizadas vía _updateAreaTecho)
-  const areasTechoVal = _areasTecho
+  const areasTechoVal = _lev.areasTecho
     .filter(a => a.nombre || a.ancho || a.largo)
     .map(a => ({
-      nombre:             a.nombre || `Área ${_areasTecho.indexOf(a)+1}`,
+      nombre:             a.nombre || `Área ${_lev.areasTecho.indexOf(a)+1}`,
       ancho:              a.ancho  || null,
       largo:              a.largo  || null,
       area:               (a.ancho && a.largo) ? parseFloat((a.ancho*a.largo).toFixed(2)) : null,
@@ -1072,8 +1086,8 @@ window.guardarLevantamiento = async function(e, projectId) {
     newLev.demandaKW      = parseFloat(fd.get('demandaKW')) || null;
     newLev.factorPotencia = parseFloat(fd.get('factorPotencia')) || null;
     newLev.modoConsumo = modoConsumo;
-    newLev.recibos     = modoConsumo==='recibo' ? _recibos : [];
-    newLev.aparatos    = modoConsumo==='aparatos' ? _aparatos : [];
+    newLev.recibos     = modoConsumo==='recibo' ? _lev.recibos : [];
+    newLev.aparatos    = modoConsumo==='aparatos' ? _lev.aparatos : [];
     if (tipo==='hibrido'||tipo==='hibrido_respaldo') {
       newLev.autonomia     = parseFloat(fd.get('autonomia'))||null;
       newLev.bancoBaterias = parseFloat(fd.get('bancoBaterias'))||null;
@@ -1081,8 +1095,8 @@ window.guardarLevantamiento = async function(e, projectId) {
   }
   if (tipo==='aislado') {
     newLev.autonomia=parseFloat(fd.get('autonomia'))||null;
-    newLev.cargasCriticas   = _cargas.critica;
-    newLev.cargasSecundarias= _cargas.secundaria;
+    newLev.cargasCriticas   = _lev.cargas.critica;
+    newLev.cargasSecundarias= _lev.cargas.secundaria;
     newLev.generador       = fd.get('generador')==='no'?null:fd.get('generador');
     newLev.generadorArranque= fd.get('generadorArranque');
     newLev.generadorKw     = parseFloat(fd.get('generadorKw'))||null;
@@ -1097,7 +1111,7 @@ window.guardarLevantamiento = async function(e, projectId) {
   }
   if (tipo==='respaldo') { // legacy
     newLev.tiempoRespaldo  = parseFloat(fd.get('tiempoRespaldo'))||null;
-    newLev.cargasRespaldo  = _cargas.critica;
+    newLev.cargasRespaldo  = _lev.cargas.critica;
   }
 
   p.documentacion = p.documentacion || {};
@@ -1261,8 +1275,8 @@ window.capFotoArea = function(pid, areaIdx) {
         url: result.url || null, id: fid, createdAt: isoNow(),
         ...(result.pending && { pending: true, pendingId: result.pendingId }),
       });
-      if (_areasTecho[areaIdx]) {
-        _areasTecho[areaIdx].fotos = [...areas[areaIdx].fotos];
+      if (_lev.areasTecho[areaIdx]) {
+        _lev.areasTecho[areaIdx].fotos = [...areas[areaIdx].fotos];
       }
     }
     prog.done();
@@ -1279,7 +1293,7 @@ window.delFotoArea = async function(pid, areaIdx, fotoIdx) {
   const areas = p.documentacion?.levantamiento?.areasTecho || [];
   if (!Array.isArray(areas[areaIdx]?.fotos)) return;
   areas[areaIdx].fotos.splice(fotoIdx, 1);
-  if (_areasTecho[areaIdx]?.fotos) _areasTecho[areaIdx].fotos.splice(fotoIdx, 1);
+  if (_lev.areasTecho[areaIdx]?.fotos) _lev.areasTecho[areaIdx].fotos.splice(fotoIdx, 1);
   p.documentacion.levantamiento.areasTecho = areas;
   await projects.update(pid, { documentacion: p.documentacion });
   navigate(`#proyecto/${pid}/levantamiento`);
@@ -1406,8 +1420,8 @@ window._onTipTechoChange = function(sel) {
 };
 
 // ── Áreas del techo — state y render ─────────────────────────────────────────
-let _areasTecho = [];  // array de {nombre, ancho, largo, fotos:{antes,durante,cierre}}
-let _levPid = '';      // projectId activo en la vista de levantamiento
+// state en window._lev.areasTecho
+// state en window._lev.pid
 
 
 function _renderAreasTecho(areas, edit, pid) {
@@ -1498,26 +1512,26 @@ function _renderAreasTecho(areas, edit, pid) {
 }
 
 window._addAreaTecho = function() {
-  const n = _areasTecho.length + 1;
-  _areasTecho.push({ nombre: `Área ${n}`, ancho: null, largo: null, orientacion: 'Sur', pisos: null, inclinacion: null, distTableroInversor: null, distInversorPaneles: null, fotos: [] });
+  const n = _lev.areasTecho.length + 1;
+  _lev.areasTecho.push({ nombre: `Área ${n}`, ancho: null, largo: null, orientacion: 'Sur', pisos: null, inclinacion: null, distTableroInversor: null, distInversorPaneles: null, fotos: [] });
   const list = document.getElementById('lev-areas-list');
-  if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true, _levPid);
+  if (list) list.innerHTML = _renderAreasTecho(_lev.areasTecho, true, _lev.pid);
 };
 
 window._removeAreaTecho = async function(idx) {
-  const nombre = _areasTecho[idx]?.nombre || `Área ${idx + 1}`;
+  const nombre = _lev.areasTecho[idx]?.nombre || `Área ${idx + 1}`;
   const ok = await confirmDialog(`¿Eliminar "${nombre}"? Se perderán sus medidas y fotos.`);
   if (!ok) return;
-  _areasTecho.splice(idx, 1);
+  _lev.areasTecho.splice(idx, 1);
   const list = document.getElementById('lev-areas-list');
-  if (list) list.innerHTML = _renderAreasTecho(_areasTecho, true, _levPid);
+  if (list) list.innerHTML = _renderAreasTecho(_lev.areasTecho, true, _lev.pid);
 };
 
 window._updateAreaTecho = function(idx, campo, val) {
-  if (!_areasTecho[idx]) return;
+  if (!_lev.areasTecho[idx]) return;
   const isStr = campo === 'nombre' || campo === 'orientacion';
-  _areasTecho[idx][campo] = isStr ? val : (parseFloat(val) || null);
-  const a = _areasTecho[idx];
+  _lev.areasTecho[idx][campo] = isStr ? val : (parseFloat(val) || null);
+  const a = _lev.areasTecho[idx];
   const res = document.getElementById(`lev-area-res-${idx}`);
   if (res) res.innerHTML = (a.ancho && a.largo)
     ? `<strong>${(a.ancho * a.largo).toFixed(1)} m²</strong>` : '—';
