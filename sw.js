@@ -18,6 +18,7 @@ const APP_SHELL = [
   './js/dashboard.js',
   './js/db.js',
   './js/documentacion.js',
+  './js/doc-sitio.js',
   './js/garantia.js',
   './js/inventario.js',
   './js/map.js',

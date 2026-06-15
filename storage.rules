@@ -1,0 +1,48 @@
+// storage.rules — Bitácora Ecofit V6
+// Desplegar con: firebase deploy --only storage
+//
+// Modelo de seguridad:
+//   - Solo usuarios autenticados y activos pueden leer o subir fotos
+//   - Las fotos se guardan bajo projects/{projectId}/...
+//   - Cualquier usuario activo puede leer fotos de cualquier proyecto
+//   - Admin y líderes pueden escribir en cualquier proyecto
+//   - Apoyo puede subir fotos (write); la verificación de proyecto asignado
+//     la hace Firestore — no duplicamos lógica compleja aquí
+//   - Todo lo demás está bloqueado por defecto
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── Helper: usuario autenticado y activo en Firestore ─────────────────────
+    function isActive() {
+      return request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid))
+          .data.activo == true;
+    }
+
+    function isLider() {
+      let rol = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.rol;
+      return isActive() && (rol == 'admin' || rol == 'lider');
+    }
+
+    // ── Fotos de proyectos ────────────────────────────────────────────────────
+    // Ruta: projects/{projectId}/fotos/{filename}
+    //       projects/{projectId}/fotos/{filename}_t.jpg  (miniaturas)
+    match /projects/{projectId}/{allPaths=**} {
+      // Cualquier usuario activo puede ver fotos
+      allow read: if isActive();
+
+      // Admin y líderes pueden subir/sobreescribir fotos
+      // Apoyo también puede subir (add), pero no borrar archivos existentes
+      allow create: if isActive();
+      allow update: if isLider();
+      allow delete: if isLider();
+    }
+
+    // ── Denegar todo lo demás ─────────────────────────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

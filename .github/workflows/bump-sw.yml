@@ -1,0 +1,65 @@
+name: Auto-bump SW cache version
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    # [skip ci] commits no disparan workflows — esta condición es defensa extra
+    if: "!contains(github.event.head_commit.message, 'auto-bump')"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 2
+
+      - name: Detectar si cambiaron archivos de app
+        id: changed
+        run: |
+          COUNT=$(git diff HEAD~1 HEAD --name-only \
+            | grep -v '^sw\.js$' \
+            | grep -cE '\.(js|html|css|json)$' || echo 0)
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Archivos de app modificados: $COUNT"
+
+      - name: Bump BUILD_DATE, CACHE_NAME y SW_VERSION en sw.js
+        if: steps.changed.outputs.count > 0
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+
+          # Extraer número actual del cache: 'ecofit-v6-v110' → 110
+          CURRENT_NUM=$(grep -oP "(?<=ecofit-v6-v)\d+" sw.js)
+          NEXT_NUM=$((CURRENT_NUM + 1))
+
+          # Extraer versión semántica actual y bumpar parche
+          CURRENT_VER=$(grep -oP "(?<=SW_VERSION  = ')\d+\.\d+\.\d+" sw.js \
+                        || grep -oP "(?<=SW_VERSION = ')\d+\.\d+\.\d+" sw.js)
+          MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT_VER" | cut -d. -f3)
+          NEXT_PATCH=$((PATCH + 1))
+
+          # Aplicar cambios en sw.js
+          sed -i "s/const BUILD_DATE  = '[^']*'/const BUILD_DATE  = '$TODAY'/" sw.js
+          sed -i "s/ecofit-v6-v[0-9]*/ecofit-v6-v$NEXT_NUM/" sw.js
+          sed -i "s/const SW_VERSION  = '[0-9.]*'/const SW_VERSION  = '$MAJOR.$MINOR.$NEXT_PATCH'/" sw.js
+
+          echo "✅ SW bumped → v$NEXT_NUM / $MAJOR.$MINOR.$NEXT_PATCH ($TODAY)"
+          grep -E "BUILD_DATE|CACHE_NAME|SW_VERSION" sw.js
+
+      - name: Commit y push del bump
+        if: steps.changed.outputs.count > 0
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sw.js
+          # Si no hay cambios reales (mismo día, mismo número) no commitear
+          if git diff --cached --quiet; then
+            echo "ℹ️ sw.js ya estaba actualizado, sin commit"
+            exit 0
+          fi
+          git commit -m "chore(sw): auto-bump cache [skip ci]"
+          git push
