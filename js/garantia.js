@@ -49,16 +49,6 @@ export async function renderGarantia(projectId, session) {
   <!-- Puesta en marcha + vencimientos -->
   ${renderVencimientos(g, projectId, edit)}
 
-  <!-- Tabs internos — General movido a Documentación > Cierre -->
-  <div class="garantia-notice card" style="margin-bottom:8px;padding:10px 14px;border-color:var(--border2)">
-    <span style="color:var(--text-muted);font-size:.82rem">
-      ${icon('info', 14)} La foto general y fotos técnicas de cierre están en
-      <button class="btn-link" onclick="navigate('#proyecto/${projectId}/documentacion')">
-        Documentación → Cierre
-      </button>
-    </span>
-  </div>
-
   <div class="tab-bar" id="garantia-tabs" role="tablist" aria-label="Secciones de garantía">
     <button class="tab-btn tab-active" role="tab" aria-selected="true"  aria-controls="g-equipos"   tabindex="0"  data-tab="g-equipos"   onclick="switchTab('garantia-tabs','g-equipos',this)">Equipos</button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-voc"       tabindex="-1" data-tab="g-voc"       onclick="switchTab('garantia-tabs','g-voc',this)">
