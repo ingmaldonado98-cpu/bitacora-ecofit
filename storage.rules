@@ -6,8 +6,9 @@
 //   - Las fotos se guardan bajo projects/{projectId}/...
 //   - Cualquier usuario activo puede leer fotos de cualquier proyecto
 //   - Admin y líderes pueden escribir en cualquier proyecto
-//   - Apoyo puede subir fotos (write); la verificación de proyecto asignado
-//     la hace Firestore — no duplicamos lógica compleja aquí
+//   - Apoyo puede subir fotos (create) SOLO si está asignado a ese proyecto
+//     (tecnicoLiderId o tecnicosApoyo en Firestore) — verificado aquí mismo,
+//     no delegado a Firestore (dominios de seguridad independientes)
 //   - Todo lo demás está bloqueado por defecto
 
 rules_version = '2';
@@ -26,6 +27,15 @@ service firebase.storage {
       return isActive() && (rol == 'admin' || rol == 'lider');
     }
 
+    // Apoyo asignado como líder o como apoyo del proyecto (mismo criterio que
+    // canEdit() en js/auth.js y la regla 'update' de /projects/{id} en firestore.rules)
+    function isAssignedToProject(projectId) {
+      let proj = firestore.get(/databases/(default)/documents/projects/$(projectId)).data;
+      return isActive() &&
+        (request.auth.uid == proj.tecnicoLiderId ||
+         request.auth.uid in proj.tecnicosApoyo);
+    }
+
     // ── Fotos de proyectos ────────────────────────────────────────────────────
     // Ruta: projects/{projectId}/fotos/{filename}
     //       projects/{projectId}/fotos/{filename}_t.jpg  (miniaturas)
@@ -33,9 +43,9 @@ service firebase.storage {
       // Cualquier usuario activo puede ver fotos
       allow read: if isActive();
 
-      // Admin y líderes pueden subir/sobreescribir fotos
-      // Apoyo también puede subir (add), pero no borrar archivos existentes
-      allow create: if isActive();
+      // Admin y líderes pueden subir/sobreescribir fotos en cualquier proyecto.
+      // Apoyo solo puede subir (create) en proyectos donde está asignado.
+      allow create: if isLider() || isAssignedToProject(projectId);
       allow update: if isLider();
       allow delete: if isLider();
     }
