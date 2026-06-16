@@ -1,17 +1,21 @@
-// project.js — Creación, detalle y gestión del proyecto
+// project.js — Vista detalle, módulos de progreso, notas rápidas, estado
+// Secciones extraídas: proj-firmas.js, proj-obs.js, proj-form.js
 
-import { projects, users, kv, logChange } from './db.js';
-import { esc, fmtFecha, fmtFechaHora, fmtRelativa, fmtProjectId, genDisplayId, uuid, isoNow, toast,
-         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog, inputDialog,
-         capturePhoto, fotoMini, getPendingSrc, calcFaseEstado, firmaModificada, countFotos } from './utils.js';
+import { projects, users } from './db.js';
+import { esc, fmtFecha, fmtFechaHora, fmtRelativa, uuid, isoNow, toast,
+         ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog,
+         calcFaseEstado, countFotos } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } from './auth.js';
 import { icon } from './icons.js';
-import { uploadPhotoQueued } from './firebase.js';
+import { renderFirmaBlock } from './proj-firmas.js';
+import { renderObservaciones } from './proj-obs.js';
+import './proj-form.js';   // registra window.selChip, toggleApoyo, _submitProject, etc.
+import './proj-obs.js';    // registra window._showAddObs, _submitObs, _delObs, _resolverObs
 
-
-// Foto de cliente pendiente de subir en el form actual
-let _clienteFotoB64 = null;
-let _clienteFotoUrl = null;
+// Re-exportar para que app.js y otros importadores no necesiten cambiar
+export { calcFaseEstado };
+export { renderFirmaBlock } from './proj-firmas.js';
+export { renderProjectForm } from './proj-form.js';
 
 // ── Vista detalle del proyecto ─────────────────────────────────────────────────
 export async function renderProjectDetail(id, session) {
@@ -166,7 +170,7 @@ export async function renderProjectDetail(id, session) {
   ${project.tipoSistema === 'sistema_pequeno' && project.clienteFoto ? `
   <div class="card card-cliente">
     <div class="cliente-foto-wrap">
-      ${fotoMini(getPendingSrc({url: project.clienteFoto}) || project.clienteFoto, 'Foto del cliente')}
+      ${fotoMiniInline(project.clienteFoto, 'Foto del cliente')}
       <span class="meta-lbl" style="margin-top:4px">Foto del cliente</span>
     </div>
   </div>` : ''}
@@ -174,7 +178,7 @@ export async function renderProjectDetail(id, session) {
   <!-- Recordatorios del equipo -->
   ${renderNotasRapidas(project, id, edit)}
 
-  <!-- Módulos con progreso — orden: Documentación → Garantía → Auditoría -->
+  <!-- Módulos con progreso -->
   ${renderModulosProgreso(project, id, session, admin)}
 
   <!-- Cambio de estado -->
@@ -225,125 +229,19 @@ export async function renderProjectDetail(id, session) {
   `;
 }
 
-// ── Estado secuencial de fases ────────────────────────────────────────────────
-// calcFaseEstado vive en utils.js (función pura, sin deps de módulo)
-// Re-exportada aquí para retrocompatibilidad con los imports existentes
-export { calcFaseEstado };
-
-// ── Firmar fase ───────────────────────────────────────────────────────────────
-const FASE_NOMBRES = { doc: 'Documentación', gar: 'Garantía', aud: 'Auditoría' };
-
-export async function firmarFase(projectId, fase) {
-  const session = await getSession();
-  if (!session) { toast('Sesión no encontrada', 'error'); return; }
-  if (!(isAdmin(session) || isLider(session))) {
-    toast('Solo líderes o administradores pueden firmar', 'error');
-    return;
-  }
-  const faseNombre = FASE_NOMBRES[fase] || fase;
-  const quien = session.nombre || session.email;
-  if (!await confirmDialog(
-    `¿Firmar ${faseNombre} como ${quien}?\n\nLa firma certifica que la información de esta fase está completa y correcta. Quedará registrada con fecha y hora.`
-  )) return;
-
-  const firma = {
-    firmado_por: session.id,
-    nombre:      quien,
-    firmado_en:  isoNow(),
-  };
-  // setField atómico — no sobreescribe el documento completo
-  await projects.setField(projectId, `fases.firmas.${fase}`, firma);
-  logChange(projectId, { modulo: faseNombre, accion: 'firmada', detalle: '', quien: session });
-  toast(`✅ Fase firmada por ${quien}`);
-  navigate(`#proyecto/${projectId}`);
-}
-window._firmarFase = firmarFase;
-
-// ── Quitar firma (solo admin, queda en el historial) ─────────────────────────
-export async function quitarFirma(projectId, fase) {
-  const session = await getSession();
-  if (!isAdmin(session)) { toast('Solo un administrador puede retirar firmas', 'error'); return; }
-  const faseNombre = FASE_NOMBRES[fase] || fase;
-  const p = await projects.getById(projectId);
-  const firma = p?.fases?.firmas?.[fase];
-  if (!firma) { toast('Esta fase no está firmada', 'error'); return; }
-  if (!await confirmDialog(
-    `¿Retirar la firma de ${faseNombre}?\n\nFirmada por ${firma.nombre || firma.firmado_por}. La acción quedará registrada en el historial.`
-  )) return;
-
-  await projects.setField(projectId, `fases.firmas.${fase}`, null);
-  logChange(projectId, {
-    modulo: faseNombre, accion: 'firma retirada',
-    detalle: `firma previa de ${firma.nombre || firma.firmado_por}`, quien: session,
-  });
-  toast('Firma retirada');
-  navigate(window.location.hash || `#proyecto/${projectId}`);
-}
-window._quitarFirma = quitarFirma;
-
-// ── Bloque de firma compartido (Documentación / Garantía / Auditoría) ─────────
-// ready=false deshabilita el botón y muestra hint; admin puede forzar.
-// Si ya está firmada: sello + aviso si hubo cambios posteriores + retiro (admin).
-export function renderFirmaBlock(project, projectId, fase, session, { ready = true, hint = '' } = {}) {
-  if (!(isAdmin(session) || isLider(session))) return '';
-  const admin = isAdmin(session);
-  const nombreFase = FASE_NOMBRES[fase] || fase;
-  const firma = project.fases?.firmas?.[fase];
-
-  if (firma) {
-    const mod = firmaModificada(project, fase);
-    return `
-  <div class="fase-firma-wrap">
-    <div class="fase-firma-ok">
-      ${icon('seal-check', 16)} ${nombreFase} firmada por <b>${esc(firma.nombre || firma.firmado_por)}</b>
-      <span class="fase-firma-fecha">${fmtFechaHora(firma.firmado_en)}</span>
-    </div>
-    ${mod ? `<p class="fase-firma-warn">${icon('warning', 13)} Hubo cambios después de la firma — revisa y vuelve a firmar.</p>` : ''}
-    ${admin ? `<button class="btn-outline btn-sm fase-firma-quitar"
-        onclick="window._quitarFirma('${projectId}','${fase}')">
-      Retirar firma</button>` : ''}
-  </div>`;
-  }
-
-  if (ready) {
-    return `
-  <div class="fase-firma-wrap">
-    <button class="btn-firma-fase" onclick="window._firmarFase('${projectId}','${fase}')">
-      ${icon('signature', 16)} Firmar ${nombreFase}
-    </button>
-  </div>`;
-  }
-
-  return `
-  <div class="fase-firma-wrap">
-    <button class="btn-firma-fase" disabled style="opacity:.45;cursor:not-allowed">
-      ${icon('lock', 16)} Firmar ${nombreFase}
-    </button>
-    <p class="fase-firma-hint">${icon('info', 13)} ${esc(hint)}</p>
-    ${admin ? `<button class="btn-outline btn-sm aud-override-btn"
-        onclick="window._firmarFase('${projectId}','${fase}')">
-      ${icon('warning', 13)} Admin: firmar de todas formas
-    </button>` : ''}
-  </div>`;
-}
-
 // ── Módulos con progreso ──────────────────────────────────────────────────────
 function renderModulosProgreso(project, id, session, admin) {
-  // ── Calcular progreso por módulo ──────────────────────────────────────────
   const doc = project.documentacion || {};
   const gar = project.garantia || {};
   const aud = project.auditoria || {};
   const ft  = gar.fotosTecnicas || {};
 
-  // Documentación: levantamiento + 3 fases
-  // Contar fotos en nueva estructura (sitio/subfase) con fallback legacy
   const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'techo',f),0);
   const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'centrosCarga',f),0);
   const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'zonaDelSistema',f),0);
 
   const esPequenoTipo = project.tipoSistema === 'sistema_pequeno';
 
-  // Levantamiento (módulo independiente)
   const levAreas = doc.levantamiento?.areasTecho?.length || 0;
   const levItems = [
     { label: 'Tipo de techo',             ok: !!(doc.levantamiento?.tipTecho) },
@@ -352,7 +250,6 @@ function renderModulosProgreso(project, id, session, admin) {
   const levDone = levItems.filter(i=>i.ok).length;
   const levPct  = Math.round(levDone / levItems.length * 100);
 
-  // Documentación: fases (techo/centros/zona) — sin levantamiento
   const docItems = esPequenoTipo
     ? []
     : [
@@ -363,7 +260,6 @@ function renderModulosProgreso(project, id, session, admin) {
   const docDone = docItems.length ? docItems.filter(i=>i.ok).length : 0;
   const docPct  = docItems.length ? Math.round(docDone / docItems.length * 100) : 0;
 
-  // Garantía: foto sistema + fotos técnicas + equipos + paneles
   const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
   const garItems = esPequenoTipo
     ? [
@@ -380,7 +276,6 @@ function renderModulosProgreso(project, id, session, admin) {
   const garDone = garItems.filter(i=>i.ok).length;
   const garPct  = Math.round(garDone / garItems.length * 100);
 
-  // Auditoría: checklist + resultado
   const checkDone  = (aud.checklist?.length||0);
   const checkTotal = 11;
   const audItems = [
@@ -391,13 +286,9 @@ function renderModulosProgreso(project, id, session, admin) {
   const audPct  = Math.round(audDone / audItems.length * 100);
 
   const esPequeno      = esPequenoTipo;
-  // Auditoría visible a todos (no solo admin) — es opcional y no afecta el progreso
   const puedeAuditoria = !esPequeno;
-
-  const estado = calcFaseEstado(project);
-
-  // Progreso general: levantamiento + doc (si aplica) + garantía (auditoría excluida — es opcional)
-  const generalPct = esPequeno
+  const estado         = calcFaseEstado(project);
+  const generalPct     = esPequeno
     ? Math.round((levPct + garPct) / 2)
     : Math.round((levPct + docPct + garPct) / 3);
 
@@ -439,7 +330,6 @@ function renderModulosProgreso(project, id, session, admin) {
     ${modCard('Garantía', 'seal-check', 'mpc-gar', garPct, garItems, `#proyecto/${id}/garantia`, 'gar')}
     ${puedeAuditoria ? modCard('Auditoría', 'magnifying-glass-plus', 'mpc-aud', audPct, audItems, `#proyecto/${id}/auditoria`, 'aud', true) : ''}
   </div>
-
 
   <!-- Herramientas secundarias -->
   <div class="tools-row">
@@ -483,7 +373,6 @@ function renderQuickCheck(project, id, admin, inline = false) {
   const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'centrosCarga',f),0);
   const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'zonaDelSistema',f),0);
   const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
-  const checkDone = aud.checklist?.length || 0;
 
   const levItems = [ { label: 'Levantamiento (tipo de techo)', ok: !!(doc.levantamiento?.tipTecho) } ];
   const docItems = esPequeno
@@ -505,20 +394,14 @@ function renderQuickCheck(project, id, admin, inline = false) {
         { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
         { label: `Paneles (${totalPaneles})`,       ok: totalPaneles > 0 },
       ];
-  const audItems = admin ? [
-    { label: `Checklist (${checkDone}/11)`,         ok: checkDone >= 11 },
-    { label: 'Resultado de auditoría',              ok: !!aud.resultado },
-  ] : [];
 
   const docLocked = estado.doc === 'bloqueada';
   const garLocked = estado.gar === 'bloqueada';
-  const audLocked = estado.aud === 'bloqueada';
 
   const pendientes = [
     ...levItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'lev', link: `#proyecto/${id}/levantamiento`, modLabel: 'Lev' })),
     ...(!docLocked ? docItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'doc', link: `#proyecto/${id}/documentacion`, modLabel: 'Doc' })) : []),
     ...(!garLocked ? garItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'gar', link: `#proyecto/${id}/garantia`,      modLabel: 'Garantía' })) : []),
-    // Auditoría es opcional — no aparece en pendientes
   ];
 
   if (!pendientes.length) return '';
@@ -630,7 +513,7 @@ window._doneNota = async function(pid, idx) {
 // ── Historial de cambios ──────────────────────────────────────────────────────
 function renderChangeLog(log) {
   if (!Array.isArray(log) || !log.length) return '';
-  const entries = log.slice(0, 10); // solo los 10 más recientes en el resumen
+  const entries = log.slice(0, 10);
   return `
   <div class="card changelog-card">
     <div class="card-title-row">
@@ -646,8 +529,6 @@ function renderChangeLog(log) {
     </div>
   </div>`;
 }
-
-// renderChecklistProgreso y renderLineaBase eliminadas
 
 // ── Badge fecha estimada ──────────────────────────────────────────────────────
 function fechaEstimadaBadge(fechaIso, estado) {
@@ -688,7 +569,7 @@ function renderStatusLog(log) {
   </div>`;
 }
 
-// ── Check requisitos para revisión ────────────────────────────────────────────
+// ── Validación requisitos para revisión ───────────────────────────────────────
 function _getFaltantes(project) {
   const faltantes = [];
   const esPequeno = project.tipoSistema === 'sistema_pequeno';
@@ -714,106 +595,13 @@ function checklistFaltantes(project) {
   </div>`;
 }
 
-// ── Observaciones ──────────────────────────────────────────────────────────────
-function renderObservaciones(obs, session, projectId, edit = false) {
-  if (!obs.length) return '<p class="empty-msg-sm">Sin observaciones.</p>';
-  return obs.map((o, i) => {
-    const p        = PRIORIDADES[o.prioridad] || PRIORIDADES.normal;
-    const resuelta = !!o.resuelta;
-    const canResolve = edit || isAdmin(session);
-    const borderColor = resuelta ? 'var(--border2)' : p.color;
-    return `
-    <div class="obs-item ${resuelta ? 'obs-resuelta' : ''}" style="border-left:3px solid ${borderColor}">
-      <div class="obs-header">
-        <span class="obs-autor">${esc(o.autorNombre || '—')}</span>
-        <span class="obs-fecha">${fmtFechaHora(o.timestamp)}</span>
-        ${resuelta
-          ? `<span class="obs-badge-resuelta">✓ Resuelta</span>`
-          : `<span class="obs-prio" style="color:${p.color}">${p.label}</span>`}
-        <div class="obs-actions">
-          ${canResolve && !resuelta
-            ? `<button class="btn-resolver" onclick="window._resolverObs('${projectId}',${i},true)" title="Marcar como resuelta">✓ Resolver</button>`
-            : ''}
-          ${isAdmin(session) && resuelta
-            ? `<button class="btn-del-sm" onclick="window._resolverObs('${projectId}',${i},false)" title="Reabrir">↩</button>`
-            : ''}
-          ${isAdmin(session)
-            ? `<button class="btn-del-sm" onclick="window._delObs('${projectId}',${i})" title="Eliminar">✕</button>`
-            : ''}
-        </div>
-      </div>
-      <p class="obs-texto">${esc(o.texto)}</p>
-      ${resuelta ? `<p class="obs-resuelta-meta">✓ Resuelta por ${esc(o.resueltaPor || '—')} · ${fmtRelativa(o.resueltaAt)}${o.resueltaNota ? ` — ${esc(o.resueltaNota)}` : ''}</p>` : ''}
-    </div>`;
-  }).join('');
+// ── Helper inline para foto de cliente (evita importar fotoMini de utils con getPendingSrc) ─
+function fotoMiniInline(src, alt) {
+  if (!src) return '';
+  return `<img src="${esc(src)}" class="foto-mini" alt="${esc(alt)}" loading="lazy" />`;
 }
 
-window._showAddObs = function(id) {
-  document.getElementById('obs-form').style.display = 'block';
-  document.getElementById('obs-texto').focus();
-};
-
-window._submitObs = async function(id) {
-  const texto = document.getElementById('obs-texto').value.trim();
-  if (!texto) return;
-  const prio = document.getElementById('obs-prio').value;
-  const [session, project] = await Promise.all([getSession(), projects.getById(id)]);
-  const obs = [...(project.observaciones || []), {
-    texto, prioridad: prio, autorId: session?.id, autorNombre: session?.nombre,
-    timestamp: isoNow(),
-  }];
-  await projects.update(id, { observaciones: obs });
-  _refreshObsList(obs, session, id, project);
-  document.getElementById('obs-form').style.display = 'none';
-  document.getElementById('obs-texto').value = '';
-  toast('Observación guardada');
-};
-
-window._delObs = async function(id, idx) {
-  if (!await confirmDialog('¿Eliminar esta observación?')) return;
-  const [session, project] = await Promise.all([getSession(), projects.getById(id)]);
-  const obs = (project.observaciones || []).filter((_,i) => i !== idx);
-  await projects.update(id, { observaciones: obs });
-  _refreshObsList(obs, session, id, project);
-};
-
-window._resolverObs = async function(id, idx, resolver) {
-  const [session, project] = await Promise.all([getSession(), projects.getById(id)]);
-  const obs = [...(project.observaciones || [])];
-  if (resolver) {
-    const nota = await inputDialog('¿Cómo se resolvió? (opcional):', '');
-    if (nota === null) return; // canceló
-    obs[idx] = {
-      ...obs[idx],
-      resuelta: true,
-      resueltaPor: session?.nombre || '—',
-      resueltaAt: isoNow(),
-      resueltaNota: nota.trim() || null,
-    };
-  } else {
-    const { resuelta, resueltaPor, resueltaAt, resueltaNota, ...rest } = obs[idx];
-    obs[idx] = rest;
-  }
-  await projects.update(id, { observaciones: obs });
-  _refreshObsList(obs, session, id, project);
-  toast(resolver ? '✓ Observación resuelta' : 'Observación reabierta');
-};
-
-function _refreshObsList(obs, session, projectId, _project) {
-  // canEdit requiere el proyecto; si no se pasa usamos isLider como fallback conservador
-  const edit = _project ? canEdit(session, _project) : isLider(session);
-  const el = document.getElementById('obs-list');
-  if (el) el.innerHTML = renderObservaciones(obs, session, projectId, edit);
-  const activas   = obs.filter(o => !o.resuelta).length;
-  const resueltas = obs.filter(o =>  o.resuelta).length;
-  const tituloEl  = document.querySelector('#obs-list')?.closest('.card')?.querySelector('.card-title');
-  if (tituloEl) {
-    tituloEl.textContent = resueltas
-      ? `Observaciones (${activas} activa${activas !== 1 ? 's' : ''} · ${resueltas} resuelta${resueltas !== 1 ? 's' : ''})`
-      : `Observaciones (${activas})`;
-  }
-}
-
+// ── Eliminar proyecto ─────────────────────────────────────────────────────────
 window._eliminarProyecto = async function(id) {
   const project = await projects.getById(id);
   if (!await confirmDialog(`¿Eliminar el proyecto "${project?.displayId} — ${project?.clientName}"?\n\nEsta acción es irreversible.`)) return;
@@ -822,8 +610,8 @@ window._eliminarProyecto = async function(id) {
   navigate('#dashboard');
 };
 
+// ── Cambiar estado ────────────────────────────────────────────────────────────
 window._cambiarEstado = async function(id, nuevoEstado) {
-  // Advertencia si está offline
   if (!navigator.onLine) {
     const ok = await confirmDialog(
       '⚠ Sin conexión a internet\n\n' +
@@ -833,7 +621,6 @@ window._cambiarEstado = async function(id, nuevoEstado) {
     if (!ok) return;
   }
 
-  // Validar requisitos antes de enviar a revisión
   if (nuevoEstado === 'pendiente_revision') {
     const project = await projects.getById(id);
     const faltantes = _getFaltantes(project);
@@ -869,342 +656,4 @@ window._cambiarEstado = async function(id, nuevoEstado) {
   await projects.update(id, changes);
   toast(`Estado → ${ESTADOS[nuevoEstado]?.label}`);
   navigate(`#proyecto/${id}`);
-};
-
-// ── Formulario nuevo / editar proyecto ────────────────────────────────────────
-export async function renderProjectForm(id, session) {
-  // FIX-9: Limpiar variables de foto al inicio para que no persistan entre proyectos
-  _clienteFotoB64 = null;
-  _clienteFotoUrl = null;
-
-  const [project, allUsers] = await Promise.all([
-    id ? projects.getById(id) : Promise.resolve(null),
-    users.getAll(),
-  ]);
-  const tecnicos = allUsers.filter(u => u.activo && u.rol !== 'admin');
-  const isEditing = project !== null;
-
-  return `
-  <div class="view-header">
-    <button class="btn-back" onclick="history.back()">${icon('caret-left')}</button>
-    <h1 class="hdr-title">${isEditing ? 'Editar proyecto' : 'Nuevo proyecto'}</h1>
-  </div>
-
-  <form id="form-proyecto" class="form-card" onsubmit="window._submitProject(event,'${id||''}')">
-    <div class="form-group">
-      <label>Nombre del cliente *</label>
-      <input type="text" name="clientName" required placeholder="Nombre completo del cliente"
-             value="${esc(project?.clientName||'')}" />
-    </div>
-
-    <div class="form-group">
-      <label>Nombre del proyecto <span class="hint-opt">(opcional — para identificar entre proyectos del mismo cliente)</span></label>
-      <input type="text" name="nombreProyecto" placeholder="Ej: Casa Lomas, Bodega norte, Local 2…"
-             value="${esc(project?.nombreProyecto||'')}" />
-    </div>
-
-    <div class="form-group">
-      <label>Teléfono / WhatsApp <span class="hint-opt">(opcional)</span></label>
-      <div class="input-icon-wrap">
-        ${icon('phone', 16, 'input-icon')}
-        <input type="tel" name="clienteTelefono" placeholder="Ej: 612 123 4567"
-               value="${esc(project?.clienteTelefono||'')}" />
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label>Tipo de sistema *</label>
-      <select name="tipoSistema" id="tipo-val"
-              onchange="document.getElementById('campos-cliente').style.display=this.value==='sistema_pequeno'?'':'none'">
-        ${Object.entries(TIPOS_SISTEMA)
-          .filter(([,v]) => !v.legacy)
-          .map(([k,v]) => {
-            const selected = project
-              ? (project.tipoSistema === k ||
-                 // compatibilidad: hibrido/respaldo legacy → hibrido_respaldo
-                 (k === 'hibrido_respaldo' && ['hibrido','respaldo'].includes(project.tipoSistema)))
-              : k === 'interconectado';
-            return `<option value="${k}" ${selected?'selected':''}>${v.label}</option>`;
-          }).join('')}
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>Prioridad</label>
-      <select name="prioridad">
-        ${Object.entries(PRIORIDADES).map(([k,v]) =>
-          `<option value="${k}" ${(project?.prioridad||'normal')===k?'selected':''}>${v.label}</option>`
-        ).join('')}
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>Técnico Líder</label>
-      <select name="tecnicoLiderId">
-        <option value="">— Sin asignar —</option>
-        ${tecnicos.filter(u=>u.rol==='lider'||u.rol==='admin').map(u =>
-          `<option value="${u.id}" ${project?.tecnicoLiderId===u.id?'selected':''}>${esc(u.nombre)}</option>`
-        ).join('')}
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>Técnicos Apoyo</label>
-      <div class="chip-group" id="chip-apoyo">
-        ${tecnicos.filter(t => t.rol === 'apoyo').map(t => `
-          <button type="button"
-            class="chip ${(project?.tecnicosApoyo||[]).includes(t.id)?'chip-active':''}"
-            onclick="toggleApoyo('${t.id}',this)">${esc(t.nombre)}</button>
-        `).join('')}
-        ${tecnicos.filter(t => t.rol === 'apoyo').length === 0
-          ? '<span class="hint-text">Sin técnicos de apoyo registrados aún.</span>' : ''}
-      </div>
-      <input type="hidden" name="tecnicosApoyo" id="apoyo-val"
-             value='${JSON.stringify(project?.tecnicosApoyo||[])}'>
-    </div>
-
-    <!-- Foto del cliente — solo para sistema pequeño -->
-    <div id="campos-cliente" style="display:${project?.tipoSistema === 'sistema_pequeno' ? '' : 'none'}">
-      <div class="form-group">
-        <label>Foto del cliente <span class="hint-opt">(referencia visual)</span></label>
-        <div class="foto-cliente-form" id="foto-cliente-preview">
-          ${project?.clienteFoto
-            ? `<img src="${esc(project.clienteFoto)}" class="foto-cliente-thumb" />
-               <button type="button" class="btn-outline btn-sm" onclick="window._capClienteFoto()">Cambiar</button>`
-            : `<button type="button" class="btn-outline btn-sm" onclick="window._capClienteFoto()">
-                ${icon('camera', 14)} Tomar foto</button>`}
-        </div>
-      </div>
-    </div>
-
-    <!-- Coordenadas GPS (todos los tipos, importante en sistema pequeño) -->
-    <div class="form-group">
-      <label>
-        ${icon('map-pin', 14)} Coordenadas GPS
-        <span class="hint-opt">(opcional)</span>
-      </label>
-      <div class="coords-inputs">
-        <input type="number" name="coordLat" id="coord-lat" step="any"
-               placeholder="Latitud  Ej: 24.1234"
-               value="${project?.coordenadas?.lat || ''}" />
-        <input type="number" name="coordLng" id="coord-lng" step="any"
-               placeholder="Longitud  Ej: -110.5678"
-               value="${project?.coordenadas?.lng || ''}" />
-      </div>
-      <button type="button" class="btn-outline btn-sm btn-gps" onclick="window._captureGPS()">
-        ${icon('crosshair', 14)} Capturar mi ubicación actual
-      </button>
-      <p class="hint-text" style="margin-top:4px">El GPS del dispositivo funciona sin internet.</p>
-    </div>
-
-    <div class="form-group">
-      <label>Dirección / Ubicación</label>
-      <input type="text" name="direccion" placeholder="Colonia, calle, municipio"
-             value="${esc(project?.direccion||'')}" />
-    </div>
-
-    <div class="form-group">
-      <label>Fecha de inicio</label>
-      <input type="date" name="fechaInicio"
-             value="${(project?.fechaInicio||'').split('T')[0]}" />
-    </div>
-
-    <div class="form-group">
-      <label>Fecha estimada de entrega <span class="hint-opt">(opcional)</span></label>
-      <input type="date" name="fechaEstimada"
-             value="${(project?.fechaEstimada||'').split('T')[0]}" />
-    </div>
-
-    <div class="form-group">
-      <label>Notas / Observaciones internas <span class="hint-opt">(opcional)</span></label>
-      <textarea name="notas" rows="3" class="textarea-field"
-                placeholder="Acceso al inmueble, condiciones especiales, acuerdos verbales…"
-      >${esc(project?.notas||'')}</textarea>
-    </div>
-
-    <div class="form-actions">
-      <button type="button" class="btn-outline" onclick="history.back()">Cancelar</button>
-      <button type="submit" class="btn-primary">${isEditing ? 'Guardar cambios' : 'Crear proyecto'}</button>
-    </div>
-  </form>`;
-}
-
-window.selChip = function(groupId, value, inputId, btn) {
-  document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('chip-active'));
-  (btn || document.activeElement).classList.add('chip-active');
-  document.getElementById(inputId).value = value;
-  // Mostrar / ocultar campos de sistema pequeño
-  if (inputId === 'tipo-val') {
-    const camposCliente = document.getElementById('campos-cliente');
-    if (camposCliente) camposCliente.style.display = value === 'sistema_pequeno' ? '' : 'none';
-  }
-};
-
-window.toggleApoyo = function(id, btn) {
-  btn.classList.toggle('chip-active');
-  const input = document.getElementById('apoyo-val');
-  let ids = JSON.parse(input.value || '[]');
-  ids = ids.includes(id) ? ids.filter(i=>i!==id) : [...ids, id];
-  input.value = JSON.stringify(ids);
-};
-
-// ── Capturar GPS ───────────────────────────────────────────────────────────────
-window._captureGPS = function() {
-  if (!navigator.geolocation) { toast('GPS no disponible en este dispositivo', 'error'); return; }
-  toast('Obteniendo ubicación…', 'info', 5000);
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      const lat = pos.coords.latitude.toFixed(7);
-      const lng = pos.coords.longitude.toFixed(7);
-      const latInput = document.getElementById('coord-lat');
-      const lngInput = document.getElementById('coord-lng');
-      if (latInput) latInput.value = lat;
-      if (lngInput) lngInput.value = lng;
-      toast(`📍 Ubicación capturada: ${lat}, ${lng}`, 'success', 4000);
-    },
-    err => {
-      const msgs = { 1: 'Permiso de ubicación denegado', 2: 'Ubicación no disponible', 3: 'Tiempo de espera agotado' };
-      toast(msgs[err.code] || 'Error al obtener ubicación', 'error');
-    },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-  );
-};
-
-// ── Capturar foto del cliente ──────────────────────────────────────────────────
-window._capClienteFoto = function() {
-  capturePhoto(b64 => {
-    _clienteFotoB64 = b64;
-    _clienteFotoUrl = null;
-    const preview = document.getElementById('foto-cliente-preview');
-    if (preview) {
-      preview.innerHTML = `
-        <img src="${b64}" class="foto-cliente-thumb" />
-        <button type="button" class="btn-outline btn-sm" onclick="window._capClienteFoto()">Cambiar</button>`;
-    }
-  });
-};
-
-window._submitProject = async function(e, editId) {
-  e.preventDefault();
-  const btn = e.target.querySelector('[type="submit"]');
-  const btnLabel = btn.textContent;
-  btn.disabled = true;
-  btn.classList.add('btn-saving');
-  btn.textContent = 'Guardando';
-
-  const fd = new FormData(e.target);
-  const session = await getSession();
-
-  const tipoSistema = fd.get('tipoSistema') || null;
-  if (!tipoSistema) {
-    btn.disabled = false;
-    btn.classList.remove('btn-saving');
-    btn.textContent = btnLabel;
-    toast('Selecciona el tipo de sistema', 'error');
-    document.getElementById('chip-tipo')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
-  const esPequeno   = tipoSistema === 'sistema_pequeno';
-
-  // Coordenadas GPS
-  const lat = parseFloat(fd.get('coordLat'));
-  const lng = parseFloat(fd.get('coordLng'));
-  const coordenadas = (!isNaN(lat) && !isNaN(lng)) ? { lat, lng } : null;
-
-  const data = {
-    clientName:      fd.get('clientName').trim(),
-    nombreProyecto:  fd.get('nombreProyecto')?.trim() || null,
-    tipoSistema,
-    prioridad:       fd.get('prioridad'),
-    tecnicoLiderId:  fd.get('tecnicoLiderId') || null,
-    tecnicosApoyo:   JSON.parse(fd.get('tecnicosApoyo') || '[]'),
-    direccion:       fd.get('direccion').trim(),
-    fechaInicio:     fd.get('fechaInicio')    ? new Date(fd.get('fechaInicio')).toISOString()    : null,
-    fechaEstimada:   fd.get('fechaEstimada') ? new Date(fd.get('fechaEstimada')).toISOString() : null,
-    coordenadas,
-    clienteTelefono:  fd.get('clienteTelefono')?.trim() || null,
-    notas:            fd.get('notas')?.trim() || null,
-  };
-
-  // Foto del cliente: subir si hay nueva foto capturada
-  if (esPequeno && _clienteFotoB64) {
-    const pid = editId || 'temp_' + uuid();
-    const result = await uploadPhotoQueued(_clienteFotoB64,
-      `projects/${editId || pid}/cliente.jpg`, editId || pid, 'clienteFoto');
-    data.clienteFoto = result.url || null;
-    _clienteFotoB64 = null;
-    _clienteFotoUrl = null;
-  } else if (editId) {
-    // Mantener foto existente si no se tomó nueva
-    const existing = await projects.getById(editId);
-    if (existing?.clienteFoto) data.clienteFoto = existing.clienteFoto;
-  }
-
-  try {
-    if (editId) {
-      // Regenerar displayId si cambió el nombre del cliente o el tipo de sistema
-      const prev = await projects.getById(editId);
-      if (prev && (prev.clientName !== data.clientName || prev.tipoSistema !== data.tipoSistema)) {
-        const all = await projects.getAll();
-        const otherIds = all.filter(x => x.id !== editId).map(x => x.displayId).filter(Boolean);
-        data.displayId = genDisplayId(data.clientName, prev.createdAt, data.tipoSistema, otherIds);
-      }
-      await projects.update(editId, data);
-      toast('Proyecto actualizado');
-      navigate(`#proyecto/${editId}`);
-    } else {
-      const createdAt = isoNow();
-      // Generar ID legible con anti-duplicados
-      const allProjects = await projects.getAll();
-      const existingIds = allProjects.map(p => p.displayId).filter(Boolean);
-      const displayId = genDisplayId(data.clientName, createdAt, data.tipoSistema, existingIds);
-      const newProject = {
-        id: uuid(),
-        displayId,
-        ...data,
-        estado: 'borrador',
-        observaciones: [],
-        garantia: { fotoSistema: null, fotosTecnicas: {}, equipos: [], estructura: null, paneles: { marca:'', modelo:'', wp:0, strings:[] } },
-        documentacion: { levantamiento: {}, fases: {
-          techo:          { antes:[], durante:[], cierre:[] },
-          centrosCarga:   { antes:[], durante:[], cierre:[] },
-          zonaDelSistema: { antes:[], durante:[], cierre:[] },
-        }},
-        auditoria: null,
-        driveSynced: false,
-        createdBy: session?.id,
-        createdAt,
-        updatedAt: createdAt,
-      };
-      await projects.add(newProject);
-      toast(`Proyecto ${newProject.displayId} creado`);
-      navigate(`#proyecto/${newProject.id}`);
-    }
-  } catch (err) {
-    btn.disabled = false;
-    btn.classList.remove('btn-saving');
-    btn.textContent = btnLabel;
-    toast(err.message || 'Error al guardar. Verifica conexión.', 'error');
-  }
-};
-
-window._importCalc = async function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    // Pre-fill form fields from calculator JSON
-    if (data.clientName) document.querySelector('[name="clientName"]').value = data.clientName;
-    if (data.tipo) {
-      // Mapear tipos legacy al nuevo esquema
-      const legacyMap = { hibrido: 'hibrido_respaldo', respaldo: 'hibrido_respaldo' };
-      const tipo = legacyMap[data.tipo] || data.tipo;
-      const sel = document.getElementById('tipo-val');
-      if (sel) sel.value = tipo;
-    }
-    toast('✅ Datos importados — completa el formulario y crea el proyecto');
-  } catch(err) {
-    toast('Error al importar: ' + err.message, 'error');
-  }
 };
