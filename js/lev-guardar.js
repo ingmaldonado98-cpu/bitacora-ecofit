@@ -191,12 +191,12 @@ window.capSombraFoto = function(pid) {
   capturePhoto(async b64 => {
     toast('Subiendo foto de sombra…');
     const result = await uploadPhotoQueued(b64, `projects/${pid}/sombra.jpg`, pid, 'sombraFoto');
-    const fotoUrl = result.url || (result.pending ? b64 : null);
     const p = await projects.getById(pid);
     p.documentacion = p.documentacion || {};
     p.documentacion.levantamiento = p.documentacion.levantamiento || {};
     p.documentacion.levantamiento.sombras = p.documentacion.levantamiento.sombras || {};
-    p.documentacion.levantamiento.sombras.foto = fotoUrl;
+    p.documentacion.levantamiento.sombras.foto = result.url
+      || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
     await projects.update(pid, { documentacion: p.documentacion });
     navigate(`#proyecto/${pid}/documentacion`);
   });
@@ -215,16 +215,16 @@ window._calcAreaTecho = function() {}; // compat shim
 window.capFotoLev = function(pid) {
   capturePhoto(async b64 => {
     toast('Subiendo foto del levantamiento…');
-    const idx = Date.now();
-    const result = await uploadPhotoQueued(b64, `projects/${pid}/lev_${idx}.jpg`, pid, 'fotoLev');
-    const fotoUrl = result.url || (result.pending ? b64 : null);
-    if (!fotoUrl) { toast('No se pudo guardar la foto', 'error'); return; }
-
+    const fid = uuid();
+    const result = await uploadPhotoQueued(b64, `projects/${pid}/lev_${fid}.jpg`, pid, 'fotoLev', { itemId: fid });
     const p = await projects.getById(pid);
     p.documentacion = p.documentacion || {};
     p.documentacion.levantamiento = p.documentacion.levantamiento || {};
     const fotos = p.documentacion.levantamiento.fotosLevantamiento || [];
-    fotos.push({ url: fotoUrl, ts: new Date().toISOString() });
+    fotos.push({
+      url: result.url || null, id: fid, ts: isoNow(),
+      ...(result.pending && { pending: true, pendingId: result.pendingId }),
+    });
     p.documentacion.levantamiento.fotosLevantamiento = fotos;
     await projects.update(pid, { documentacion: p.documentacion });
     navigate(`#proyecto/${pid}/levantamiento`);

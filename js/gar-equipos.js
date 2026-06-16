@@ -6,6 +6,7 @@ import { esc, fotoMini, capturePhoto, toast, confirmDialog, uuid, isoNow,
          MARCAS_EQUIPOS, openScannerOverlay } from './utils.js';
 import { getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
+import { updateQueueItem } from './photo-queue.js';
 import { icon } from './icons.js';
 
 // ── Tipos de equipo ────────────────────────────────────────────────────────────
@@ -143,11 +144,10 @@ export function formEquipo(projectId, eq = null, editIdx = -1) {
 window.capEqFoto = function(tipo, slotId) {
   capturePhoto(async (b64) => {
     toast('Subiendo foto…');
-    // Usar un projectId genérico para fotos de equipo no vinculadas aún
     const fid = uuid();
     const result = await uploadPhotoQueued(b64, `projects/equipo_${tipo}_${fid}.jpg`,
       'equipo_temp', 'eqFoto', { tipo });
-    _eqFotos[tipo] = result.url || b64; // fallback a b64 si está offline
+    _eqFotos[tipo] = result.url || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
     const slot = document.getElementById(slotId);
     if (slot) slot.innerHTML = fotoMini(_eqFotos[tipo], tipo);
     if (result.url) toast('✅ Foto guardada');
@@ -258,6 +258,22 @@ window.guardarEquipo = async function(projectId) {
 
   // setField en lugar de update() — escribe solo garantia.equipos, no el doc completo
   await projects.setField(projectId, 'garantia.equipos', newEquipos);
+
+  // Reparchar items de cola con el projectId real y el ID del equipo,
+  // para que processQueue pueda actualizar el campo correcto al reconectar
+  const _fotoCampos = [['placa','fotoPlaca'], ['frontal','fotoFrontal'], ['angulo','fotoAngulo']];
+  for (const [tipo, campo] of _fotoCampos) {
+    const fotoMem = _eqFotos[tipo];
+    if (fotoMem && typeof fotoMem === 'object' && fotoMem.pending && fotoMem.pendingId) {
+      await updateQueueItem(fotoMem.pendingId, {
+        projectId,
+        storagePath: `projects/${projectId}/equipo_${tipo}_${fotoMem.pendingId}.jpg`,
+        op: 'eqFoto',
+        opArgs: { eqId: equipo.id, campo },
+      });
+    }
+  }
+
   const _eqSession = await getSession();
   logChange(projectId, {
     modulo: 'Garantía',

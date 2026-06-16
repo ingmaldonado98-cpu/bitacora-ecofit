@@ -46,6 +46,22 @@ export async function enqueuePhoto(item) {
   _updatePendingBadge();
 }
 
+// ── Actualizar item en la cola (patch parcial) ───────────────────────────────
+export async function updateQueueItem(id, updates) {
+  const db = await _openDB();
+  await new Promise((resolve, reject) => {
+    const tx    = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const req   = store.get(id);
+    req.onsuccess = e => {
+      const item = e.target.result;
+      if (item) store.put({ ...item, ...updates });
+    };
+    tx.oncomplete = resolve;
+    tx.onerror    = e => reject(e.target.error);
+  });
+}
+
 // ── Eliminar de la cola ───────────────────────────────────────────────────────
 export async function dequeuePhoto(id) {
   const db = await _openDB();
@@ -173,6 +189,46 @@ export async function processQueue() {
         case 'clienteFoto':
           await projects.update(item.projectId, { clienteFoto: url });
           break;
+
+        case 'sombraFoto':
+          p.documentacion = p.documentacion || {};
+          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+          p.documentacion.levantamiento.sombras = p.documentacion.levantamiento.sombras || {};
+          p.documentacion.levantamiento.sombras.foto = url;
+          await projects.update(item.projectId, { documentacion: p.documentacion });
+          break;
+
+        case 'fotoLev': {
+          const { itemId: levItemId } = item.opArgs || {};
+          p.documentacion = p.documentacion || {};
+          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+          const fotosLev = p.documentacion.levantamiento.fotosLevantamiento || [];
+          const fLev = fotosLev.find(f => f.id === levItemId);
+          if (fLev) { fLev.url = url; delete fLev.pending; delete fLev.pendingId; }
+          p.documentacion.levantamiento.fotosLevantamiento = fotosLev;
+          await projects.update(item.projectId, { documentacion: p.documentacion });
+          break;
+        }
+
+        case 'reciboFoto': {
+          p.documentacion = p.documentacion || {};
+          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+          const recibos = p.documentacion.levantamiento.recibos || [];
+          const recibo = recibos.find(r => r.foto?.pendingId === item.id);
+          if (recibo) recibo.foto = url;
+          p.documentacion.levantamiento.recibos = recibos;
+          await projects.update(item.projectId, { documentacion: p.documentacion });
+          break;
+        }
+
+        case 'eqFoto': {
+          const { eqId, campo } = item.opArgs || {};
+          p.garantia = p.garantia || {};
+          const eq = (p.garantia.equipos || []).find(e => e.id === eqId);
+          if (eq) eq[campo] = url;
+          await projects.setField(item.projectId, 'garantia.equipos', p.garantia.equipos);
+          break;
+        }
       }
 
       await dequeuePhoto(item.id);

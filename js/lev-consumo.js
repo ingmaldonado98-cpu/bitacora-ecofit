@@ -107,11 +107,12 @@ window.delRecibo = function(i) { window._lev.recibos.splice(i,1); refreshRecibos
 window.capReciboFoto = function(i) {
   capturePhoto(async b64 => {
     toast('Subiendo foto del recibo…');
-    // Usamos un ID temporal sin projectId ya que los recibos son parte del levantamiento
     const fid = uuid();
-    const result = await uploadPhotoQueued(b64, `levantamiento/recibo_${fid}.jpg`,
-      'levantamiento_temp', 'reciboFoto');
-    window._lev.recibos[i].foto = result.url || (result.pending ? b64 : null);
+    const pid = window._lev?.pid;
+    const path = pid ? `projects/${pid}/recibo_${fid}.jpg` : `levantamiento/recibo_${fid}.jpg`;
+    const result = await uploadPhotoQueued(b64, path, pid || 'levantamiento_temp', 'reciboFoto');
+    window._lev.recibos[i].foto = result.url
+      || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
     refreshRecibos();
     if (result.url) toast('✅ Foto del recibo guardada');
   });

@@ -196,7 +196,7 @@ window.capFotoAdicionalDoc = function(projectId) {
       const fid = uuid();
       const result = await uploadPhotoQueued(fotos[i],
         `projects/${projectId}/adicional_${fid}.jpg`, projectId, 'fotoAdicional', { itemId: fid });
-      nuevas.push({ data: result.url || (result.pending ? fotos[i] : null),
+      nuevas.push({ data: result.url || null,
         nota: '', id: fid, createdAt: isoNow(),
         ...(result.pending && { pending: true, pendingId: result.pendingId }) });
     }
@@ -356,7 +356,7 @@ window.agregarFotoSitio = function(projectId, sitio, subfase) {
         projectId, 'fotoFase', { sitio, subfase, itemId: fid }
       );
       nuevas.push({
-        data: result.url || (result.pending ? fotos[i] : null),
+        data: result.url || null,
         nota: '', id: fid, createdAt: isoNow(),
         fuente: fileMeta?.fuente || 'camera',
         ...(result.pending && { pending: true, pendingId: result.pendingId }),
