@@ -102,7 +102,9 @@
   <!-- ── Toast container ─────────────────────────────────────────────────────── -->
   <div id="toast-container" aria-live="polite"></div>
 
-  <!-- Capacitor runtime — generado por "npx cap copy android" (ausente en web) -->
+  <!-- Capacitor runtime — gancho intencional para el futuro build nativo (Android/iOS).
+       "npx cap copy" genera este archivo y lo inyecta aquí; en web/GitHub Pages no existe
+       y el 404 es esperado — onerror lo silencia para no ensuciar la consola del usuario. -->
   <script src="./capacitor.js" onerror="void 0"></script>
 
   <!-- ── External libraries ──────────────────────────────────────────────────── -->

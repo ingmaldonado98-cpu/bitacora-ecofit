@@ -78,7 +78,6 @@ const APP_SHELL = [
   './js/clima.js',
   './js/trayecto.js',
   './js/trayectorias.js',
-  './modules/inventario/index.js',
   './ecofit-scanner.html',
   './js/vendor/zxing.min.js',
   './js/vendor/qrcode.min.js',
