@@ -30,6 +30,27 @@ service cloud.firestore {
     function isLider()  { return isAuth() && (myRol() == 'lider' || myRol() == 'admin'); }
     function isActive() { return isAuth() && myProfile().activo == true; }
 
+    // ── Máquina de estados — debe mantenerse sincronizada a mano con
+    //    TRANSITIONS en js/auth.js. Solo se aplica a lider/apoyo: admin
+    //    conserva su override total (válvula de escape ante casos atípicos).
+    function transitionMap() {
+      return {
+        'borrador':           {'admin': ['en_progreso','cancelado'], 'lider': ['en_progreso'], 'apoyo': []},
+        'en_progreso':        {'admin': ['pendiente_revision','cancelado'], 'lider': ['pendiente_revision'], 'apoyo': ['pendiente_revision']},
+        'pendiente_revision': {'admin': ['observado','comisionado','cerrado','en_progreso'], 'lider': [], 'apoyo': []},
+        'observado':          {'admin': ['cerrado','cancelado'], 'lider': ['en_progreso'], 'apoyo': []},
+        'comisionado':        {'admin': ['en_garantia','cerrado'], 'lider': ['en_garantia'], 'apoyo': []},
+        'en_garantia':        {'admin': ['fuera_garantia','cerrado'], 'lider': [], 'apoyo': []},
+        'fuera_garantia':     {'admin': ['cerrado'], 'lider': [], 'apoyo': []},
+        'cerrado':            {'admin': [], 'lider': [], 'apoyo': []},
+        'cancelado':          {'admin': ['borrador'], 'lider': [], 'apoyo': []},
+      };
+    }
+    function isValidTransition(desde, hasta, rol) {
+      let m = transitionMap();
+      return desde in m && rol in m[desde] && hasta in m[desde][rol];
+    }
+
     // ── Proyectos ─────────────────────────────────────────────────────────────
     match /projects/{projectId} {
       // Cualquier usuario activo puede leer proyectos
@@ -38,16 +59,26 @@ service cloud.firestore {
       // Admin y líder pueden crear proyectos
       allow create: if isLider() && isActive();
 
-      // Admin puede actualizar cualquier proyecto
-      // Líder puede actualizar cualquier proyecto activo
-      // Apoyo solo puede actualizar proyectos donde está asignado
-      allow update: if isActive() && (
-        isAdmin() ||
-        isLider() ||
-        (myRol() == 'apoyo' && (
+      function tocaEstado() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasAny(['estado']);
+      }
+      function isAsignado() {
+        return myRol() == 'apoyo' && (
           resource.data.tecnicoLiderId == uid() ||
           uid() in resource.data.tecnicosApoyo
-        ))
+        );
+      }
+
+      // Admin: override total (incluye cambios de estado fuera de la máquina de estados).
+      // Líder/apoyo: si el write toca 'estado', debe ser una transición válida para su
+      // rol (replica TRANSITIONS de js/auth.js); si no toca 'estado', aplican las reglas
+      // normales de edición (líder cualquier proyecto, apoyo solo el suyo asignado).
+      allow update: if isActive() && (
+        isAdmin() ||
+        (tocaEstado()
+          ? isValidTransition(resource.data.estado, request.resource.data.estado, myRol()) &&
+            (myRol() == 'lider' || isAsignado())
+          : (isLider() || isAsignado()))
       );
 
       // Solo admin puede eliminar
