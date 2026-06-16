@@ -370,10 +370,11 @@ window.exportarWordTecnico = async function(projectId) {
   const totalPaneles = (project.garantia?.paneles?.strings||[]).reduce((s,str)=>s+(str.paneles?.length||0),0);
   const totalKwp = totalPaneles * ((project.garantia?.paneles?.wp||0)/1000);
 
-  const wImg = (b64, maxW='280pt') => {
-    if (!b64) return '';
-    const src = b64.startsWith('data:') ? b64 : `data:image/jpeg;base64,${b64}`;
-    return `<img src="${src}" style="max-width:${maxW};height:auto;margin:4pt 0;display:block">`;
+  const wImg = (src, maxW='280pt') => {
+    if (!src || typeof src !== 'string') return '';
+    const imgSrc = (src.startsWith('data:') || src.startsWith('http'))
+      ? src : `data:image/jpeg;base64,${src}`;
+    return `<img src="${imgSrc}" style="max-width:${maxW};height:auto;margin:4pt 0;display:block">`;
   };
   const wCampo = (label, value) =>
     `<p style="margin:0 0 8pt"><small style="color:#78888c;text-transform:uppercase;font-size:8pt">${esc(label)}</small><br><span style="font-size:11pt">${esc(String(value||'—'))}</span></p>`;

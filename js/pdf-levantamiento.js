@@ -16,10 +16,11 @@ window.exportarWordLevantamiento = async function(projectId) {
     value ? `<p style="margin:0 0 8pt"><small style="color:#6b7280;text-transform:uppercase;font-size:8pt">${esc(label)}</small><br><span style="font-size:11pt">${esc(String(value))}</span></p>` : '';
   const wSec = (title) =>
     `<h2 style="color:#16a34a;font-size:13pt;margin:18pt 0 8pt;border-bottom:1px solid #e5e7eb;padding-bottom:4pt">${esc(title)}</h2>`;
-  const wImg = (b64, maxW='260pt') => {
-    if (!b64) return '';
-    const src = b64.startsWith('data:') ? b64 : `data:image/jpeg;base64,${b64}`;
-    return `<img src="${src}" style="max-width:${maxW};height:auto;margin:4pt 0;display:block">`;
+  const wImg = (src, maxW='260pt') => {
+    if (!src || typeof src !== 'string') return '';
+    const imgSrc = (src.startsWith('data:') || src.startsWith('http'))
+      ? src : `data:image/jpeg;base64,${src}`;
+    return `<img src="${imgSrc}" style="max-width:${maxW};height:auto;margin:4pt 0;display:block">`;
   };
   const TH = 'style="background:#16a34a;color:white;padding:4pt 8pt;text-align:left;font-size:10pt"';
   const TD = 'style="padding:4pt 8pt;border:1px solid #e5e7eb;font-size:10pt"';

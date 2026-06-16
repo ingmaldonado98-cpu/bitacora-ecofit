@@ -71,7 +71,7 @@ function renderCierreSitio(project, sitio, edit, projectId) {
       <div class="fotos-grid">
         ${(g.fotosAdicionales || []).map((f, i) => `
           <div class="foto-card">
-            ${fotoMini(f.data, 'Foto '+(i+1))}
+            ${fotoMini(f, 'Foto '+(i+1))}
             ${f.nota ? `<p class="foto-nota">${esc(f.nota)}</p>` : ''}
             ${edit ? `
               <button class="btn-del-foto-abs" onclick="editFotoAdicionalDoc('${projectId}',${i})">✎</button>
@@ -101,7 +101,7 @@ function renderCierreSitio(project, sitio, edit, projectId) {
         <div class="ft-fotos-grid">
           ${fotos.map((f, i) => `
             <div class="ft-foto-item">
-              ${fotoMini(f.url, s.label)}
+              ${fotoMini(f, s.label)}
               ${edit ? `<button class="btn-del-foto-abs" onclick="delFotoTecnicaDoc('${projectId}','${s.key}',${i})">✕</button>` : ''}
             </div>`).join('')}
           ${edit ? `<button class="btn-foto-sm ft-add-btn" onclick="capFotoTecnicaDoc('${projectId}','${s.key}')">
@@ -303,7 +303,7 @@ function renderFotosGrid(fotos, sitio, subfase, titulo, projectId, edit) {
   <div class="fotos-grid" id="fotos-${sitio}_${subfase}">
     ${fotos.map((f,i)=>`
       <div class="foto-card">
-        ${fotoMini(f.data,`Foto ${i+1}`)}
+        ${fotoMini(f,`Foto ${i+1}`)}
         ${f.nota?`<p class="foto-nota">${esc(f.nota)}</p>`:''}
         ${edit?`
           <button class="btn-del-foto-abs" onclick="editFotoNotaSitio('${projectId}','${sitio}','${subfase}',${i})">✎</button>
