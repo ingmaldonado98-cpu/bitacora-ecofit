@@ -12,6 +12,9 @@ export const ROLES = {
 };
 
 // ── Transiciones de estado ─────────────────────────────────────────────────
+// ⚠ Replicado en firestore.rules (transitionMap/isValidTransition) para que
+// el servidor también lo haga cumplir, no solo la UI. Si cambias este mapa,
+// actualiza firestore.rules a mano (sin generación automática entre ambos).
 export const TRANSITIONS = {
   borrador:           { admin: ['en_progreso','cancelado'],                         lider: ['en_progreso'],       apoyo: [] },
   en_progreso:        { admin: ['pendiente_revision','cancelado'],                  lider: ['pendiente_revision'], apoyo: ['pendiente_revision'] },
