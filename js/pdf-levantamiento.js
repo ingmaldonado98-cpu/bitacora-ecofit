@@ -112,7 +112,7 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
   const cSec      = lev.cargasSecundarias || [];
   const hayBaterias = lev.autonomia || lev.bancoBaterias;
   const AREAS_ORDER = ['General','Sala/Comedor','Cocina','Habitación 1','Habitación 2','Habitación 3',
-                       'Baño','Cochera','Entrada','Patio/Jardín','Sala de máquinas','Otro'];
+                       'Baño','Cuarto de lavado','Cochera','Entrada','Patio/Jardín','Sala de máquinas','Otro'];
 
   if (tieneElec) {
     html += wSec('Eléctrico, consumo y cargas');

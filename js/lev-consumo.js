@@ -131,7 +131,7 @@ const APARATOS_RAPIDOS = [
   {nombre:'Lavadora',potencia:500,horas:1},
 ];
 const AREAS_CONSUMO = ['General','Sala/Comedor','Cocina','Habitación 1','Habitación 2','Habitación 3',
-                       'Baño','Cochera','Entrada','Patio/Jardín','Sala de máquinas','Otro'];
+                       'Baño','Cuarto de lavado','Cochera','Entrada','Patio/Jardín','Sala de máquinas','Otro'];
 
 function _areaOpts(sel) {
   return AREAS_CONSUMO.map(a=>`<option ${a===sel?'selected':''}>${a}</option>`).join('');
