@@ -291,7 +291,8 @@ window.refreshCargasTotales = function(tipo) {
   el.innerHTML = `Total: <strong>${totalW} W</strong> — <strong>${(totalWh/1000).toFixed(2)} kWh/día</strong>`;
   window._refreshCargasResumen(tipo);
 };
-function refreshCargas(tipo) { const el=document.getElementById(`cargas-${tipo}`); if(el) el.innerHTML=renderCargas(window._lev.cargas[tipo],true,tipo); }
+// El contenedor real en lev-campos.js es "cargas-criticas" / "cargas-secundarias" (plural)
+function refreshCargas(tipo) { const el=document.getElementById(`cargas-${tipo}s`); if(el) el.innerHTML=renderCargas(window._lev.cargas[tipo],true,tipo); }
 
 window.toggleGenerador = function(val) {
   document.getElementById('gen-extra').style.display = val==='no' ? 'none' : '';
