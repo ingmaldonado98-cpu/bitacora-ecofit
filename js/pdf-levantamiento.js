@@ -259,6 +259,21 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
     }
   }
 
+  // Sistema eléctrico DC (sistema pequeño)
+  if (tipoSis === 'sistema_pequeno') {
+    html += wSec('Sistema eléctrico DC');
+    if (lev.voltajeSistemaDC)      html += wCampo('Voltaje del sistema', lev.voltajeSistemaDC);
+    if (lev.tipoControlador)       html += wCampo('Tipo de regulación de carga', lev.tipoControlador);
+    if (lev.distPanelRefrigerador) html += wCampo('Dist. panel→batería/refrigerador', `${lev.distPanelRefrigerador} m`);
+    if (lev.calibreCableDC)        html += wCampo('Calibre de cable DC', lev.calibreCableDC);
+    if (lev.exposicionTempExtrema) html += wCampo('Exposición a temperatura extrema', lev.exposicionTempExtrema === 'si' ? 'Sí' : 'No');
+    if (lev.bateria)               html += wCampo('Batería', lev.bateria);
+    if (lev.mppt)                  html += wCampo('Controlador MPPT/PWM', lev.mppt);
+    if (lev.inversor)              html += wCampo('Inversor', lev.inversor);
+    if (lev.breakerPanel)          html += wCampo('Breaker de paneles', lev.breakerPanel);
+    if (lev.breakerPolo)           html += wCampo('Breaker 1 polo', lev.breakerPolo);
+  }
+
   // Notas
   if (lev.observacionesGenerales || lev.restricciones) {
     html += wSec('Notas del levantamiento');

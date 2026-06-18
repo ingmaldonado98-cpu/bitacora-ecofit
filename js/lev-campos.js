@@ -1,7 +1,7 @@
 // lev-campos.js — renderCamposDinamicos: campos dinámicos según tipo de sistema
 // Pura función sin estado — extrae la sección 'Eléctrico y consumo' del levantamiento
 
-import { esc, fotoMini } from './utils.js';
+import { esc, fotoMini, CAMPOS_SISTEMA_PEQUENO } from './utils.js';
 import { renderRecibos, renderAparatos, renderCargas } from './lev-consumo.js';
 import { icon } from './icons.js';
 
@@ -204,6 +204,50 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
       <div class="form-group"><label>Cargas secundarias</label>
         <div id="cargas-secundarias">${renderCargas(lev.cargasSecundarias||[],edit,'secundaria')}</div>
       </div>
+    </div>`;
+  }
+
+  if (tipo === 'sistema_pequeno') {
+    return `
+    <div class="card">
+      <h3 class="card-title">Sistema eléctrico DC</h3>
+      <div class="form-row">
+        <div class="form-group"><label>Voltaje del sistema (compresor)</label>
+          <select name="voltajeSistemaDC" ${dis}>
+            <option value="">— Seleccionar —</option>
+            ${['12V','24V','48V'].map(v=>`<option ${lev.voltajeSistemaDC===v?'selected':''}>${v}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Tipo de regulación de carga</label>
+          <select name="tipoControlador" ${dis}>
+            <option value="">— Seleccionar —</option>
+            <option ${lev.tipoControlador==='PWM'?'selected':''} value="PWM">PWM</option>
+            <option ${lev.tipoControlador==='MPPT'?'selected':''} value="MPPT">MPPT</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Distancia panel→batería/refrigerador (m)
+            <span class="form-hint">ideal &lt;3–5 m por caída de voltaje en DC</span>
+          </label>
+          <input type="number" name="distPanelRefrigerador" value="${lev.distPanelRefrigerador||''}" min="0" step="0.5" ${dis}/>
+        </div>
+        <div class="form-group"><label>Calibre de cable DC <span class="form-hint">AWG</span></label>
+          <input type="text" name="calibreCableDC" value="${esc(lev.calibreCableDC||'')}" placeholder="Ej: 10 AWG" ${dis}/>
+        </div>
+      </div>
+      <div class="form-group"><label>Exposición a temperatura ambiente extrema</label>
+        <select name="exposicionTempExtrema" ${dis}>
+          <option value="">— Seleccionar —</option>
+          <option ${lev.exposicionTempExtrema==='si'?'selected':''} value="si">Sí — sin sombra/ventilación (duplica ciclos del compresor)</option>
+          <option ${lev.exposicionTempExtrema==='no'?'selected':''} value="no">No — bien ventilado/con sombra</option>
+        </select>
+      </div>
+      ${CAMPOS_SISTEMA_PEQUENO.map(c=>`
+      <div class="form-group"><label>${esc(c.label)}</label>
+        <input type="text" name="${c.name}" value="${esc(lev[c.name]||'')}" placeholder="${esc(c.placeholder)}" ${dis}/>
+      </div>`).join('')}
     </div>`;
   }
 

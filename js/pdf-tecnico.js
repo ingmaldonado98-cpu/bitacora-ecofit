@@ -148,6 +148,20 @@ window.exportarPDFTecnico = async function(projectId) {
       }
       if (lev.sombras?.checklist?.length) y=campo(doc,'Obstáculos de sombra',lev.sombras.checklist.join(', '),14,y);
       if (lev.condicionesAmbientales?.length) y=campo(doc,'Condiciones ambientales',lev.condicionesAmbientales.join(', '),14,y);
+      if (project.tipoSistema === 'sistema_pequeno') {
+        if (y>240) { doc.addPage(); addHeader(doc,'Levantamiento técnico (cont.)',project); y=44; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+        doc.text('Sistema eléctrico DC', 14, y); y += 6;
+        if (lev.voltajeSistemaDC)      y=campo(doc,'Voltaje del sistema',lev.voltajeSistemaDC,14,y);
+        if (lev.tipoControlador)       y=campo(doc,'Tipo de regulación',lev.tipoControlador,14,y);
+        if (lev.distPanelRefrigerador) y=campo(doc,'Dist. panel→refrigerador',`${lev.distPanelRefrigerador} m`,14,y);
+        if (lev.calibreCableDC)        y=campo(doc,'Calibre de cable DC',lev.calibreCableDC,14,y);
+        if (lev.bateria)               y=campo(doc,'Batería',lev.bateria,14,y);
+        if (lev.mppt)                  y=campo(doc,'Controlador MPPT/PWM',lev.mppt,14,y);
+        if (lev.inversor)              y=campo(doc,'Inversor',lev.inversor,14,y);
+        if (lev.breakerPanel)          y=campo(doc,'Breaker de paneles',lev.breakerPanel,14,y);
+        if (lev.breakerPolo)           y=campo(doc,'Breaker 1 polo',lev.breakerPolo,14,y);
+      }
       if (lev.observacionesGenerales) {
         const lineas = doc.splitTextToSize(lev.observacionesGenerales, 180);
         doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
@@ -523,6 +537,18 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
     }
     if (lev.sombras?.checklist?.length) html += wCampo('Obstáculos de sombra', lev.sombras.checklist.join(', '));
     if (lev.condicionesAmbientales?.length) html += wCampo('Condiciones ambientales', lev.condicionesAmbientales.join(', '));
+    if (project.tipoSistema === 'sistema_pequeno') {
+      html += `<p style="font-weight:bold;color:#40916C;margin-top:8pt">Sistema eléctrico DC</p>`;
+      if (lev.voltajeSistemaDC)      html += wCampo('Voltaje del sistema', lev.voltajeSistemaDC);
+      if (lev.tipoControlador)       html += wCampo('Tipo de regulación', lev.tipoControlador);
+      if (lev.distPanelRefrigerador) html += wCampo('Dist. panel→refrigerador', `${lev.distPanelRefrigerador} m`);
+      if (lev.calibreCableDC)        html += wCampo('Calibre de cable DC', lev.calibreCableDC);
+      if (lev.bateria)               html += wCampo('Batería', lev.bateria);
+      if (lev.mppt)                  html += wCampo('Controlador MPPT/PWM', lev.mppt);
+      if (lev.inversor)              html += wCampo('Inversor', lev.inversor);
+      if (lev.breakerPanel)          html += wCampo('Breaker de paneles', lev.breakerPanel);
+      if (lev.breakerPolo)           html += wCampo('Breaker 1 polo', lev.breakerPolo);
+    }
     if (lev.observacionesGenerales) {
       html += `<p><small style="color:#78888c;text-transform:uppercase;font-size:8pt">OBSERVACIONES</small><br>${esc(lev.observacionesGenerales)}</p>`;
     }

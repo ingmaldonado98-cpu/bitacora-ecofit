@@ -104,6 +104,18 @@ window.guardarLevantamiento = async function(e, projectId) {
     newLev.tiempoRespaldo  = parseFloat(fd.get('tiempoRespaldo'))||null;
     newLev.cargasRespaldo  = window._lev.cargas.critica;
   }
+  if (tipo==='sistema_pequeno') {
+    newLev.voltajeSistemaDC      = fd.get('voltajeSistemaDC')      || null;
+    newLev.tipoControlador       = fd.get('tipoControlador')       || null;
+    newLev.distPanelRefrigerador = parseFloat(fd.get('distPanelRefrigerador')) || null;
+    newLev.calibreCableDC        = fd.get('calibreCableDC')        || null;
+    newLev.exposicionTempExtrema = fd.get('exposicionTempExtrema') || null;
+    newLev.bateria       = fd.get('bateria')?.trim()       || null;
+    newLev.mppt           = fd.get('mppt')?.trim()          || null;
+    newLev.inversor       = fd.get('inversor')?.trim()      || null;
+    newLev.breakerPanel   = fd.get('breakerPanel')?.trim()  || null;
+    newLev.breakerPolo    = fd.get('breakerPolo')?.trim()   || null;
+  }
 
   p.documentacion = p.documentacion || {};
   p.documentacion.levantamiento = newLev;

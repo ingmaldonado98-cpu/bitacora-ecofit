@@ -46,7 +46,8 @@ function renderLevantamiento(project, tipo, edit) {
   const hasSitio      = !!(lev.tipTecho || (lev.areasTecho?.length > 0));
   const hasElecConsumo= !!(lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga ||
                            lev.recibos?.length || lev.aparatos?.length || lev.tarifaCFE ||
-                           lev.autonomia || lev.cargasCriticas?.length);
+                           lev.autonomia || lev.cargasCriticas?.length ||
+                           lev.voltajeSistemaDC || lev.tipoControlador || lev.bateria);
   const hasSombras    = !!(lev.sombras?.checklist?.length || lev.sombras?.foto || lev.sombras?.notas ||
                            lev.condicionesAmbientales?.length);
   const hasNotas      = !!(lev.observacionesGenerales);
@@ -246,8 +247,9 @@ function renderLevantamiento(project, tipo, edit) {
       </div>
     `)}
 
-    ${/* Eléctrico y consumo — no aplica para sistema_pequeno ni otro */
-      !['sistema_pequeno','otro'].includes(tipo) ? acc('elec_consumo', 'Eléctrico y consumo', '⚡', hasElecConsumo, `
+    ${/* Eléctrico y consumo — no aplica para 'otro'. Sistema pequeño usa solo el bloque DC (dinamico) */
+      tipo !== 'otro' ? acc('elec_consumo', 'Eléctrico y consumo', '⚡', hasElecConsumo, `
+      ${tipo !== 'sistema_pequeno' ? `
       <div class="form-group"><label>Tipo de servicio CFE</label>
         <select name="tipoServicioCFE" ${dis}>
           ${tipo==='aislado'?'<option value="NA">N/A (sin CFE)</option>':''}
@@ -332,6 +334,7 @@ function renderLevantamiento(project, tipo, edit) {
           </div>
         </div>
       </details>
+      ` : ''}
       ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
     `) : ''}
 
