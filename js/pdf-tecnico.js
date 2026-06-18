@@ -162,6 +162,11 @@ window.exportarPDFTecnico = async function(projectId) {
         if (lev.breakerPanel)          y=campo(doc,'Breaker de paneles',lev.breakerPanel,14,y);
         if (lev.breakerPolo)           y=campo(doc,'Breaker 1 polo',lev.breakerPolo,14,y);
       }
+      if (lev.accesoTecho || lev.almacenamientoTemporal || lev.conectividadInversor) {
+        if (lev.accesoTecho)            y=campo(doc,'Ruta de acceso al techo',lev.accesoTecho,14,y);
+        if (lev.almacenamientoTemporal) y=campo(doc,'Almacenamiento temporal',lev.almacenamientoTemporal,14,y);
+        if (lev.conectividadInversor)   y=campo(doc,'Conectividad en inversor',lev.conectividadInversor,14,y);
+      }
       if (lev.observacionesGenerales) {
         const lineas = doc.splitTextToSize(lev.observacionesGenerales, 180);
         doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
@@ -548,6 +553,11 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
       if (lev.inversor)              html += wCampo('Inversor', lev.inversor);
       if (lev.breakerPanel)          html += wCampo('Breaker de paneles', lev.breakerPanel);
       if (lev.breakerPolo)           html += wCampo('Breaker 1 polo', lev.breakerPolo);
+    }
+    if (lev.accesoTecho || lev.almacenamientoTemporal || lev.conectividadInversor) {
+      if (lev.accesoTecho)            html += wCampo('Ruta de acceso al techo', lev.accesoTecho);
+      if (lev.almacenamientoTemporal) html += wCampo('Almacenamiento temporal', lev.almacenamientoTemporal);
+      if (lev.conectividadInversor)   html += wCampo('Conectividad en inversor', lev.conectividadInversor);
     }
     if (lev.observacionesGenerales) {
       html += `<p><small style="color:#78888c;text-transform:uppercase;font-size:8pt">OBSERVACIONES</small><br>${esc(lev.observacionesGenerales)}</p>`;

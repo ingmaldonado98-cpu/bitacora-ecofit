@@ -50,6 +50,7 @@ function renderLevantamiento(project, tipo, edit) {
                            lev.voltajeSistemaDC || lev.tipoControlador || lev.bateria);
   const hasSombras    = !!(lev.sombras?.checklist?.length || lev.sombras?.foto || lev.sombras?.notas ||
                            lev.condicionesAmbientales?.length);
+  const hasLogistica  = !!(lev.accesoTecho || lev.almacenamientoTemporal || lev.conectividadInversor || lev.logisticaNotas);
   const hasNotas      = !!(lev.observacionesGenerales);
 
   // Helper para wrapper de acordeón
@@ -337,6 +338,37 @@ function renderLevantamiento(project, tipo, edit) {
       ` : ''}
       ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
     `) : ''}
+
+    ${acc('logistica', 'Logística de instalación', '🚚', hasLogistica, `
+      <div class="form-row">
+        <div class="form-group"><label>Ruta de acceso al techo</label>
+          <select name="accesoTecho" ${dis}>
+            <option value="">— Seleccionar —</option>
+            ${['Escalera interna','Escalera telescópica exterior','Requiere grúa','Otro'].map(t=>
+              `<option ${lev.accesoTecho===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Almacenamiento temporal de material</label>
+          <select name="almacenamientoTemporal" ${dis}>
+            <option value="">— Seleccionar —</option>
+            ${['Disponible en sitio','No disponible — coordinar con cliente','N/A'].map(t=>
+              `<option ${lev.almacenamientoTemporal===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Conectividad en ubicación del inversor
+        <span class="form-hint">para el sistema de monitoreo</span></label>
+        <select name="conectividadInversor" ${dis}>
+          <option value="">— Seleccionar —</option>
+          ${['Buena (WiFi/datos estables)','Regular (intermitente)','Sin señal — requiere módem/SIM dedicado'].map(t=>
+            `<option ${lev.conectividadInversor===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notas de logística <span class="form-hint">grúa, restricciones de acceso, horarios, etc.</span></label>
+        <textarea name="logisticaNotas" rows="2" ${dis}>${esc(lev.logisticaNotas||'')}</textarea>
+      </div>
+    `)}
 
     ${acc('notas', 'Notas del levantamiento', '📝', hasNotas, `
       <div class="form-group">

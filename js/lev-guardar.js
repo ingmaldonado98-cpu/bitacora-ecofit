@@ -68,6 +68,10 @@ window.guardarLevantamiento = async function(e, projectId) {
     observacionesGenerales: fd.get('observacionesGenerales') || '',
     restricciones:          fd.get('restricciones') || '',
     horarioUso:             fd.get('horarioUso') || null,
+    accesoTecho:             fd.get('accesoTecho')             || null,
+    almacenamientoTemporal:  fd.get('almacenamientoTemporal')  || null,
+    conectividadInversor:    fd.get('conectividadInversor')    || null,
+    logisticaNotas:          fd.get('logisticaNotas')           || '',
   };
 
   if (tipo==='interconectado'||tipo==='hibrido'||tipo==='hibrido_respaldo') {

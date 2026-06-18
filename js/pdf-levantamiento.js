@@ -274,6 +274,15 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
     if (lev.breakerPolo)           html += wCampo('Breaker 1 polo', lev.breakerPolo);
   }
 
+  // Logística de instalación
+  if (lev.accesoTecho || lev.almacenamientoTemporal || lev.conectividadInversor || lev.logisticaNotas) {
+    html += wSec('Logística de instalación');
+    html += wCampo('Ruta de acceso al techo', lev.accesoTecho);
+    html += wCampo('Almacenamiento temporal', lev.almacenamientoTemporal);
+    html += wCampo('Conectividad en ubicación del inversor', lev.conectividadInversor);
+    if (lev.logisticaNotas) html += wCampo('Notas de logística', lev.logisticaNotas);
+  }
+
   // Notas
   if (lev.observacionesGenerales || lev.restricciones) {
     html += wSec('Notas del levantamiento');
