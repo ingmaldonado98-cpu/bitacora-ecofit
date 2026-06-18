@@ -147,6 +147,7 @@ window.exportarPDFTecnico = async function(projectId) {
           `${lev.capacidadInterruptorPrincipal||'—'} A / ${lev.capacidadBarrasTablero||'—'} A`,14,y);
       }
       if (lev.sombras?.checklist?.length) y=campo(doc,'Obstáculos de sombra',lev.sombras.checklist.join(', '),14,y);
+      if (lev.condicionesAmbientales?.length) y=campo(doc,'Condiciones ambientales',lev.condicionesAmbientales.join(', '),14,y);
       if (lev.observacionesGenerales) {
         const lineas = doc.splitTextToSize(lev.observacionesGenerales, 180);
         doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
@@ -521,6 +522,7 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
         `${lev.capacidadInterruptorPrincipal||'—'} A / ${lev.capacidadBarrasTablero||'—'} A`);
     }
     if (lev.sombras?.checklist?.length) html += wCampo('Obstáculos de sombra', lev.sombras.checklist.join(', '));
+    if (lev.condicionesAmbientales?.length) html += wCampo('Condiciones ambientales', lev.condicionesAmbientales.join(', '));
     if (lev.observacionesGenerales) {
       html += `<p><small style="color:#78888c;text-transform:uppercase;font-size:8pt">OBSERVACIONES</small><br>${esc(lev.observacionesGenerales)}</p>`;
     }

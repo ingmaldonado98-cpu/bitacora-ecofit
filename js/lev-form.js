@@ -47,7 +47,8 @@ function renderLevantamiento(project, tipo, edit) {
   const hasElecConsumo= !!(lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga ||
                            lev.recibos?.length || lev.aparatos?.length || lev.tarifaCFE ||
                            lev.autonomia || lev.cargasCriticas?.length);
-  const hasSombras    = !!(lev.sombras?.checklist?.length || lev.sombras?.foto || lev.sombras?.notas);
+  const hasSombras    = !!(lev.sombras?.checklist?.length || lev.sombras?.foto || lev.sombras?.notas ||
+                           lev.condicionesAmbientales?.length);
   const hasNotas      = !!(lev.observacionesGenerales);
 
   // Helper para wrapper de acordeón
@@ -231,6 +232,17 @@ function renderLevantamiento(project, tipo, edit) {
       <div class="form-group" style="margin-top:8px">
         <label>Notas de sombras</label>
         <textarea name="sombraNotas" rows="2" ${dis}>${esc(lev.sombras?.notas||'')}</textarea>
+      </div>
+      <div class="form-group" style="margin-top:8px">
+        <label>Condiciones ambientales del sitio</label>
+        <div class="sombras-check">
+          ${['Polvo','Salinidad costera','Calor extremo','Humedad alta','Viento fuerte','Otra'].map(c=>`
+            <label class="check-chip ${(lev.condicionesAmbientales||[]).includes(c)?'check-active':''}">
+              <input type="checkbox" name="cond_${c}" ${dis} value="${c}"
+                ${(lev.condicionesAmbientales||[]).includes(c)?'checked':''}
+                onchange="this.closest('.check-chip').classList.toggle('check-active',this.checked)"> ${c}
+            </label>`).join('')}
+        </div>
       </div>
     `)}
 

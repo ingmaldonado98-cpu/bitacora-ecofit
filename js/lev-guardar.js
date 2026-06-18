@@ -63,6 +63,7 @@ window.guardarLevantamiento = async function(e, projectId) {
     gpsLat:              lev.gpsLat  ?? null,
     gpsLng:              lev.gpsLng  ?? null,
     sombras:             { checklist:sombrasChecklist, foto:lev.sombras?.foto||null, notas:fd.get('sombraNotas')||'' },
+    condicionesAmbientales: condiciones,
     fotosLevantamiento:  lev.fotosLevantamiento || [],
     observacionesGenerales: fd.get('observacionesGenerales') || '',
     restricciones:          fd.get('restricciones') || '',
@@ -92,7 +93,6 @@ window.guardarLevantamiento = async function(e, projectId) {
     newLev.generadorArranque= fd.get('generadorArranque');
     newLev.generadorKw     = parseFloat(fd.get('generadorKw'))||null;
     newLev.crecimientoFuturo= fd.get('crecimientoFuturo')||'';
-    newLev.condicionesAmbientales = condiciones;
   }
   if (tipo==='bombeo') {
     newLev.tipoBomba       = fd.get('tipoBomba');

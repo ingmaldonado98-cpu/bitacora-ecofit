@@ -132,16 +132,6 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
       <div class="form-group"><label>Crecimiento futuro esperado <span class="req-badge">CRÍTICO</span></label>
         <textarea name="crecimientoFuturo" rows="2" ${dis} placeholder="Ej: después pondrán minisplit…">${esc(lev.crecimientoFuturo||'')}</textarea>
       </div>
-      <div class="form-group"><label>Condiciones ambientales</label>
-        <div class="sombras-check">
-          ${['Polvo','Salinidad costera','Calor extremo','Humedad alta','Viento fuerte','Otra'].map(c=>`
-            <label class="check-chip ${(lev.condicionesAmbientales||[]).includes(c)?'check-active':''}">
-              <input type="checkbox" name="cond_${c}" ${dis} value="${c}"
-                ${(lev.condicionesAmbientales||[]).includes(c)?'checked':''}
-                onchange="this.closest('.check-chip').classList.toggle('check-active',this.checked)"> ${c}
-            </label>`).join('')}
-        </div>
-      </div>
     </div>`;
   }
 

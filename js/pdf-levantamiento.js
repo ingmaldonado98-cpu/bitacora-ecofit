@@ -102,6 +102,9 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
     if (sombras.notas) html += wCampo('Notas de sombras', sombras.notas);
     if (sombras.foto) html += wImg(sombras.foto);
   }
+  if (lev.condicionesAmbientales?.length) {
+    html += wCampo('Condiciones ambientales del sitio', lev.condicionesAmbientales.join(', '));
+  }
 
   // Eléctrico, consumo y cargas
   const tipoSis   = project.tipoSistema || '';
@@ -253,7 +256,6 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
         html += wCampo('Generador de respaldo', `${lev.generador} — ${lev.generadorArranque||'manual'}${lev.generadorKw ? ` · ${lev.generadorKw} kW` : ''}`);
       }
       if (lev.crecimientoFuturo) html += wCampo('Crecimiento futuro esperado', lev.crecimientoFuturo);
-      if (lev.condicionesAmbientales?.length) html += wCampo('Condiciones ambientales', lev.condicionesAmbientales.join(', '));
     }
   }
 
