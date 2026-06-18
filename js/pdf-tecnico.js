@@ -112,17 +112,26 @@ window.exportarPDFTecnico = async function(projectId) {
       doc.addPage(); addHeader(doc,'Levantamiento técnico',project); y=44;
       const lev = project.documentacion?.levantamiento||{};
       y=campo(doc,'Tipo de techo',lev.tipTecho,14,y);
-      if (lev.materialCubierta) y=campo(doc,'Material de cubierta',lev.materialCubierta,14,y);
-      y=campo(doc,'Orientación',lev.orientacion,14,y);
-      if (lev.numPisos) y=campo(doc,'Número de pisos',`${lev.numPisos}`,14,y);
       if (lev.tipoSujecion) y=campo(doc,'Tipo de sujeción',lev.tipoSujecion,14,y);
-      const dimText = lev.anchoTecho && lev.largoTecho
-        ? `${lev.anchoTecho} m × ${lev.largoTecho} m = ${(lev.anchoTecho*lev.largoTecho).toFixed(1)} m²`
-        : (lev.areaDisponible ? `${lev.areaDisponible} m²` : '—');
-      y=campo(doc,'Área disponible',dimText,14,y);
-      y=campo(doc,'Inclinación',`${lev.inclinacion||'—'}°`,14,y);
-      y=campo(doc,'Dist. tablero→inversor',`${lev.distTableroInversor||'—'} m`,14,y);
-      y=campo(doc,'Dist. inversor→paneles',`${lev.distInversorPaneles||'—'} m`,14,y);
+      y=campo(doc,'Área disponible',lev.areaDisponible?`${lev.areaDisponible} m²`:'—',14,y);
+
+      // Áreas del techo (orientación/inclinación/pisos/distancias viven por área)
+      const areasLev = lev.areasTecho || [];
+      if (areasLev.length) {
+        if (y>240) { doc.addPage(); addHeader(doc,'Levantamiento técnico (cont.)',project); y=44; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+        doc.text('Áreas del techo', 14, y); y += 6;
+        for (const a of areasLev) {
+          if (y>250) { doc.addPage(); addHeader(doc,'Levantamiento técnico (cont.)',project); y=44; }
+          const dim = (a.ancho && a.largo) ? `${a.ancho} × ${a.largo} m` : (a.area ? `${a.area} m²` : '—');
+          doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+          doc.text(a.nombre || 'Área', 14, y); y += 5;
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GRIS_CLR);
+          doc.text(`Dim: ${dim} · Orientación: ${a.orientacion||'—'} · Inclinación: ${a.inclinacion!=null?`${a.inclinacion}°`:'—'} · Pisos: ${a.pisos!=null?a.pisos:'—'}`, 14, y); y += 4;
+          doc.text(`Tablero→Inv.: ${a.distTableroInversor!=null?`${a.distTableroInversor} m`:'—'} · Inv.→Paneles: ${a.distInversorPaneles!=null?`${a.distInversorPaneles} m`:'—'}`, 14, y); y += 7;
+        }
+      }
+
       y=campo(doc,'Servicio CFE',lev.tipoServicioCFE,14,y);
       y=campo(doc,'Tierra física',lev.tierraFisica,14,y);
       y=campo(doc,'Centro de carga',lev.centroCarga,14,y);
@@ -460,17 +469,32 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
     const lev = project.documentacion?.levantamiento || {};
     html += wPage() + wSec('Levantamiento técnico');
     html += wCampo('Tipo de techo', lev.tipTecho);
-    if (lev.materialCubierta) html += wCampo('Material de cubierta', lev.materialCubierta);
-    html += wCampo('Orientación', lev.orientacion);
-    if (lev.numPisos) html += wCampo('Número de pisos', `${lev.numPisos}`);
     if (lev.tipoSujecion) html += wCampo('Tipo de sujeción', lev.tipoSujecion);
-    const dimText = lev.anchoTecho && lev.largoTecho
-      ? `${lev.anchoTecho} m × ${lev.largoTecho} m = ${(lev.anchoTecho*lev.largoTecho).toFixed(1)} m²`
-      : (lev.areaDisponible ? `${lev.areaDisponible} m²` : '—');
-    html += wCampo('Área disponible', dimText);
-    html += wCampo('Inclinación', `${lev.inclinacion||'—'}°`);
-    html += wCampo('Dist. tablero→inversor', `${lev.distTableroInversor||'—'} m`);
-    html += wCampo('Dist. inversor→paneles', `${lev.distInversorPaneles||'—'} m`);
+    html += wCampo('Área disponible', lev.areaDisponible ? `${lev.areaDisponible} m²` : '—');
+
+    // Áreas del techo (orientación/inclinación/pisos/distancias viven por área)
+    const areasLev = lev.areasTecho || [];
+    if (areasLev.length) {
+      html += `<p style="font-weight:bold;color:#40916C;margin-top:8pt">Áreas del techo</p>`;
+      html += `<table style="width:100%;border-collapse:collapse"><tr>
+        <th ${TH}>Área</th><th ${TH}>Dimensiones</th><th ${TH}>Orientación</th>
+        <th ${TH}>Inclinación</th><th ${TH}>Pisos</th>
+        <th ${TH}>Tablero→Inv.</th><th ${TH}>Inv.→Paneles</th>
+      </tr>`;
+      for (const a of areasLev) {
+        const dim = (a.ancho && a.largo) ? `${a.ancho} × ${a.largo} m` : (a.area ? `${a.area} m²` : '—');
+        html += `<tr>
+          <td ${TD}>${esc(a.nombre || '—')}</td><td ${TD}>${dim}</td>
+          <td ${TD}>${esc(a.orientacion || '—')}</td>
+          <td ${TD}>${a.inclinacion != null ? `${a.inclinacion}°` : '—'}</td>
+          <td ${TD}>${a.pisos != null ? a.pisos : '—'}</td>
+          <td ${TD}>${a.distTableroInversor != null ? `${a.distTableroInversor} m` : '—'}</td>
+          <td ${TD}>${a.distInversorPaneles != null ? `${a.distInversorPaneles} m` : '—'}</td>
+        </tr>`;
+      }
+      html += '</table>';
+    }
+
     html += wCampo('Servicio CFE', lev.tipoServicioCFE);
     html += wCampo('Tierra física', lev.tierraFisica);
     html += wCampo('Centro de carga', lev.centroCarga);
