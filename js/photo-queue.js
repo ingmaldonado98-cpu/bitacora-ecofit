@@ -198,6 +198,13 @@ export async function processQueue() {
           await projects.update(item.projectId, { documentacion: p.documentacion });
           break;
 
+        case 'fotoMedidor':
+          p.documentacion = p.documentacion || {};
+          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+          p.documentacion.levantamiento.fotoMedidor = url;
+          await projects.update(item.projectId, { documentacion: p.documentacion });
+          break;
+
         case 'fotoLev': {
           const { itemId: levItemId } = item.opArgs || {};
           p.documentacion = p.documentacion || {};

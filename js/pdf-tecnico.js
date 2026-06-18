@@ -135,6 +135,17 @@ window.exportarPDFTecnico = async function(projectId) {
       y=campo(doc,'Servicio CFE',lev.tipoServicioCFE,14,y);
       y=campo(doc,'Tierra física',lev.tierraFisica,14,y);
       y=campo(doc,'Centro de carga',lev.centroCarga,14,y);
+      if (lev.voltajeFaseFase || lev.voltajeFaseNeutro || lev.voltajeFaseTierra) {
+        y=campo(doc,'Voltajes medidos', [
+          lev.voltajeFaseFase   ? `Fase-fase: ${lev.voltajeFaseFase} V`     : null,
+          lev.voltajeFaseNeutro ? `Fase-neutro: ${lev.voltajeFaseNeutro} V` : null,
+          lev.voltajeFaseTierra ? `Fase-tierra: ${lev.voltajeFaseTierra} V` : null,
+        ].filter(Boolean).join(' · '),14,y);
+      }
+      if (lev.capacidadInterruptorPrincipal || lev.capacidadBarrasTablero) {
+        y=campo(doc,'Interruptor principal / Barras (busbar)',
+          `${lev.capacidadInterruptorPrincipal||'—'} A / ${lev.capacidadBarrasTablero||'—'} A`,14,y);
+      }
       if (lev.sombras?.checklist?.length) y=campo(doc,'Obstáculos de sombra',lev.sombras.checklist.join(', '),14,y);
       if (lev.observacionesGenerales) {
         const lineas = doc.splitTextToSize(lev.observacionesGenerales, 180);
@@ -498,6 +509,17 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
     html += wCampo('Servicio CFE', lev.tipoServicioCFE);
     html += wCampo('Tierra física', lev.tierraFisica);
     html += wCampo('Centro de carga', lev.centroCarga);
+    if (lev.voltajeFaseFase || lev.voltajeFaseNeutro || lev.voltajeFaseTierra) {
+      html += wCampo('Voltajes medidos', [
+        lev.voltajeFaseFase   ? `Fase-fase: ${lev.voltajeFaseFase} V`     : null,
+        lev.voltajeFaseNeutro ? `Fase-neutro: ${lev.voltajeFaseNeutro} V` : null,
+        lev.voltajeFaseTierra ? `Fase-tierra: ${lev.voltajeFaseTierra} V` : null,
+      ].filter(Boolean).join(' · '));
+    }
+    if (lev.capacidadInterruptorPrincipal || lev.capacidadBarrasTablero) {
+      html += wCampo('Interruptor principal / Barras (busbar)',
+        `${lev.capacidadInterruptorPrincipal||'—'} A / ${lev.capacidadBarrasTablero||'—'} A`);
+    }
     if (lev.sombras?.checklist?.length) html += wCampo('Obstáculos de sombra', lev.sombras.checklist.join(', '));
     if (lev.observacionesGenerales) {
       html += `<p><small style="color:#78888c;text-transform:uppercase;font-size:8pt">OBSERVACIONES</small><br>${esc(lev.observacionesGenerales)}</p>`;

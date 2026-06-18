@@ -257,6 +257,22 @@ function renderLevantamiento(project, tipo, edit) {
           </select>
         </div>
       </div>
+      <details class="pd-details" ${(lev.voltajeFaseFase || lev.voltajeFaseNeutro || lev.voltajeFaseTierra) ? 'open' : ''}>
+        <summary>Voltajes medidos en sitio <span class="pd-caret">▾</span></summary>
+        <div class="pd-body">
+          <div class="form-row">
+            <div class="form-group"><label>Fase-fase (V)</label>
+              <input type="number" name="voltajeFaseFase" value="${lev.voltajeFaseFase||''}" min="0" step="0.1" placeholder="Ej: 220" ${dis}/></div>
+            <div class="form-group"><label>Fase-neutro (V)</label>
+              <input type="number" name="voltajeFaseNeutro" value="${lev.voltajeFaseNeutro||''}" min="0" step="0.1" placeholder="Ej: 127" ${dis}/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Fase-tierra (V)</label>
+              <input type="number" name="voltajeFaseTierra" value="${lev.voltajeFaseTierra||''}" min="0" step="0.1" ${dis}/></div>
+          </div>
+          <p class="form-hint" style="margin:0">Mide con multímetro en horas de mayor sol — voltajes altos pueden disparar la protección anti-isla del inversor.</p>
+        </div>
+      </details>
       <details class="pd-details" ${(lev.marcaTablero || lev.tipoTablero) ? 'open' : ''}>
         <summary>Detalles del tablero <span class="pd-caret">▾</span></summary>
         <div class="pd-body">
@@ -286,6 +302,20 @@ function renderLevantamiento(project, tipo, edit) {
               <datalist id="cap-tablero-list">
                 ${[4,6,8,10,12,16,20,24,30,40].map(n=>`<option value="${n} polos">`).join('')}
               </datalist>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Interruptor principal (A)</label>
+              <input type="number" name="capacidadInterruptorPrincipal" value="${lev.capacidadInterruptorPrincipal||''}"
+                     min="0" step="5" placeholder="Ej: 100" ${dis}/>
+            </div>
+            <div class="form-group">
+              <label>Capacidad de barras / busbar (A)
+                <span class="form-hint">para la regla del 120% — NOM-001-SEDE Art. 705</span>
+              </label>
+              <input type="number" name="capacidadBarrasTablero" value="${lev.capacidadBarrasTablero||''}"
+                     min="0" step="5" placeholder="Ej: 125" ${dis}/>
             </div>
           </div>
         </div>

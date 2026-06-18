@@ -1,8 +1,9 @@
 // lev-campos.js — renderCamposDinamicos: campos dinámicos según tipo de sistema
 // Pura función sin estado — extrae la sección 'Eléctrico y consumo' del levantamiento
 
-import { esc } from './utils.js';
+import { esc, fotoMini } from './utils.js';
 import { renderRecibos, renderAparatos, renderCargas } from './lev-consumo.js';
+import { icon } from './icons.js';
 
 export function renderCamposDinamicos(tipo, lev, edit, pid) {
   const dis = edit ? '' : 'disabled';
@@ -17,9 +18,24 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
                  placeholder="12 dígitos" inputmode="numeric" maxlength="18" ${dis}/>
         </div>
         <div class="form-group">
+          <label>RPU <span class="form-hint">Registro Permanente de Usuario</span></label>
+          <input type="text" name="rpu" value="${esc(lev.rpu||'')}"
+                 placeholder="En el recibo de CFE" ${dis}/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
           <label>Titular del servicio</label>
           <input type="text" name="titularServicio" value="${esc(lev.titularServicio||'')}"
                  placeholder="Nombre en el recibo" ${dis}/>
+        </div>
+      </div>
+      <div class="foto-tecnica-row">
+        <div class="ft-label">${icon('camera',14)} Foto de la base del medidor</div>
+        <div class="ft-slot">
+          ${lev.fotoMedidor
+            ? `${fotoMini(lev.fotoMedidor,'Base del medidor')}${edit?`<button type="button" class="btn-del-foto" onclick="delFotoMedidor('${pid}')">✕</button>`:''}`
+            : (edit ? `<button type="button" class="btn-foto-sm" onclick="capFotoMedidor('${pid}')">${icon('camera')} Foto</button>` : '<span style="color:var(--text-muted);font-size:.75rem">Sin foto</span>')}
         </div>
       </div>
       <div class="form-row">

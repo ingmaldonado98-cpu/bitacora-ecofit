@@ -119,8 +119,9 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
     html += wSec('Eléctrico, consumo y cargas');
 
     // CFE y contrato
-    if (tieneCFE && (lev.nisServicio || lev.titularServicio || lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga || lev.tarifaCFE)) {
+    if (tieneCFE && (lev.nisServicio || lev.rpu || lev.titularServicio || lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga || lev.tarifaCFE)) {
       if (lev.nisServicio)     html += wCampo('NIS (Núm. de Servicio CFE)', lev.nisServicio);
+      if (lev.rpu)             html += wCampo('RPU', lev.rpu);
       if (lev.titularServicio) html += wCampo('Titular del servicio', lev.titularServicio);
       html += wCampo('Servicio CFE', lev.tipoServicioCFE);
       html += wCampo('Tierra física', lev.tierraFisica);
@@ -129,6 +130,21 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
       if (lev.demandaKW)      html += wCampo('Demanda contratada', `${lev.demandaKW} kW`);
       if (lev.factorPotencia) html += wCampo('Factor de potencia', `${lev.factorPotencia}`);
       if (lev.horarioUso)     html += wCampo('Horario de uso', lev.horarioUso);
+      if (lev.voltajeFaseFase || lev.voltajeFaseNeutro || lev.voltajeFaseTierra) {
+        html += wCampo('Voltajes medidos', [
+          lev.voltajeFaseFase   ? `Fase-fase: ${lev.voltajeFaseFase} V`     : null,
+          lev.voltajeFaseNeutro ? `Fase-neutro: ${lev.voltajeFaseNeutro} V` : null,
+          lev.voltajeFaseTierra ? `Fase-tierra: ${lev.voltajeFaseTierra} V` : null,
+        ].filter(Boolean).join(' · '));
+      }
+      if (lev.capacidadInterruptorPrincipal || lev.capacidadBarrasTablero) {
+        html += wCampo('Interruptor principal / Barras (busbar)',
+          `${lev.capacidadInterruptorPrincipal||'—'} A / ${lev.capacidadBarrasTablero||'—'} A`);
+      }
+      if (typeof lev.fotoMedidor === 'string') {
+        html += `<p style="font-size:9pt;color:#78888c;text-transform:uppercase;margin-bottom:2pt">Base del medidor</p>`;
+        html += wImg(lev.fotoMedidor);
+      }
     }
 
     // Recibos CFE

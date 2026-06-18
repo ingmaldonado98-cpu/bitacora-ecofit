@@ -52,9 +52,14 @@ window.guardarLevantamiento = async function(e, projectId) {
     tipoServicioCFE:     fd.get('tipoServicioCFE'),
     tierraFisica:        fd.get('tierraFisica'),
     centroCarga:         fd.get('centroCarga'),
+    voltajeFaseFase:     parseFloat(fd.get('voltajeFaseFase'))   || null,
+    voltajeFaseNeutro:   parseFloat(fd.get('voltajeFaseNeutro')) || null,
+    voltajeFaseTierra:   parseFloat(fd.get('voltajeFaseTierra')) || null,
     tipoTablero:         fd.get('tipoTablero')      || null,
     marcaTablero:        fd.get('marcaTablero')     || null,
     capacidadTablero:    fd.get('capacidadTablero') || null,
+    capacidadInterruptorPrincipal: parseFloat(fd.get('capacidadInterruptorPrincipal')) || null,
+    capacidadBarrasTablero:        parseFloat(fd.get('capacidadBarrasTablero'))        || null,
     gpsLat:              lev.gpsLat  ?? null,
     gpsLng:              lev.gpsLng  ?? null,
     sombras:             { checklist:sombrasChecklist, foto:lev.sombras?.foto||null, notas:fd.get('sombraNotas')||'' },
@@ -66,6 +71,7 @@ window.guardarLevantamiento = async function(e, projectId) {
 
   if (tipo==='interconectado'||tipo==='hibrido'||tipo==='hibrido_respaldo') {
     newLev.nisServicio    = fd.get('nisServicio')    || null;
+    newLev.rpu            = fd.get('rpu')            || null;
     newLev.titularServicio= fd.get('titularServicio') || null;
     newLev.tarifaCFE      = fd.get('tarifaCFE');
     newLev.demandaKW      = parseFloat(fd.get('demandaKW')) || null;
@@ -206,6 +212,26 @@ window.delSombraFoto = async function(pid) {
   p.documentacion.levantamiento.sombras.foto = null;
   await projects.update(pid, { documentacion: p.documentacion });
   navigate(`#proyecto/${pid}/documentacion`);
+};
+
+window.capFotoMedidor = function(pid) {
+  capturePhoto(async b64 => {
+    toast('Subiendo foto del medidor…');
+    const result = await uploadPhotoQueued(b64, `projects/${pid}/medidor.jpg`, pid, 'fotoMedidor');
+    const p = await projects.getById(pid);
+    p.documentacion = p.documentacion || {};
+    p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+    p.documentacion.levantamiento.fotoMedidor = result.url
+      || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
+    await projects.update(pid, { documentacion: p.documentacion });
+    navigate(`#proyecto/${pid}/levantamiento`);
+  });
+};
+window.delFotoMedidor = async function(pid) {
+  const p = await projects.getById(pid);
+  p.documentacion.levantamiento.fotoMedidor = null;
+  await projects.update(pid, { documentacion: p.documentacion });
+  navigate(`#proyecto/${pid}/levantamiento`);
 };
 
 // ── _calcAreaTecho: obsoleto — reemplazado por _calcAreaItem ─────────────────
