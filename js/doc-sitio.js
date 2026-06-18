@@ -125,8 +125,8 @@ window.capFotoSistemaDoc = function(projectId) {
     const result = await uploadPhotoQueued(b64, `projects/${projectId}/sistema.jpg`, projectId, 'fotoSistema');
     const p = await projects.getById(projectId);
     p.garantia = p.garantia || {};
-    p.garantia.fotoSistema = result.url || null;
-    if (result.pending) p.garantia._fotoSistemaPending = result.pendingId;
+    p.garantia.fotoSistema = result.url
+      || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
     await projects.update(projectId, { garantia: p.garantia });
     _gotoCierre('techo');
     navigate(`#proyecto/${projectId}/documentacion`);
