@@ -308,8 +308,20 @@ window.guardarEquipo = async function(projectId) {
 window.delEquipo = async function(projectId, idx) {
   if (!await confirmDialog('¿Eliminar este equipo?')) return;
   const p = await projects.getById(projectId);
+  const equipo = p.garantia?.equipos?.[idx];
   const newEquipos = (p.garantia?.equipos || []).filter((_,i) => i !== idx);
   await projects.setField(projectId, 'garantia.equipos', newEquipos);
+
+  // Si el equipo venía del Kit de obra, desvincula la fila para que vuelva a
+  // mostrar "→ Registrar" en vez de un "✓ Instalado" apuntando a nada.
+  if (equipo) {
+    const kitMap = p.checklistData?.kitEquipo || {};
+    const orphanId = Object.keys(kitMap).find(kid => kitMap[kid]?.garantiaEquipoId === equipo.id);
+    if (orphanId) {
+      await projects.setField(projectId, `checklistData.kitEquipo.${orphanId}.garantiaEquipoId`, null);
+    }
+  }
+
   sessionStorage.setItem('garantia-tab-target', 'g-equipos');
   navigate(`#proyecto/${projectId}/garantia`);
 };

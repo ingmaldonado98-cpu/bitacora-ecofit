@@ -8,6 +8,7 @@ import {
   savePDF, pdfYield, btnLoading, btnDone,
   VERDE, VERDE_MED, GRIS, GRIS_CLR,
 } from './pdf-helpers.js';
+import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
 
 const ESTADOS_LABEL = Object.fromEntries(Object.entries(ESTADOS).map(([k,v]) => [k, v.label]));
 
@@ -372,16 +373,38 @@ window.exportarPDFTecnico = async function(projectId) {
       if (aud.auditor?.empresa){ y=campo(doc,'Empresa',aud.auditor.empresa,14,y); }
       y=campo(doc,'Norma',aud.norma,14,y);
       y=campo(doc,'Resultado',aud.resultado?.replace(/_/g,' ').toUpperCase(),14,y);
+
+      const esFormal   = aud.modo === 'formal';
+      const itemsAud   = esFormal ? CHECKLIST_FORMAL : CHECKLIST_RAPIDO;
+      const resultsAud = esFormal ? (aud.formalChecklist||{}) : (aud.rapidoChecklist||{});
+      const obsAud     = aud.formalObs || {};
       doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...VERDE);
-      doc.text('Checklist técnico', 14, y); y+=6;
-      (aud.checklist||[]).forEach(item => {
-        const label = ['','Polaridad correcta','Torque verificado','Tierra física','Protecciones AC',
-          'Protecciones DC','Etiquetado','Canalización','Impermeabilización',
-          'Voltajes correctos','Equipo energizado','Monitoreo / Comunicación'][item.itemId] || '';
-        const mark = item.resultado==='ok'?'✓' : item.resultado==='no_cumple'?'✗' : 'N/A';
+      doc.text(`Checklist técnico (${esFormal?'Formal':'Rápido'})`, 14, y); y+=6;
+      for (const item of itemsAud) {
+        if (y>270) { doc.addPage(); addHeader(doc,'Auditoría técnica (cont.)',project); y=44; }
+        const r = resultsAud[item.id];
+        const mark = (r==='ok'||r==='si') ? '✓' : (r==='no_cumple'||r==='no') ? '✗' : r==='na' ? 'N/A' : '—';
         doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
-        doc.text(`${mark}  ${label}`, 18, y); y+=5;
-      });
+        doc.text(`${mark}  ${item.label}`, 18, y); y+=5;
+        if (esFormal && obsAud[item.id]) {
+          doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
+          doc.text(`   ${obsAud[item.id]}`, 18, y); y+=4;
+        }
+      }
+
+      const med     = aud.mediciones || {};
+      const medVals = MEDICIONES.filter(m => med[m.id]);
+      if (medVals.length) {
+        if (y>250) { doc.addPage(); addHeader(doc,'Auditoría técnica (cont.)',project); y=44; }
+        y+=2;
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...VERDE);
+        doc.text('Mediciones', 14, y); y+=6;
+        for (const m of medVals) {
+          doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+          doc.text(`${m.label}: ${med[m.id]} ${m.unit}`, 18, y); y+=5;
+        }
+      }
+
       if (aud.observaciones){ y+=2; y=campo(doc,'Observaciones',aud.observaciones,14,y); }
       if (aud.docFirmado){ y=await addImage(doc,aud.docFirmado,14,y,100,70); }
     }
@@ -688,26 +711,40 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
   // Auditoría
   if (sec('sec-auditoria') && project.auditoria?.resultado) {
     const aud = project.auditoria;
-    const AUDIT_LABELS = ['','Polaridad correcta','Torque verificado','Tierra física','Protecciones AC',
-      'Protecciones DC','Etiquetado','Canalización','Impermeabilización',
-      'Voltajes correctos','Equipo energizado','Monitoreo / Comunicación'];
     html += wPage() + wSec('Auditoría técnica');
     html += wCampo('Tipo', aud.tipo==='interna'?'Interna Ecofit':'Externa');
     html += wCampo('Auditor', aud.auditor?.nombre);
     if (aud.auditor?.empresa) html += wCampo('Empresa', aud.auditor.empresa);
     html += wCampo('Norma', aud.norma);
     html += wCampo('Resultado', aud.resultado?.replace(/_/g,' ').toUpperCase());
-    if (aud.checklist?.length) {
-      html += `<p style="font-weight:bold;margin-top:12pt">Checklist técnico</p>`;
-      html += `<table style="width:100%;border-collapse:collapse"><tr><th ${TH}>Ítem</th><th ${TH} style="text-align:center">Resultado</th></tr>`;
-      for (const item of aud.checklist) {
-        const label = AUDIT_LABELS[item.itemId] || `Ítem ${item.itemId}`;
-        const mark  = item.resultado==='ok'?'✓ OK':item.resultado==='no_cumple'?'✗ No cumple':'N/A';
-        const color = item.resultado==='ok'?'#1e7840':item.resultado==='no_cumple'?'#c82828':'#78888c';
-        html += `<tr><td ${TD}>${esc(label)}</td><td ${TD} style="text-align:center;color:${color};font-weight:bold">${mark}</td></tr>`;
+
+    const esFormalW   = aud.modo === 'formal';
+    const itemsAudW   = esFormalW ? CHECKLIST_FORMAL : CHECKLIST_RAPIDO;
+    const resultsAudW = esFormalW ? (aud.formalChecklist||{}) : (aud.rapidoChecklist||{});
+    const obsAudW     = aud.formalObs || {};
+    html += `<p style="font-weight:bold;margin-top:12pt">Checklist técnico (${esFormalW?'Formal':'Rápido'})</p>`;
+    html += `<table style="width:100%;border-collapse:collapse"><tr><th ${TH}>Ítem</th><th ${TH} style="text-align:center">Resultado</th></tr>`;
+    for (const item of itemsAudW) {
+      const r    = resultsAudW[item.id];
+      const ok   = r==='ok' || r==='si';
+      const nc   = r==='no_cumple' || r==='no';
+      const mark  = ok ? '✓ OK' : nc ? '✗ No cumple' : r==='na' ? 'N/A' : '—';
+      const color = ok ? '#1e7840' : nc ? '#c82828' : '#78888c';
+      html += `<tr><td ${TD}>${esc(item.label)}${obsAudW[item.id] ? `<br><small style="color:#78888c">${esc(obsAudW[item.id])}</small>` : ''}</td><td ${TD} style="text-align:center;color:${color};font-weight:bold">${mark}</td></tr>`;
+    }
+    html += '</table>';
+
+    const medW     = aud.mediciones || {};
+    const medValsW = MEDICIONES.filter(m => medW[m.id]);
+    if (medValsW.length) {
+      html += `<p style="font-weight:bold;margin-top:12pt">Mediciones</p>`;
+      html += `<table style="width:100%;border-collapse:collapse"><tr><th ${TH}>Medición</th><th ${TH}>Valor</th><th ${TH}>Referencia</th></tr>`;
+      for (const m of medValsW) {
+        html += `<tr><td ${TD}>${esc(m.label)}</td><td ${TD}>${esc(medW[m.id])} ${esc(m.unit)}</td><td ${TD}>${esc(m.ref)}</td></tr>`;
       }
       html += '</table>';
     }
+
     if (aud.observaciones) html += `<p><small style="color:#78888c;text-transform:uppercase;font-size:8pt">OBSERVACIONES</small><br>${esc(aud.observaciones)}</p>`;
     if (aud.docFirmado) html += wImg(aud.docFirmado, '400pt');
   }
