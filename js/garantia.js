@@ -129,6 +129,17 @@ export async function renderGarantia(projectId, session) {
         const btn = bar?.querySelector('[data-tab="' + target + '"]');
         if (btn) btn.click();
       }
+      // Si viene del Kit de obra (Checklist), abre el form de equipo pre-llenado
+      const kitPrefillRaw = sessionStorage.getItem('garantia-kit-prefill');
+      if (kitPrefillRaw) {
+        sessionStorage.removeItem('garantia-kit-prefill');
+        try {
+          const { kitId, nombre } = JSON.parse(kitPrefillRaw);
+          setTimeout(() => {
+            if (typeof showFormEquipoFromKit === 'function') showFormEquipoFromKit('${projectId}', kitId, nombre);
+          }, 150);
+        } catch (_) {}
+      }
       // Auto-calcular Voc si hay datos pre-cargados
       setTimeout(() => { if (typeof calcVoc === 'function') calcVoc(); }, 50);
     })();

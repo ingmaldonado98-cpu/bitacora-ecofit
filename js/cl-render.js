@@ -352,6 +352,10 @@ export async function renderChecklistModule(projectId, session) {
           <input type="text" class="cl-kit-input cl-kit-qty" placeholder="Cant."
             value="${esc(it.cantidad || '')}" ${!edit ? 'disabled' : ''}
             oninput="updKitEquipo('${projectId}','${kid}','cantidad',this.value)">
+          ${it.garantiaEquipoId
+            ? `<span class="cl-kit-instalado" title="Vinculado a Garantía">${icon('check-circle', 14)} Instalado</span>`
+            : (edit ? `<button class="btn-outline btn-sm cl-kit-link-btn"
+                onclick="_irAGarantiaDesdeKit('${projectId}','${kid}',this.closest('.cl-kit-row').querySelector('.cl-kit-input').value)">→ Registrar</button>` : '')}
           ${edit ? `<button class="btn-del-sm" onclick="delKitEquipo('${projectId}','${kid}')">✕</button>` : ''}
         </div>`).join('')}
         ${!Object.keys(kitEquipo).length ? '<p class="empty-msg-sm">Sin equipo agregado todavía.</p>' : ''}

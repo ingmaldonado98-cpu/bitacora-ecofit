@@ -1956,6 +1956,11 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 .cl-kit-input:disabled { opacity: .5; }
 .cl-kit-qty { flex: 0 0 64px; text-align: center; }
 .cl-kit-row.cl-item-done .cl-kit-input { color: var(--text-muted); text-decoration: line-through; }
+.cl-kit-link-btn { flex-shrink: 0; white-space: nowrap; }
+.cl-kit-instalado {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;
+  font-size: .76rem; font-weight: 600; color: var(--g300);
+}
 .cl-no-cfg p { font-size: .84rem; max-width: 240px; }
 .cl-locked-banner { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 12px; font-size: .8rem; color: var(--text-muted); }
 .cl-locked-banner p { margin: 0; }

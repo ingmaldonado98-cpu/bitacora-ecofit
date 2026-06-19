@@ -67,11 +67,14 @@ export function renderEquipos(equipos, projectId, edit, admin) {
   }).join('');
 }
 
-export function formEquipo(projectId, eq = null, editIdx = -1) {
+export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null) {
   const isEdit = editIdx >= 0 && eq;
+  const modeloVal = isEdit ? esc(eq.modelo) : esc(kitPrefill?.nombre || '');
   return `
     <h3 class="card-title">${isEdit ? 'Editar equipo' : 'Agregar equipo'}</h3>
     <input type="hidden" id="eq-editing-idx" value="${editIdx}" />
+    <input type="hidden" id="eq-kit-id" value="${esc(kitPrefill?.kitId || '')}" />
+    ${kitPrefill ? `<p class="form-hint">Viene del Kit de obra — completa tipo, marca y serial.</p>` : ''}
     <div class="form-row">
       <div class="form-group">
         <label>Tipo *</label>
@@ -91,7 +94,7 @@ export function formEquipo(projectId, eq = null, editIdx = -1) {
     <div class="form-group">
       <label>Modelo *</label>
       <input type="text" id="eq-modelo" placeholder="Ej: LXP-5K-48"
-             value="${isEdit ? esc(eq.modelo) : ''}"
+             value="${modeloVal}"
              oninput="toggleVocMaxField()" />
     </div>
     <!-- vocMax: solo para inversores -->
@@ -196,6 +199,16 @@ window.showFormEquipo = function(projectId) {
   form.scrollIntoView({ behavior:'smooth' });
 };
 
+// Abre el form pre-llenado desde una fila del Kit de obra (Checklist) — cierra
+// el hilo diseño/compra → instalado al vincular el equipo con su número de serie.
+window.showFormEquipoFromKit = function(projectId, kitId, nombre) {
+  const form = document.getElementById('form-equipo');
+  form.innerHTML = formEquipo(projectId, null, -1, { kitId, nombre });
+  _clearEqFotos();
+  form.style.display = 'block';
+  form.scrollIntoView({ behavior:'smooth' });
+};
+
 window.editarEquipo = async function(projectId, idx) {
   const p = await projects.getById(projectId);
   const eq = p.garantia.equipos[idx];
@@ -258,6 +271,12 @@ window.guardarEquipo = async function(projectId) {
 
   // setField en lugar de update() — escribe solo garantia.equipos, no el doc completo
   await projects.setField(projectId, 'garantia.equipos', newEquipos);
+
+  // Si viene del Kit de obra, vincula el item del kit con el equipo ya instalado
+  const kitId = document.getElementById('eq-kit-id')?.value;
+  if (kitId) {
+    await projects.setField(projectId, `checklistData.kitEquipo.${kitId}.garantiaEquipoId`, equipo.id);
+  }
 
   // Reparchar items de cola con el projectId real y el ID del equipo,
   // para que processQueue pueda actualizar el campo correcto al reconectar

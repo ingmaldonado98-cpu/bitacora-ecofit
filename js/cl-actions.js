@@ -45,6 +45,14 @@ window.updKitEquipo = (pid, id, field, val) => {
   }, 600);
 };
 
+// Cierra el hilo diseño/compra → instalado: lleva el item del Kit a Garantía
+// para registrarlo con tipo/marca/serial (rutas distintas, por eso sessionStorage).
+window._irAGarantiaDesdeKit = function(pid, kitId, nombre) {
+  sessionStorage.setItem('garantia-tab-target', 'g-equipos');
+  sessionStorage.setItem('garantia-kit-prefill', JSON.stringify({ kitId, nombre }));
+  navigate(`#proyecto/${pid}/garantia`);
+};
+
 let _execTextTimer = null;
 window.clSaveExecText = (pid, id, val) => {
   clearTimeout(_execTextTimer);
