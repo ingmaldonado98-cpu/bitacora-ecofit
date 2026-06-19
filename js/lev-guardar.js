@@ -303,28 +303,41 @@ window.capFotoArea = function(pid, areaIdx) {
   capturePhoto(async (b64Array) => {
     const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
     const total = fotos.length;
-    const prog = uploadProgressBar(total);
     const p = await projects.getById(pid);
     const areas = p.documentacion?.levantamiento?.areasTecho || [];
     if (!areas[areaIdx]) { toast('Área no encontrada', 'error'); return; }
     areas[areaIdx].fotos = Array.isArray(areas[areaIdx].fotos) ? areas[areaIdx].fotos : [];
-    for (let i = 0; i < total; i++) {
-      prog.update(i + 1);
-      const fid = uuid();
-      const result = await uploadPhotoQueued(fotos[i],
-        `projects/${pid}/area${areaIdx}_${fid}.jpg`, pid, 'fotoArea',
-        { areaIdx, itemId: fid });
-      areas[areaIdx].fotos.push({
-        url: result.url || null, id: fid, createdAt: isoNow(),
-        ...(result.pending && { pending: true, pendingId: result.pendingId }),
-      });
-      if (window._lev.areasTecho[areaIdx]) {
-        window._lev.areasTecho[areaIdx].fotos = [...areas[areaIdx].fotos];
+    const prog = uploadProgressBar(total);
+    let subidas = 0, fallo = null;
+    try {
+      for (let i = 0; i < total; i++) {
+        prog.update(i + 1);
+        const fid = uuid();
+        const result = await uploadPhotoQueued(fotos[i],
+          `projects/${pid}/area${areaIdx}_${fid}.jpg`, pid, 'fotoArea',
+          { areaIdx, itemId: fid });
+        areas[areaIdx].fotos.push({
+          url: result.url || null, id: fid, createdAt: isoNow(),
+          ...(result.pending && { pending: true, pendingId: result.pendingId }),
+        });
+        if (window._lev.areasTecho[areaIdx]) {
+          window._lev.areasTecho[areaIdx].fotos = [...areas[areaIdx].fotos];
+        }
+        subidas++;
       }
+    } catch (err) {
+      console.error('capFotoArea error:', err);
+      fallo = err;
+    } finally {
+      prog.done();
     }
-    prog.done();
     p.documentacion.levantamiento.areasTecho = areas;
     await projects.update(pid, { documentacion: p.documentacion });
+    if (fallo) {
+      toast(`⚠ Se guardaron ${subidas} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
+      navigate(`#proyecto/${pid}/levantamiento`);
+      return;
+    }
     navigate(`#proyecto/${pid}/levantamiento`);
     toast(`✅ ${total} foto${total > 1 ? 's' : ''} guardada${total > 1 ? 's' : ''}`);
   }, { multiple: true });

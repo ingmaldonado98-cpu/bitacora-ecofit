@@ -156,17 +156,30 @@ window.capFotoTecnicaDoc = function(projectId, key) {
       if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
       return Array.isArray(v) ? v : [];
     })();
-    for (let i = 0; i < total; i++) {
-      prog.update(i + 1);
-      const fid = uuid();
-      const result = await uploadPhotoQueued(fotos[i],
-        `projects/${projectId}/tecnica_${key}_${fid}.jpg`, projectId, 'fotoTecnica', { key, itemId: fid });
-      existentes.push({ url: result.url || null, id: fid, createdAt: isoNow(),
-        ...(result.pending && { pending: true, pendingId: result.pendingId }) });
+    let subidas = 0, fallo = null;
+    try {
+      for (let i = 0; i < total; i++) {
+        prog.update(i + 1);
+        const fid = uuid();
+        const result = await uploadPhotoQueued(fotos[i],
+          `projects/${projectId}/tecnica_${key}_${fid}.jpg`, projectId, 'fotoTecnica', { key, itemId: fid });
+        existentes.push({ url: result.url || null, id: fid, createdAt: isoNow(),
+          ...(result.pending && { pending: true, pendingId: result.pendingId }) });
+        subidas++;
+      }
+    } catch (err) {
+      console.error('capFotoTecnicaDoc error:', err);
+      fallo = err;
+    } finally {
+      prog.done();
     }
-    prog.done();
+    // Guardar lo que sí se subió, aunque haya fallado a la mitad
     p.garantia.fotosTecnicas[key] = existentes;
     await projects.update(projectId, { garantia: p.garantia });
+    if (fallo) {
+      toast(`⚠ Se guardaron ${subidas} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
+      return;
+    }
     _gotoCierre(_sitioForFTKey(key));
     navigate(`#proyecto/${projectId}/documentacion`);
     toast(`✅ ${total} foto${total > 1 ? 's' : ''} guardada${total > 1 ? 's' : ''}`);
@@ -191,21 +204,34 @@ window.capFotoAdicionalDoc = function(projectId) {
     const total = fotos.length;
     const prog = uploadProgressBar(total);
     const nuevas = [];
-    for (let i = 0; i < total; i++) {
-      prog.update(i + 1);
-      const fid = uuid();
-      const result = await uploadPhotoQueued(fotos[i],
-        `projects/${projectId}/adicional_${fid}.jpg`, projectId, 'fotoAdicional', { itemId: fid });
-      nuevas.push({ data: result.url || null,
-        nota: '', id: fid, createdAt: isoNow(),
-        ...(result.pending && { pending: true, pendingId: result.pendingId }) });
+    let fallo = null;
+    try {
+      for (let i = 0; i < total; i++) {
+        prog.update(i + 1);
+        const fid = uuid();
+        const result = await uploadPhotoQueued(fotos[i],
+          `projects/${projectId}/adicional_${fid}.jpg`, projectId, 'fotoAdicional', { itemId: fid });
+        nuevas.push({ data: result.url || null,
+          nota: '', id: fid, createdAt: isoNow(),
+          ...(result.pending && { pending: true, pendingId: result.pendingId }) });
+      }
+    } catch (err) {
+      console.error('capFotoAdicionalDoc error:', err);
+      fallo = err;
+    } finally {
+      prog.done();
     }
-    prog.done();
-    if (total === 1) nuevas[0].nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
+    if (!fallo && total === 1 && nuevas.length === 1) {
+      nuevas[0].nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
+    }
     const p = await projects.getById(projectId);
     p.garantia = p.garantia || {};
     p.garantia.fotosAdicionales = [...(p.garantia.fotosAdicionales || []), ...nuevas];
     await projects.update(projectId, { garantia: p.garantia });
+    if (fallo) {
+      toast(`⚠ Se guardaron ${nuevas.length} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
+      return;
+    }
     _gotoCierre('techo');
     navigate(`#proyecto/${projectId}/documentacion`);
     toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
@@ -347,24 +373,31 @@ window.agregarFotoSitio = function(projectId, sitio, subfase) {
     const total = fotos.length;
     const prog  = uploadProgressBar(total);
     const nuevas = [];
+    let fallo = null;
 
-    for (let i = 0; i < total; i++) {
-      prog.update(i + 1);
-      const fid = uuid();
-      const result = await uploadPhotoQueued(
-        fotos[i], `projects/${projectId}/${sitio}_${subfase}_${fid}.jpg`,
-        projectId, 'fotoFase', { sitio, subfase, itemId: fid }
-      );
-      nuevas.push({
-        data: result.url || null,
-        nota: '', id: fid, createdAt: isoNow(),
-        fuente: fileMeta?.fuente || 'camera',
-        ...(result.pending && { pending: true, pendingId: result.pendingId }),
-      });
+    try {
+      for (let i = 0; i < total; i++) {
+        prog.update(i + 1);
+        const fid = uuid();
+        const result = await uploadPhotoQueued(
+          fotos[i], `projects/${projectId}/${sitio}_${subfase}_${fid}.jpg`,
+          projectId, 'fotoFase', { sitio, subfase, itemId: fid }
+        );
+        nuevas.push({
+          data: result.url || null,
+          nota: '', id: fid, createdAt: isoNow(),
+          fuente: fileMeta?.fuente || 'camera',
+          ...(result.pending && { pending: true, pendingId: result.pendingId }),
+        });
+      }
+    } catch (err) {
+      console.error('agregarFotoSitio error:', err);
+      fallo = err;
+    } finally {
+      prog.done();
     }
-    prog.done();
 
-    if (total === 1) {
+    if (!fallo && total === 1 && nuevas.length === 1) {
       nuevas[0].nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
     }
 
@@ -375,6 +408,11 @@ window.agregarFotoSitio = function(projectId, sitio, subfase) {
 
     sessionStorage.setItem('doc-tab-target',  SITIO_TAB[sitio] || 'd-techo');
     sessionStorage.setItem('doc-subfa-target', subfase);
+    if (fallo) {
+      toast(`⚠ Se guardaron ${nuevas.length} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
+      navigate(`#proyecto/${projectId}/documentacion`);
+      return;
+    }
     navigate(`#proyecto/${projectId}/documentacion`);
     toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
   }, { multiple: true, projectId, fase: sitio, campo: subfase });
