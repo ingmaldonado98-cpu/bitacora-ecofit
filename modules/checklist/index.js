@@ -106,7 +106,25 @@ export function emptyChecklistState() {
   };
 }
 
-// ── Tierra: sub-ítems que se inyectan al final de cada bloque de inversor ──────
+// ── Fases del checklist de ejecución ───────────────────────────────────────────
+// El flujo en campo no sigue el orden de los módulos de datos — sigue la secuencia
+// física de la obra. Cada bloque de ejecución se etiqueta con su fase para que el
+// técnico entienda el orden aunque los bloques se repartan entre las pestañas de
+// sitio (Techo / Centros de carga / Zona del sistema).
+export const FASE_LABELS = {
+  1: 'Fase 1',
+  2: 'Fase 2',
+  3: 'Fase 3',
+  4: 'Fase 4',
+};
+export const FASE_DESC = {
+  1: 'Preparación y obra civil externa',
+  2: 'Canalizaciones e infraestructura de rutas',
+  3: 'Tendido eléctrico y montaje de módulos',
+  4: 'Comisionamiento, verificación y cierre',
+};
+
+// ── Tierra: bloque único compartido por todos los tipos de sistema ────────────
 const _tierraItems = [
   { id: 'ptr-01', n: 'Varilla PTR enterrada (profundidad suficiente)' },
   { id: 'ptr-02', n: 'Continuidad de tierra verificada con multímetro' },
@@ -114,197 +132,276 @@ const _tierraItems = [
   { id: 'ptr-04', n: 'Cable de tierra conectado a inversor / equipo principal' },
 ];
 
-// ── Bloques de ejecución por tipo de sistema ──────────────────────────────────
-// Bloques base: aplican a todos los sistemas (sin bloque Preparación)
-function _baseBlocks(techo) {
+// ── Fase 1 — Preparación y obra civil externa ─────────────────────────────────
+function _anclajeBlock(techo) {
   const esCemento = techo !== 'metal';
-  return [
-    {
-      id: 'struct', label: 'Estructura / Anclaje',
-      items: esCemento ? [
-        { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
-        { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
-        { id: 'st-02', n: 'Puntos de anclaje marcados según diagrama' },
-        { id: 'st-03', n: 'Perforación con rotomartillo — 5 cm profundidad con tubo guía' },
-        { id: 'st-04', n: 'Hoyos soplados y cepillados (sin polvo)' },
-        { id: 'st-05', n: 'Epóxico inyectado con pipeta (una por hoyo)' },
-        { id: 'st-06', n: 'Varilla roscada instalada y alineada' },
-        { id: 'st-07', n: 'Curado de epóxico completado (≥ 20 min)' },
-        { id: 'st-08', n: 'Bases L-foot colocadas con neopreno' },
-        { id: 'st-09', n: 'Rieles instalados y nivelados' },
-        { id: 'st-10', n: 'Cortes de riel correctos (medidas del diagrama)' },
-        { id: 'st-11', n: 'Paneles montados con mid/end-clamps' },
-        { id: 'st-12', n: 'Apriete de sujetadores aplicado con rach' },
-        { id: 'st-13', n: 'Bases y tuercas selladas con sellador blanco' },
-      ] : [
-        { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
-        { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
-        { id: 'st-02', n: 'Puntos de anclaje marcados sobre estructura metálica' },
-        { id: 'st-03', n: 'Perforación con WD-40 (broca para metal)' },
-        { id: 'st-04', n: 'Varilla roscada instalada con tuerca + arandelas' },
-        { id: 'st-05', n: 'Bases L-foot / soportes colocados' },
-        { id: 'st-06', n: 'Rieles instalados y nivelados' },
-        { id: 'st-07', n: 'Cortes de riel correctos (medidas del diagrama)' },
-        { id: 'st-08', n: 'Paneles montados con mid/end-clamps' },
-        { id: 'st-09', n: 'Apriete de sujetadores aplicado con rach' },
-        { id: 'st-10', n: 'Bases y tuercas selladas con sellador transparente' },
-      ],
-    },
-    {
-      id: 'canal', label: 'Canalización',
-      items: [
-        { id: 'cn-01', n: 'Ruta de canalización definida y marcada' },
-        { id: 'cn-02', n: 'Conduit/canaleta instalado desde paneles hasta tablero' },
-        { id: 'cn-03', n: 'Sujetadores y abrazaderas fijos cada 1.5 m máx' },
-        { id: 'cn-04', n: 'Entradas a tablero selladas (sin luz exterior)' },
-      ],
-    },
-    {
-      id: 'cable-dc', label: 'Cableado DC',
-      items: [
-        { id: 'dc-01', n: 'Cable DC tendido por canalización sin empalmes expuestos' },
-        { id: 'dc-02', n: 'Polaridad positiva/negativa verificada en cada string' },
-        { id: 'dc-03', n: 'Conectores MC4 engarzados y asegurados' },
-        { id: 'dc-04', n: 'Continuidad DC medida con multímetro' },
-      ],
-    },
-    {
-      id: 'prot-dc', label: 'Protecciones DC',
-      items: [
-        { id: 'pd-01', n: 'Fusibles DC instalados — calibre correcto por string' },
-        { id: 'pd-02', n: 'Seccionador DC instalado y accesible' },
-        { id: 'pd-03', n: 'DPS DC instalado (si aplica por normativa)' },
-      ],
-    },
-  ];
+  return {
+    id: 'anclaje', label: 'Anclaje e impermeabilización', fase: 1,
+    items: esCemento ? [
+      { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
+      { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
+      { id: 'st-02', n: 'Puntos de anclaje marcados según diagrama' },
+      { id: 'st-03', n: 'Perforación con rotomartillo — 5 cm profundidad con tubo guía' },
+      { id: 'st-04', n: 'Hoyos soplados y cepillados (sin polvo)' },
+      { id: 'st-05', n: 'Epóxico inyectado con pipeta (una por hoyo)' },
+      { id: 'st-06', n: 'Varilla roscada instalada y alineada' },
+      { id: 'st-07', n: 'Curado de epóxico completado (≥ 20 min)' },
+    ] : [
+      { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
+      { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
+      { id: 'st-02', n: 'Puntos de anclaje marcados sobre estructura metálica' },
+      { id: 'st-03', n: 'Perforación con WD-40 (broca para metal)' },
+      { id: 'st-04', n: 'Varilla roscada instalada con tuerca + arandelas' },
+    ],
+  };
 }
 
-// Bloques específicos por tipo de sistema (tierra incluida al final de cada inversor)
-const _typeBlocks = {
+const _COMPONENTE = {
+  interconectado:   { nombre: 'Inversor',            lugar: 'lugar ventilado, protegido de la luz solar directa' },
+  hibrido_respaldo: { nombre: 'Inversor híbrido',     lugar: 'lugar ventilado, protegido de la luz solar directa' },
+  aislado:          { nombre: 'Inversor/regulador',   lugar: 'lugar protegido de la intemperie' },
+  bombeo:           { nombre: 'Controlador de bomba', lugar: 'lugar protegido de lluvia' },
+  sistema_pequeno:  { nombre: 'Controlador de carga', lugar: 'lugar ventilado' },
+};
+function _invFixBlock(tipo) {
+  const c = _COMPONENTE[tipo] || _COMPONENTE.interconectado;
+  return {
+    id: 'inv-fix', label: `Fijación de ${c.nombre.toLowerCase()} y tableros`, fase: 1,
+    items: [
+      { id: 'if-01', n: `${c.nombre} montado y nivelado en ${c.lugar}` },
+      { id: 'if-02', n: 'Gabinetes vacíos de protección CD/CA instalados (si aplica)' },
+    ],
+  };
+}
+
+function _armazonBlock(techo) {
+  const esCemento = techo !== 'metal';
+  const base = esCemento ? [
+    { id: 'st-08', n: 'Bases L-foot colocadas con neopreno' },
+    { id: 'st-09', n: 'Rieles instalados y nivelados' },
+    { id: 'st-10', n: 'Cortes de riel correctos (medidas del diagrama)' },
+  ] : [
+    { id: 'st-05', n: 'Bases L-foot / soportes colocados' },
+    { id: 'st-06', n: 'Rieles instalados y nivelados' },
+    { id: 'st-07', n: 'Cortes de riel correctos (medidas del diagrama)' },
+  ];
+  const sellado = esCemento
+    ? { id: 'st-13', n: 'Bases y tuercas selladas con sellador blanco' }
+    : { id: 'st-10', n: 'Bases y tuercas selladas con sellador transparente' };
+  return {
+    id: 'armazon', label: 'Montaje de armazón y par galvánico', fase: 1,
+    items: [
+      ...base,
+      { id: 'pg-01', n: 'Arandelas de aislamiento colocadas entre metales disímiles (acero/aluminio)' },
+      { id: 'ic-01', n: 'Inclinación y orientación validadas con nivel/brújula antes de bloquear estructura' },
+      sellado,
+    ],
+  };
+}
+
+// ── Fase 2 — Canalizaciones e infraestructura de rutas ────────────────────────
+function _canalBlock() {
+  return {
+    id: 'canal', label: 'Canalización y protección', fase: 2,
+    items: [
+      { id: 'cn-01', n: 'Ruta de canalización definida y marcada' },
+      { id: 'cn-02', n: 'Conduit/canaleta instalado desde paneles hasta tablero' },
+      { id: 'cn-03', n: 'Sujetadores y abrazaderas fijos cada 1.5 m máx' },
+      { id: 'cn-04', n: 'Entradas a tablero selladas (sin luz exterior)' },
+      { id: 'in-01', n: 'Coples / conectores estancos contra lluvia y polvo colocados' },
+      { id: 'in-02', n: 'Extremos de cable expuestos sellados' },
+    ],
+  };
+}
+
+// ── Fase 3 — Tendido eléctrico y montaje de módulos ───────────────────────────
+function _panelFixBlock(techo) {
+  const esCemento = techo !== 'metal';
+  return {
+    id: 'panel-fix', label: 'Fijación física y torque de paneles', fase: 3,
+    items: esCemento ? [
+      { id: 'st-11', n: 'Paneles montados con mid/end-clamps' },
+      { id: 'st-12', n: 'Torque aplicado con torquímetro — alineación y estética verificadas' },
+    ] : [
+      { id: 'st-08', n: 'Paneles montados con mid/end-clamps' },
+      { id: 'st-09', n: 'Torque aplicado con torquímetro — alineación y estética verificadas' },
+    ],
+  };
+}
+
+// Cableado CA y protecciones — trimmed por tipo (sin montaje, sin tierra, sin energizado;
+// esos pasos viven en inv-fix / tierra / puesta-marcha respectivamente)
+const _cableAcBlocks = {
   interconectado: [
-    {
-      id: 'inversor', label: 'Inversor y puesta a tierra',
-      items: [
-        { id: 'inv-01', n: 'Inversor montado y nivelado en lugar ventilado' },
-        { id: 'inv-02', n: 'Conexión DC al inversor verificada' },
-        { id: 'inv-03', n: 'Cable AC tendido hasta tablero principal' },
-        { id: 'inv-04', n: 'Protección AC (interruptor dedicado) instalada en tablero' },
-        ..._tierraItems,
-        { id: 'inv-05', n: 'Inversor energizado — sin fallas ni alarmas' },
-        { id: 'inv-06', n: 'Monitoreo configurado y datos visibles' },
-      ],
-    },
-    {
-      id: 'cfe', label: 'Conexión CFE / Red',
-      items: [
-        { id: 'cfe-01', n: 'Solicitud de interconexión presentada a CFE' },
-        { id: 'cfe-02', n: 'Medidor bidireccional instalado (si ya aprobó CFE)' },
-        { id: 'cfe-03', n: 'Etiquetas reglamentarias colocadas en tablero y punto de desconexión' },
-      ],
-    },
+    { id: 'cable-ac', label: 'Cableado CA y protecciones', fase: 3, items: [
+      { id: 'inv-02', n: 'Conexión DC al inversor verificada' },
+      { id: 'inv-03', n: 'Cable AC tendido hasta tablero principal' },
+      { id: 'inv-04', n: 'Protección AC (interruptor dedicado) instalada en tablero' },
+    ]},
   ],
   hibrido_respaldo: [
-    {
-      id: 'inversor', label: 'Inversor y puesta a tierra',
-      items: [
-        { id: 'inv-01', n: 'Inversor híbrido montado y nivelado' },
-        { id: 'inv-02', n: 'Conexión DC (paneles) al inversor verificada' },
-        { id: 'inv-03', n: 'Cable AC tendido hasta tablero' },
-        { id: 'inv-04', n: 'Protección AC instalada en tablero' },
-        ..._tierraItems,
-        { id: 'inv-05', n: 'Modo de operación configurado (grid-tie + respaldo)' },
-        { id: 'inv-06', n: 'Inversor energizado — sin fallas' },
-      ],
-    },
-    {
-      id: 'baterias', label: 'Banco de baterías',
-      items: [
-        { id: 'bat-01', n: 'Baterías instaladas en rack o caja ventilada' },
-        { id: 'bat-02', n: 'Conexión en serie/paralelo según especificación del banco' },
-        { id: 'bat-03', n: 'Fusible o seccionador de batería instalado' },
-        { id: 'bat-04', n: 'BMS configurado y comunicación verificada (si aplica)' },
-        { id: 'bat-05', n: 'Voltaje del banco medido y dentro del rango' },
-      ],
-    },
+    { id: 'cable-ac', label: 'Cableado CA y protecciones', fase: 3, items: [
+      { id: 'inv-02', n: 'Conexión DC (paneles) al inversor verificada' },
+      { id: 'inv-03', n: 'Cable AC tendido hasta tablero' },
+      { id: 'inv-04', n: 'Protección AC instalada en tablero' },
+    ]},
+    { id: 'baterias', label: 'Banco de baterías', fase: 3, items: [
+      { id: 'bat-01', n: 'Baterías instaladas en rack o caja ventilada' },
+      { id: 'bat-02', n: 'Conexión en serie/paralelo según especificación del banco' },
+      { id: 'bat-03', n: 'Fusible o seccionador de batería instalado' },
+      { id: 'bat-04', n: 'BMS configurado y comunicación verificada (si aplica)' },
+      { id: 'bat-05', n: 'Voltaje del banco medido y dentro del rango' },
+    ]},
   ],
   aislado: [
-    {
-      id: 'inversor', label: 'Inversor / Regulador y puesta a tierra',
-      items: [
-        { id: 'inv-01', n: 'Inversor/regulador montado en lugar protegido' },
-        { id: 'inv-02', n: 'Conexión DC desde paneles verificada' },
-        { id: 'inv-03', n: 'Salida AC configurada y protegida (si aplica)' },
-        ..._tierraItems,
-        { id: 'inv-04', n: 'Sistema energizado — sin fallas' },
-      ],
-    },
-    {
-      id: 'baterias', label: 'Banco de baterías',
-      items: [
-        { id: 'bat-01', n: 'Baterías instaladas en rack o caja ventilada' },
-        { id: 'bat-02', n: 'Conexión en serie/paralelo según especificación del banco' },
-        { id: 'bat-03', n: 'Fusible de batería instalado' },
-        { id: 'bat-04', n: 'BMS configurado (si aplica)' },
-        { id: 'bat-05', n: 'Voltaje del banco medido y correcto' },
-      ],
-    },
+    { id: 'cable-ac', label: 'Cableado CA (si aplica)', fase: 3, items: [
+      { id: 'inv-02', n: 'Conexión DC desde paneles verificada' },
+      { id: 'inv-03', n: 'Salida AC configurada y protegida (si aplica)' },
+    ]},
+    { id: 'baterias', label: 'Banco de baterías', fase: 3, items: [
+      { id: 'bat-01', n: 'Baterías instaladas en rack o caja ventilada' },
+      { id: 'bat-02', n: 'Conexión en serie/paralelo según especificación del banco' },
+      { id: 'bat-03', n: 'Fusible de batería instalado' },
+      { id: 'bat-04', n: 'BMS configurado (si aplica)' },
+      { id: 'bat-05', n: 'Voltaje del banco medido y correcto' },
+    ]},
   ],
   bombeo: [
-    {
-      id: 'controlador', label: 'Controlador de bomba y puesta a tierra',
-      items: [
-        { id: 'ctrl-01', n: 'Controlador montado en lugar protegido de lluvia' },
-        { id: 'ctrl-02', n: 'Conexión DC desde paneles al controlador verificada' },
-        { id: 'ctrl-03', n: 'Conexión del motor al controlador verificada' },
-        ..._tierraItems,
-        { id: 'ctrl-04', n: 'Parámetros configurados (voltaje, frecuencia, protecciones)' },
-      ],
-    },
-    {
-      id: 'bomba', label: 'Motor / Bomba',
-      items: [
-        { id: 'bom-01', n: 'Bomba instalada en pozo o toma de agua' },
-        { id: 'bom-02', n: 'Tuberías conectadas y sin fugas' },
-        { id: 'bom-03', n: 'Nivel de agua suficiente para bomba sumergible' },
-        { id: 'bom-04', n: 'Prueba de operación — flujo verificado' },
-      ],
-    },
+    { id: 'cable-ac', label: 'Cableado del controlador', fase: 3, items: [
+      { id: 'ctrl-02', n: 'Conexión DC desde paneles al controlador verificada' },
+      { id: 'ctrl-03', n: 'Conexión del motor al controlador verificada' },
+    ]},
+    { id: 'bomba', label: 'Motor / Bomba', fase: 3, items: [
+      { id: 'bom-01', n: 'Bomba instalada en pozo o toma de agua' },
+      { id: 'bom-02', n: 'Tuberías conectadas y sin fugas' },
+      { id: 'bom-03', n: 'Nivel de agua suficiente para bomba sumergible' },
+    ]},
   ],
   sistema_pequeno: [
-    {
-      id: 'equipo', label: 'Equipos, conexión y tierra',
-      items: [
-        { id: 'eq-01', n: 'Panel(es) instalados y correctamente orientados' },
-        { id: 'eq-02', n: 'Controlador de carga conectado entre paneles y batería' },
-        { id: 'eq-03', n: 'Batería conectada (si incluye)' },
-        ..._tierraItems,
-        { id: 'eq-04', n: 'Carga / equipo (congelador, etc.) conectado' },
-        { id: 'eq-05', n: 'Sistema energizado — sin fallas' },
-      ],
-    },
+    { id: 'cable-ac', label: 'Conexión de equipos', fase: 3, items: [
+      { id: 'eq-01', n: 'Panel(es) instalados y correctamente orientados' },
+      { id: 'eq-02', n: 'Controlador de carga conectado entre paneles y batería' },
+      { id: 'eq-03', n: 'Batería conectada (si incluye)' },
+      { id: 'eq-04', n: 'Carga / equipo (congelador, etc.) conectado' },
+    ]},
   ],
 };
 
-// Bloque de cierre: aplica a todos los sistemas
-const _closingBlocks = [
-  {
-    id: 'cierre', label: 'Puesta en marcha y cierre',
-    items: [
-      { id: 'pm-01', n: 'Voltaje y corriente DC verificados en operación', hasInput: true, inputPlaceholder: 'Ej. 380 V / 8 A' },
-      { id: 'pm-02', n: 'Sistema operando sin alarmas ni fallas activas' },
-      { id: 'pm-03', n: 'Fotos técnicas subidas en módulo Garantía', isNav: true, navRoute: 'garantia' },
-      { id: 'pm-04', n: 'Cliente informado y uso del sistema explicado' },
-    ],
-  },
-];
+const _etiquetadoBlock = {
+  id: 'etiquetado', label: 'Identificación', fase: 3,
+  items: [
+    { id: 'et-01', n: 'Cables identificados: positivo, negativo, fases, neutro, tierra' },
+    { id: 'et-02', n: 'Calcomanías de advertencia "Sistema Fotovoltaico" colocadas' },
+  ],
+};
 
-export function getExecBlocks(tipoSistema, techo) {
-  const tipo       = tipoSistema || 'interconectado';
-  const typeSpec   = _typeBlocks[tipo] || _typeBlocks.interconectado;
+// ── Fase 4 — Comisionamiento, verificación y cierre ───────────────────────────
+function _medicionItems(project) {
+  const strings = project?.garantia?.paneles?.strings || [];
+  if (!strings.length) {
+    return [{ id: 'med-01', n: 'Voc/Isc registrados por cadena', hasInput: true, inputPlaceholder: 'Ej: String 1: 380V / 8.2A' }];
+  }
+  return strings.flatMap((s, i) => ([
+    { id: `med-voc-${i}`, n: `Voc — ${s.nombre || `String ${i+1}`}`, hasInput: true, inputPlaceholder: 'Ej: 380 V' },
+    { id: `med-isc-${i}`, n: `Isc — ${s.nombre || `String ${i+1}`}`, hasInput: true, inputPlaceholder: 'Ej: 8.2 A' },
+  ]));
+}
+function _verificacionBlock(project) {
+  return {
+    id: 'verificacion', label: 'Verificación previa al encendido', fase: 4,
+    items: [
+      ..._medicionItems(project),
+      { id: 'med-02', n: 'Voltajes CA medidos (fase-fase, fase-neutro, fase-tierra)', hasInput: true, inputPlaceholder: 'Ej: 220V / 127V / 127V' },
+      { id: 'med-03', n: 'Resistencia de la red de tierra física medida', hasInput: true, inputPlaceholder: 'Ej: 4.8 Ω' },
+    ],
+  };
+}
+
+const _ENERGIZADO_ITEMS = {
+  interconectado:   [{ id: 'inv-05', n: 'Inversor energizado — sin fallas ni alarmas' }],
+  hibrido_respaldo: [{ id: 'inv-05', n: 'Modo de operación configurado (grid-tie + respaldo)' },
+                      { id: 'inv-06', n: 'Inversor energizado — sin fallas' }],
+  aislado:          [{ id: 'inv-04', n: 'Sistema energizado — sin fallas' }],
+  bombeo:           [{ id: 'ctrl-04', n: 'Parámetros configurados (voltaje, frecuencia, protecciones)' },
+                      { id: 'bom-04', n: 'Prueba de operación — flujo verificado' }],
+  sistema_pequeno:  [{ id: 'eq-05', n: 'Sistema energizado — sin fallas' }],
+};
+function _puestaMarchaBlock(tipo) {
+  const energ = _ENERGIZADO_ITEMS[tipo] || _ENERGIZADO_ITEMS.interconectado;
+  return {
+    id: 'puesta-marcha', label: 'Puesta en marcha y monitoreo', fase: 4,
+    items: [
+      { id: 'pm-05', n: 'Estándar de red/país configurado en el inversor (si aplica)' },
+      { id: 'pm-06', n: 'Encendido secuencial realizado — CD primero, luego CA' },
+      ...energ,
+      { id: 'mon-01', n: 'Vinculado a WiFi/Ethernet del sitio o módem dedicado (si aplica)' },
+      { id: 'mon-02', n: 'Planta creada en la plataforma del fabricante y cliente registrado (si aplica)' },
+    ],
+  };
+}
+
+// Interconexión CFE en modo Zero Export — sin contrato de interconexión vigente.
+// cfe-01/cfe-02 se conservan por si en el futuro aplica un trámite formal con CFE.
+function _cfeBlock(tipo) {
+  if (!['interconectado', 'hibrido_respaldo'].includes(tipo)) return null;
+  return {
+    id: 'cfe', label: 'Interconexión CFE — Zero Export', fase: 4,
+    items: [
+      { id: 'zx-01', n: 'Inversor configurado en modo Zero Export (límite de exportación = 0%)' },
+      { id: 'zx-02', n: 'CT / sensor de exportación instalado y calibrado en la acometida' },
+      { id: 'zx-03', n: 'Verificado con pinza amperométrica — sin flujo inverso hacia la red en operación normal' },
+      { id: 'cfe-03', n: 'Etiquetas reglamentarias colocadas en tablero y punto de desconexión' },
+      { id: 'cfe-01', n: 'Solicitud de interconexión presentada a CFE (solo si se gestiona contrato — no aplica en zero export)' },
+      { id: 'cfe-02', n: 'Medidor bidireccional instalado (solo si CFE aprobó contrato de interconexión)' },
+    ],
+  };
+}
+
+const _cierreBlock = {
+  id: 'cierre', label: 'Limpieza, revisión y entrega', fase: 4,
+  items: [
+    { id: 'ci-01', n: 'Herramientas y materiales sobrantes retirados del techo' },
+    { id: 'ci-02', n: 'Revisión de raspaduras o daños en impermeabilización' },
+    { id: 'ci-03', n: 'Módulos lavados con agua pura — sin polvo de obra' },
+    { id: 'pm-03', n: 'Fotos técnicas subidas en módulo Garantía', isNav: true, navRoute: 'garantia' },
+    { id: 'pm-04', n: 'Cliente informado y uso del sistema explicado' },
+  ],
+};
+
+// ── Ensamble final — orden = secuencia física de la obra, no el orden de los módulos ──
+export function getExecBlocks(project, techo) {
+  const tipo     = project?.tipoSistema || 'interconectado';
+  const t        = techo || 'cemento';
+  const cableAc  = _cableAcBlocks[tipo] || _cableAcBlocks.interconectado;
+  const cfe      = _cfeBlock(tipo);
   return [
-    ..._baseBlocks(techo || 'cemento'),
-    ...typeSpec,
-    ..._closingBlocks,
+    // Fase 1 — Preparación y obra civil externa
+    _anclajeBlock(t),
+    _invFixBlock(tipo),
+    _armazonBlock(t),
+    // Fase 2 — Canalizaciones e infraestructura de rutas
+    _canalBlock(),
+    // Fase 3 — Tendido eléctrico y montaje de módulos
+    _panelFixBlock(t),
+    { id: 'cable-dc', label: 'Cableado DC', fase: 3, items: [
+      { id: 'dc-01', n: 'Cable DC tendido por canalización sin empalmes expuestos' },
+      { id: 'dc-02', n: 'Polaridad positiva/negativa verificada en cada string' },
+      { id: 'dc-03', n: 'Conectores MC4 engarzados y asegurados' },
+      { id: 'dc-04', n: 'Continuidad DC medida con multímetro' },
+    ]},
+    { id: 'prot-dc', label: 'Protecciones DC', fase: 3, items: [
+      { id: 'pd-01', n: 'Fusibles DC instalados — calibre correcto por string' },
+      { id: 'pd-02', n: 'Seccionador DC instalado y accesible' },
+      { id: 'pd-03', n: 'DPS DC instalado (si aplica por normativa)' },
+    ]},
+    { id: 'tierra', label: 'Puesta a tierra', fase: 3, items: [..._tierraItems] },
+    ...cableAc,
+    _etiquetadoBlock,
+    // Fase 4 — Comisionamiento, verificación y cierre
+    _verificacionBlock(project),
+    _puestaMarchaBlock(tipo),
+    ...(cfe ? [cfe] : []),
+    _cierreBlock,
   ];
 }
 

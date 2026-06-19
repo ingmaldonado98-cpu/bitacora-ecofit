@@ -428,7 +428,7 @@ export async function renderChecklistsList(session) {
     const herr = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
     const cons = cfg ? (cfg.computed?.consumibles || []) : [];
 
-    const execBlocksL   = getExecBlocks(p.tipoSistema, techo);
+    const execBlocksL   = getExecBlocks(p, techo);
     const execAllItemsL = execBlocksL.flatMap(b => b.items);
 
     const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length + execAllItemsL.length;

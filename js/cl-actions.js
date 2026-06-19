@@ -93,7 +93,7 @@ window.clExportPDF = async function(projectId) {
     ? `Aprobado por ${cl.publishedBy} · ${new Date(cl.publishedAt).toLocaleDateString('es-MX')}`
     : 'Pendiente de aprobación';
 
-  const execBlocks  = getExecBlocks(project.tipoSistema, techo);
+  const execBlocks  = getExecBlocks(project, techo);
   const torqueRows  = buildTorqueTable(cfg?.estructura || 'k2', techo);
   const torqData    = cl.torques || {};
   const execText    = cl.execText || {};

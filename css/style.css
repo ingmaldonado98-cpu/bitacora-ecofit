@@ -2745,6 +2745,12 @@ details.cl-exec-block summary.cl-exec-block-hdr {
   cursor: pointer; list-style: none; user-select: none;
 }
 details.cl-exec-block summary.cl-exec-block-hdr::-webkit-details-marker { display: none; }
+.cl-exec-fase-badge {
+  font-size: .68rem; font-weight: 700; letter-spacing: .02em;
+  color: var(--solar); background: rgba(245,166,35,.12);
+  border: 1px solid rgba(245,166,35,.3);
+  border-radius: 8px; padding: 1px 7px; flex-shrink: 0;
+}
 .cl-exec-block-title { flex: 1; font-size: .86rem; font-weight: 700; color: var(--text); }
 .cl-exec-block-badge {
   font-size: .72rem; font-weight: 700; font-family: monospace;

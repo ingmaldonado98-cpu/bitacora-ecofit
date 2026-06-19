@@ -3,11 +3,13 @@
 
 import { esc } from './utils.js';
 import { icon } from './icons.js';
+import { FASE_LABELS, FASE_DESC } from '../modules/checklist/index.js';
 
 export const EXEC_POR_SITIO = {
-  techo:          ['struct', 'canal', 'cable-dc'],
+  techo:          ['anclaje', 'armazon', 'canal', 'panel-fix', 'cable-dc'],
   centrosCarga:   ['cfe'],
-  zonaDelSistema: ['prot-dc', 'inversor', 'controlador', 'equipo', 'baterias', 'bomba', 'cierre'],
+  zonaDelSistema: ['inv-fix', 'prot-dc', 'tierra', 'cable-ac', 'baterias', 'bomba',
+                    'etiquetado', 'verificacion', 'puesta-marcha', 'cierre'],
 };
 
 export function renderExecPorSitio(project, sitio, allExecBlocks, edit) {
@@ -65,6 +67,7 @@ export function renderExecPorSitio(project, sitio, allExecBlocks, edit) {
       return `
       <details class="cl-exec-block" ${ok ? '' : 'open'}>
         <summary class="cl-exec-block-hdr">
+          <span class="cl-exec-fase-badge" title="${esc(FASE_DESC[block.fase] || '')}">${esc(FASE_LABELS[block.fase] || '')}</span>
           <span class="cl-exec-block-title">${esc(block.label)}</span>
           <span class="cl-exec-block-badge ${ok ? 'cl-exec-ok' : ''}">${ok ? '✓' : `${bd}/${bt}`}</span>
           <span class="cl-exec-caret">▾</span>

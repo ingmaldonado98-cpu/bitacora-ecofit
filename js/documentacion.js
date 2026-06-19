@@ -31,7 +31,7 @@ export async function renderDocumentacion(projectId, session) {
   const cNotas   = (project.documentacion?.notas || []).length;
 
   // Exec blocks por sección
-  const allExecBlocks = getExecBlocks(project.tipoSistema, techo);
+  const allExecBlocks = getExecBlocks(project, techo);
   const _exCount = (sitio) => {
     const items = allExecBlocks.filter(b => EXEC_POR_SITIO[sitio]?.includes(b.id)).flatMap(b => b.items);
     return { done: items.filter(it => cl.exec?.[it.id]).length, total: items.length };
