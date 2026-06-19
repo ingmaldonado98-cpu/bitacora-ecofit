@@ -26,6 +26,7 @@ window.guardarLevantamiento = async function(e, projectId) {
     .filter(a => a.nombre || a.ancho || a.largo)
     .map(a => ({
       nombre:             a.nombre || `Área ${window._lev.areasTecho.indexOf(a)+1}`,
+      tipTecho:           a.tipTecho || null, // null = usa el tipo de techo general del sitio
       ancho:              a.ancho  || null,
       largo:              a.largo  || null,
       area:               (a.ancho && a.largo) ? parseFloat((a.ancho*a.largo).toFixed(2)) : null,

@@ -55,9 +55,10 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
   const areas = lev.areasTecho || [];
   if (areas.length) {
     html += `<p style="font-weight:bold;color:#16a34a;margin:12pt 0 6pt">Áreas del techo</p>`;
+    const techoMixto = areas.some(a => a.tipTecho);
     html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8pt">
       <tr>
-        <th ${TH}>Área</th><th ${TH}>Dimensiones</th><th ${TH}>Superficie</th>
+        <th ${TH}>Área</th>${techoMixto ? `<th ${TH}>Tipo de techo</th>` : ''}<th ${TH}>Dimensiones</th><th ${TH}>Superficie</th>
         <th ${TH}>Orientación</th><th ${TH}>Inclinación</th><th ${TH}>Pisos</th>
         <th ${TH}>Tablero→Inv.</th><th ${TH}>Inv.→Paneles</th>
       </tr>`;
@@ -65,7 +66,7 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
       const dim = (a.ancho && a.largo) ? `${a.ancho} × ${a.largo} m` : '—';
       const sup = (a.ancho && a.largo) ? `${(a.ancho * a.largo).toFixed(1)} m²` : (a.area ? `${a.area} m²` : '—');
       html += `<tr>
-        <td ${TD}>${esc(a.nombre || '—')}</td><td ${TD}>${dim}</td><td ${TD}>${sup}</td>
+        <td ${TD}>${esc(a.nombre || '—')}</td>${techoMixto ? `<td ${TD}>${esc(a.tipTecho || '(igual al general)')}</td>` : ''}<td ${TD}>${dim}</td><td ${TD}>${sup}</td>
         <td ${TD}>${esc(a.orientacion || '—')}</td>
         <td ${TD}>${a.inclinacion != null ? `${a.inclinacion}°` : '—'}</td>
         <td ${TD}>${a.pisos != null ? a.pisos : '—'}</td>

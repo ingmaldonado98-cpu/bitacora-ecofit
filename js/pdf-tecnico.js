@@ -126,7 +126,7 @@ window.exportarPDFTecnico = async function(projectId) {
           if (y>250) { doc.addPage(); addHeader(doc,'Levantamiento técnico (cont.)',project); y=44; }
           const dim = (a.ancho && a.largo) ? `${a.ancho} × ${a.largo} m` : (a.area ? `${a.area} m²` : '—');
           doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GRIS);
-          doc.text(a.nombre || 'Área', 14, y); y += 5;
+          doc.text(`${a.nombre || 'Área'}${a.tipTecho ? ` (${a.tipTecho})` : ''}`, 14, y); y += 5;
           doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GRIS_CLR);
           doc.text(`Dim: ${dim} · Orientación: ${a.orientacion||'—'} · Inclinación: ${a.inclinacion!=null?`${a.inclinacion}°`:'—'} · Pisos: ${a.pisos!=null?a.pisos:'—'}`, 14, y); y += 4;
           doc.text(`Tablero→Inv.: ${a.distTableroInversor!=null?`${a.distTableroInversor} m`:'—'} · Inv.→Paneles: ${a.distInversorPaneles!=null?`${a.distInversorPaneles} m`:'—'}`, 14, y); y += 7;
@@ -529,16 +529,17 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
     // Áreas del techo (orientación/inclinación/pisos/distancias viven por área)
     const areasLev = lev.areasTecho || [];
     if (areasLev.length) {
+      const techoMixtoW = areasLev.some(a => a.tipTecho);
       html += `<p style="font-weight:bold;color:#40916C;margin-top:8pt">Áreas del techo</p>`;
       html += `<table style="width:100%;border-collapse:collapse"><tr>
-        <th ${TH}>Área</th><th ${TH}>Dimensiones</th><th ${TH}>Orientación</th>
+        <th ${TH}>Área</th>${techoMixtoW ? `<th ${TH}>Tipo de techo</th>` : ''}<th ${TH}>Dimensiones</th><th ${TH}>Orientación</th>
         <th ${TH}>Inclinación</th><th ${TH}>Pisos</th>
         <th ${TH}>Tablero→Inv.</th><th ${TH}>Inv.→Paneles</th>
       </tr>`;
       for (const a of areasLev) {
         const dim = (a.ancho && a.largo) ? `${a.ancho} × ${a.largo} m` : (a.area ? `${a.area} m²` : '—');
         html += `<tr>
-          <td ${TD}>${esc(a.nombre || '—')}</td><td ${TD}>${dim}</td>
+          <td ${TD}>${esc(a.nombre || '—')}</td>${techoMixtoW ? `<td ${TD}>${esc(a.tipTecho || '(igual al general)')}</td>` : ''}<td ${TD}>${dim}</td>
           <td ${TD}>${esc(a.orientacion || '—')}</td>
           <td ${TD}>${a.inclinacion != null ? `${a.inclinacion}°` : '—'}</td>
           <td ${TD}>${a.pisos != null ? a.pisos : '—'}</td>

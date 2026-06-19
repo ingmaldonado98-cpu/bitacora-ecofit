@@ -30,6 +30,11 @@ window._onTipTechoChange = function(sel) {
 // state en window.window._lev.pid
 
 
+// Mismas opciones que el selector general de techo (lev-form.js) — se usa
+// solo cuando un área tiene un tipo de techo distinto al del resto del sitio
+// (ej. ampliación con lámina sobre una losa de concreto existente).
+const TIPOS_TECHO_AREA = ['Losa de concreto','Lámina','Metálico','Madera','Otro'];
+
 export function _renderAreasTecho(areas, edit, pid) {
   if (!areas.length && !edit) return '';
   const ORIENTACIONES = ['Sur','Poniente','Oriente','Norte','Sur-Poniente','Sur-Oriente'];
@@ -46,6 +51,13 @@ export function _renderAreasTecho(areas, edit, pid) {
         <input type="text" class="input-field" value="${esc(a.nombre||'')}"
                placeholder="Ej: Techo sur, Bodega…"
                ${edit?`oninput="window._updateAreaTecho(${i},'nombre',this.value)"`:''} ${edit?'':'disabled'} />
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Tipo de techo <span class="form-hint">si es distinto</span></label>
+        <select ${edit?`onchange="window._updateAreaTecho(${i},'tipTecho',this.value)"`:''} ${edit?'':'disabled'}>
+          <option value="">— Igual al general —</option>
+          ${TIPOS_TECHO_AREA.map(t=>`<option ${a.tipTecho===t?'selected':''}>${t}</option>`).join('')}
+        </select>
       </div>
       <div class="form-group" style="flex:1">
         <label>Ancho (m)</label>
@@ -119,7 +131,7 @@ export function _renderAreasTecho(areas, edit, pid) {
 
 window._addAreaTecho = function() {
   const n = window._lev.areasTecho.length + 1;
-  window._lev.areasTecho.push({ nombre: `Área ${n}`, ancho: null, largo: null, orientacion: 'Sur', pisos: null, inclinacion: null, distTableroInversor: null, distInversorPaneles: null, fotos: [] });
+  window._lev.areasTecho.push({ nombre: `Área ${n}`, tipTecho: null, ancho: null, largo: null, orientacion: 'Sur', pisos: null, inclinacion: null, distTableroInversor: null, distInversorPaneles: null, fotos: [] });
   const list = document.getElementById('lev-areas-list');
   if (list) list.innerHTML = _renderAreasTecho(window._lev.areasTecho, true, window._lev.pid);
 };
@@ -135,8 +147,8 @@ window._removeAreaTecho = async function(idx) {
 
 window._updateAreaTecho = function(idx, campo, val) {
   if (!window._lev.areasTecho[idx]) return;
-  const isStr = campo === 'nombre' || campo === 'orientacion';
-  window._lev.areasTecho[idx][campo] = isStr ? val : (parseFloat(val) || null);
+  const isStr = campo === 'nombre' || campo === 'orientacion' || campo === 'tipTecho';
+  window._lev.areasTecho[idx][campo] = isStr ? (val || null) : (parseFloat(val) || null);
   const a = window._lev.areasTecho[idx];
   const res = document.getElementById(`lev-area-res-${idx}`);
   if (res) res.innerHTML = (a.ancho && a.largo)
