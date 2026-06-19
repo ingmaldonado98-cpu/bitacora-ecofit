@@ -1,9 +1,9 @@
 // documentacion.js — Módulo 2: Progreso de obra (Antes/Durante/Después)
 
-import { projects } from './db.js';
+import { projects, logChange } from './db.js';
 import { esc, calcFaseEstado, countFotos } from './utils.js';
 import { renderFirmaBlock } from './project.js';
-import { canEdit } from './auth.js';
+import { canEdit, isAdmin, getSession } from './auth.js';
 import { icon } from './icons.js';
 import { getExecBlocks } from '../modules/checklist/index.js';
 import { renderSitio, _countCierreExtra } from './doc-sitio.js';
@@ -16,8 +16,9 @@ export { renderLevantamientoView } from './lev-form.js';
 export async function renderDocumentacion(projectId, session) {
   const project = await projects.getById(projectId);
   if (!project) return '<p class="empty-msg">Proyecto no encontrado.</p>';
-  const edit = canEdit(session, project);
-  const cl   = project.checklistData || {};
+  const edit  = canEdit(session, project);
+  const admin = isAdmin(session);
+  const cl    = project.checklistData || {};
   const techo = project.projectConfig?.techo || cl.techo || 'cemento';
 
   // Contar fotos por sitio para badges del tab
@@ -76,19 +77,19 @@ export async function renderDocumentacion(projectId, session) {
   <!-- Techo -->
   <div id="d-techo" class="tab-panel tab-panel-active">
     ${renderSitio(project, 'techo', edit, projectId)}
-    ${renderExecPorSitio(project, 'techo', allExecBlocks, edit)}
+    ${renderExecPorSitio(project, 'techo', allExecBlocks, edit, admin)}
   </div>
 
   <!-- Centros de carga -->
   <div id="d-centros" class="tab-panel">
     ${renderSitio(project, 'centrosCarga', edit, projectId)}
-    ${renderExecPorSitio(project, 'centrosCarga', allExecBlocks, edit)}
+    ${renderExecPorSitio(project, 'centrosCarga', allExecBlocks, edit, admin)}
   </div>
 
   <!-- Zona del sistema -->
   <div id="d-zona" class="tab-panel">
     ${renderSitio(project, 'zonaDelSistema', edit, projectId)}
-    ${renderExecPorSitio(project, 'zonaDelSistema', allExecBlocks, edit)}
+    ${renderExecPorSitio(project, 'zonaDelSistema', allExecBlocks, edit, admin)}
   </div>
 
   <!-- Notas -->
@@ -153,3 +154,16 @@ export async function renderDocumentacion(projectId, session) {
     _docExecTextTimer = setTimeout(() => projects.setField(pid, `checklistData.execText.${id}`, val), 600);
   };
 }
+
+// ── Candado por fase: override de admin (excepción registrada en el historial) ─
+window._clOverrideFase = async function(pid, fase, on) {
+  await projects.setField(pid, `checklistData.faseOverride.${fase}`, on || null);
+  const session = await getSession();
+  logChange(pid, {
+    modulo: 'Checklist',
+    accion: on ? `Fase ${fase} desbloqueada manualmente (excepción)` : `Fase ${fase} re-bloqueada`,
+    detalle: '',
+    quien: session,
+  });
+  navigate(window.location.hash);
+};

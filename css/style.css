@@ -2761,6 +2761,17 @@ details.cl-exec-block summary.cl-exec-block-hdr::-webkit-details-marker { displa
 .cl-exec-caret { font-size: .8rem; color: var(--text-muted); transition: transform .2s; }
 details.cl-exec-block[open] .cl-exec-caret { transform: rotate(180deg); }
 
+/* Candado por fase ───────────────────────────────────────────────────────── */
+details.cl-exec-block.cl-exec-locked summary.cl-exec-block-hdr { opacity: .6; }
+.cl-exec-lock-icon { color: var(--text-muted); flex-shrink: 0; display: flex; }
+.cl-exec-gate-msg {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: .8rem; padding: 8px 14px; margin: 0;
+}
+.cl-exec-gate-locked { color: var(--text-muted); background: var(--surface2); }
+.cl-exec-gate-override { color: var(--solar); background: rgba(245,166,35,.08); }
+details.cl-exec-block.cl-exec-locked .cl-item-list { opacity: .45; pointer-events: none; }
+
 /* ── Calculadora — secciones expandibles ─────────────────────────────────── */
 details.calc-section { padding: 0; overflow: hidden; }
 details.calc-section summary.calc-section-hdr {
