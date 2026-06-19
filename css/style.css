@@ -1942,6 +1942,20 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 .cl-item-done .cl-item-name { color: var(--text-muted); text-decoration: line-through; }
 .cl-step-num   { width: 20px; flex-shrink: 0; font-size: .72rem; font-weight: 700; color: var(--text-muted); margin-top: 3px; text-align: right; }
 .cl-no-cfg { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px 0; text-align: center; color: var(--text-muted); }
+
+/* Kit de obra — equipo principal ────────────────────────────────────────── */
+.cl-kit-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.cl-kit-row:last-child { border-bottom: none; }
+.cl-kit-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--g500); cursor: pointer; }
+.cl-kit-input {
+  flex: 1; padding: 6px 9px; font-size: .84rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+}
+.cl-kit-input:focus { border-color: var(--g300); outline: none; }
+.cl-kit-input:disabled { opacity: .5; }
+.cl-kit-qty { flex: 0 0 64px; text-align: center; }
+.cl-kit-row.cl-item-done .cl-kit-input { color: var(--text-muted); text-decoration: line-through; }
 .cl-no-cfg p { font-size: .84rem; max-width: 240px; }
 .cl-locked-banner { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 12px; font-size: .8rem; color: var(--text-muted); }
 .cl-locked-banner p { margin: 0; }

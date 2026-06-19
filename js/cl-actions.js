@@ -1,6 +1,6 @@
 // cl-actions.js — Persistencia, acciones y window globals del Checklist
 
-import { toast, isoNow, esc } from './utils.js';
+import { toast, isoNow, esc, uuid } from './utils.js';
 import { getSession } from './auth.js';
 import { projects } from './db.js';
 import { HERRAMIENTA, getConsumibles, ADMIN_REVIEW_ITEMS, getExecBlocks } from '../modules/checklist/index.js';
@@ -18,6 +18,32 @@ window.clToggleCons  = (pid, idx, v) => _saveField(pid, 'cons',  String(idx), v)
 window.clToggleBOM   = (pid, idx, v) => _saveField(pid, 'bom',   String(idx), v);
 window.clToggleAdmin = (pid, id, v)  => _saveField(pid, 'admin', id,         v);
 window.clToggleExec  = (pid, id, v)  => _saveField(pid, 'exec',  id,         v);
+
+// ── Kit de obra — equipo principal a llevar a la instalación ────────────────
+// Independiente del inventario de bodega (ese se hace una vez al mes; con 2-3
+// proyectos saliendo en ese periodo, amarrarlo al inventario sería un cuello
+// de botella). Es solo confirmación de "esto va en el kit de este proyecto".
+window.addKitEquipo = async (pid) => {
+  const id = uuid();
+  await projects.setField(pid, `checklistData.kitEquipo.${id}`, { nombre: '', cantidad: '', empacado: false });
+  navigate(window.location.hash);
+};
+window.delKitEquipo = async (pid, id) => {
+  const p = await projects.getById(pid);
+  const map = { ...(p.checklistData?.kitEquipo || {}) };
+  delete map[id];
+  await projects.setField(pid, 'checklistData.kitEquipo', map);
+  navigate(window.location.hash);
+};
+window.toggleKitEquipo = (pid, id, v) => _saveField(pid, 'kitEquipo', `${id}.empacado`, v);
+
+let _kitTextTimer = null;
+window.updKitEquipo = (pid, id, field, val) => {
+  clearTimeout(_kitTextTimer);
+  _kitTextTimer = setTimeout(() => {
+    projects.setField(pid, `checklistData.kitEquipo.${id}.${field}`, val);
+  }, 600);
+};
 
 let _execTextTimer = null;
 window.clSaveExecText = (pid, id, val) => {
@@ -144,6 +170,9 @@ window.clExportPDF = async function(projectId) {
 
   <h2>Herramienta</h2>
   <table>${herramienta.map(h => checkRow(!!cl.herr?.[h.id], h.n, h.note)).join('')}</table>
+
+  ${Object.keys(cl.kitEquipo || {}).length ? `<h2>Equipo principal — Kit de obra</h2>
+  <table>${Object.values(cl.kitEquipo).map(it => checkRow(!!it.empacado, it.nombre || '—', it.cantidad ? `Cantidad: ${it.cantidad}` : null)).join('')}</table>` : ''}
 
   ${consumibles.length ? `<h2>Consumibles</h2>
   <table>${consumibles.map((c, i) => checkRow(!!cl.cons?.[String(i)], c.n, c.note)).join('')}</table>` : ''}

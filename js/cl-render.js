@@ -241,6 +241,7 @@ export async function renderChecklistModule(projectId, session) {
   const estructura = cfg?.estructura || null;
   const base       = cfg?.base || null;
 
+  const kitEquipo   = cl.kitEquipo || {};
   const herramienta = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
   const consumibles = cfg
     ? (cfg.computed?.consumibles || []).map(c => ({ n: c.nombre, unit: c.unit, qty: c.qty }))
@@ -252,8 +253,10 @@ export async function renderChecklistModule(projectId, session) {
   const doneAdmin = ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length;
   const allAdmin  = ADMIN_REVIEW_ITEMS.length > 0 && doneAdmin === ADMIN_REVIEW_ITEMS.length;
   const published = !!cl.publishedAt;
-  const totalMat  = bomItems.length + consumibles.length;
-  const doneMat   = doneBOM + doneCons;
+  const kitVals   = Object.values(kitEquipo);
+  const doneKit   = kitVals.filter(it => it.empacado).length;
+  const totalMat  = bomItems.length + consumibles.length + kitVals.length;
+  const doneMat   = doneBOM + doneCons + doneKit;
 
   const torqueRows  = buildTorqueTable(estructura || cfg?.estructura || 'k2', techo);
   const torqData    = cl.torques || {};
@@ -328,8 +331,32 @@ export async function renderChecklistModule(projectId, session) {
     </div>
   </div>
 
-  <!-- Materiales: BOM + Consumibles unificados -->
+  <!-- Materiales: Equipo principal (kit de obra) + BOM + Consumibles -->
   <div id="cl-cons" class="tab-panel">
+    <div class="card" id="cl-kit-card">
+      <div class="card-title-row">
+        <h3 class="card-title">Equipo principal — Kit de obra</h3>
+        ${edit ? `<button class="btn-outline btn-sm" onclick="addKitEquipo('${projectId}')">+ Agregar</button>` : ''}
+      </div>
+      <p class="cl-hint">Inversor, baterías, paneles y demás equipo que se llevará a esta instalación. Confírmalo como "Empacado" antes de salir a obra — independiente del inventario de bodega.</p>
+      <div class="cl-item-list">
+        ${Object.entries(kitEquipo).map(([kid, it]) => `
+        <div class="cl-kit-row ${it.empacado ? 'cl-item-done' : ''}">
+          <label class="cl-kit-check">
+            <input type="checkbox" ${it.empacado ? 'checked' : ''} ${!edit ? 'disabled' : ''}
+              onchange="toggleKitEquipo('${projectId}','${kid}',this.checked);this.closest('.cl-kit-row').classList.toggle('cl-item-done',this.checked)">
+          </label>
+          <input type="text" class="cl-kit-input" placeholder="Ej: Inversor LuxPower 5kW"
+            value="${esc(it.nombre || '')}" ${!edit ? 'disabled' : ''}
+            oninput="updKitEquipo('${projectId}','${kid}','nombre',this.value)">
+          <input type="text" class="cl-kit-input cl-kit-qty" placeholder="Cant."
+            value="${esc(it.cantidad || '')}" ${!edit ? 'disabled' : ''}
+            oninput="updKitEquipo('${projectId}','${kid}','cantidad',this.value)">
+          ${edit ? `<button class="btn-del-sm" onclick="delKitEquipo('${projectId}','${kid}')">✕</button>` : ''}
+        </div>`).join('')}
+        ${!Object.keys(kitEquipo).length ? '<p class="empty-msg-sm">Sin equipo agregado todavía.</p>' : ''}
+      </div>
+    </div>
     ${cfg ? (() => {
       const grpOrder = ['rieles','bases','abrazaderas','accesorios','tierra','otro'];
       const grpLabel = { rieles:'Rieles', bases:'Bases', abrazaderas:'Abrazaderas', accesorios:'Accesorios', tierra:'Tierra / Puesta a tierra', otro:'Otros' };
@@ -430,13 +457,15 @@ export async function renderChecklistsList(session) {
 
     const execBlocksL   = getExecBlocks(p, techo);
     const execAllItemsL = execBlocksL.flatMap(b => b.items);
+    const kitValsL      = Object.values(cl.kitEquipo || {});
 
-    const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length + execAllItemsL.length;
+    const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length + execAllItemsL.length + kitValsL.length;
     const doneItems  =
       herr.filter(h => cl.herr?.[h.id]).length +
       cons.filter((_, i) => cl.cons?.[String(i)]).length +
       ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length +
-      execAllItemsL.filter(it => cl.exec?.[it.id]).length;
+      execAllItemsL.filter(it => cl.exec?.[it.id]).length +
+      kitValsL.filter(it => it.empacado).length;
 
     const pct      = totalItems > 0 ? Math.round(doneItems / totalItems * 100) : 0;
     const published = !!cl.publishedAt;
