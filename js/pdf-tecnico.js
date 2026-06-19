@@ -155,9 +155,15 @@ window.exportarPDFTecnico = async function(projectId) {
         doc.text('Sistema eléctrico DC', 14, y); y += 6;
         if (lev.voltajeSistemaDC)      y=campo(doc,'Voltaje del sistema',lev.voltajeSistemaDC,14,y);
         if (lev.tipoControlador)       y=campo(doc,'Tipo de regulación',lev.tipoControlador,14,y);
+        if (lev.arregloPaneles)        y=campo(doc,'Arreglo de paneles',lev.arregloPaneles,14,y);
+        if (lev.arregloBaterias)       y=campo(doc,'Arreglo de baterías',lev.arregloBaterias,14,y);
+        if (lev.alimentacionRefrigerador) y=campo(doc,'Alimentación del refrigerador',
+          lev.alimentacionRefrigerador === 'inversor_bateria'
+            ? 'Vía inversor desde batería (CA)' : 'Directo desde salida LOAD del controlador (DC)',14,y);
         if (lev.distPanelRefrigerador) y=campo(doc,'Dist. panel→refrigerador',`${lev.distPanelRefrigerador} m`,14,y);
         if (lev.calibreCableDC)        y=campo(doc,'Calibre de cable DC',lev.calibreCableDC,14,y);
         if (lev.bateria)               y=campo(doc,'Batería',lev.bateria,14,y);
+        if (lev.breakerBateria)        y=campo(doc,'Breaker de batería',lev.breakerBateria,14,y);
         if (lev.mppt)                  y=campo(doc,'Controlador MPPT/PWM',lev.mppt,14,y);
         if (lev.potenciaInversorW || lev.inversor) {
           y=campo(doc,'Inversor', [
@@ -575,9 +581,15 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
       html += `<p style="font-weight:bold;color:#40916C;margin-top:8pt">Sistema eléctrico DC</p>`;
       if (lev.voltajeSistemaDC)      html += wCampo('Voltaje del sistema', lev.voltajeSistemaDC);
       if (lev.tipoControlador)       html += wCampo('Tipo de regulación', lev.tipoControlador);
+      if (lev.arregloPaneles)        html += wCampo('Arreglo de paneles', lev.arregloPaneles);
+      if (lev.arregloBaterias)       html += wCampo('Arreglo de baterías', lev.arregloBaterias);
+      if (lev.alimentacionRefrigerador) html += wCampo('Alimentación del refrigerador',
+        lev.alimentacionRefrigerador === 'inversor_bateria'
+          ? 'Vía inversor desde batería (CA)' : 'Directo desde salida LOAD del controlador (DC)');
       if (lev.distPanelRefrigerador) html += wCampo('Dist. panel→refrigerador', `${lev.distPanelRefrigerador} m`);
       if (lev.calibreCableDC)        html += wCampo('Calibre de cable DC', lev.calibreCableDC);
       if (lev.bateria)               html += wCampo('Batería', lev.bateria);
+      if (lev.breakerBateria)        html += wCampo('Breaker de batería', lev.breakerBateria);
       if (lev.mppt)                  html += wCampo('Controlador MPPT/PWM', lev.mppt);
       if (lev.potenciaInversorW || lev.inversor) {
         html += wCampo('Inversor', [

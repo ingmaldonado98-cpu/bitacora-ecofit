@@ -227,10 +227,29 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label>Potencia del inversor (W)
-            <span class="form-hint">la mayoría de refrigeradores son tipo inverter (compresor de velocidad variable) y necesitan CA, no DC directo</span>
-          </label>
+        <div class="form-group"><label>Arreglo de paneles</label>
+          <select name="arregloPaneles" ${dis}>
+            <option value="">— Seleccionar —</option>
+            ${['Serie','Paralelo','Serie-Paralelo'].map(t=>`<option ${lev.arregloPaneles===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Arreglo de baterías</label>
+          <select name="arregloBaterias" ${dis}>
+            <option value="">— Seleccionar —</option>
+            ${['Serie','Paralelo','Serie-Paralelo'].map(t=>`<option ${lev.arregloBaterias===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>¿Cómo se alimenta el refrigerador?</label>
+        <select name="alimentacionRefrigerador" ${dis} onchange="window._onAlimentacionRefrigeradorChange(this)">
+          <option value="">— Seleccionar —</option>
+          <option value="directo_mppt" ${lev.alimentacionRefrigerador==='directo_mppt'?'selected':''}>Directo desde salida LOAD del controlador (refrigerador DC)</option>
+          <option value="inversor_bateria" ${lev.alimentacionRefrigerador==='inversor_bateria'?'selected':''}>Vía inversor desde batería (refrigerador CA / tipo inverter)</option>
+        </select>
+      </div>
+      <div class="form-row" id="inversor-peq-wrap" style="${lev.alimentacionRefrigerador!=='inversor_bateria'?'display:none':''}">
+        <div class="form-group"><label>Potencia del inversor (W)</label>
           <input type="number" name="potenciaInversorW" value="${lev.potenciaInversorW||''}" min="0" step="50" placeholder="Ej: 500" ${dis}/>
         </div>
         <div class="form-group"><label>Modelo del inversor</label>
@@ -255,7 +274,19 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
           <option ${lev.exposicionTempExtrema==='no'?'selected':''} value="no">No — bien ventilado/con sombra</option>
         </select>
       </div>
-      ${CAMPOS_SISTEMA_PEQUENO.filter(c=>c.name!=='inversor').map(c=>`
+      <div class="form-group"><label>Batería <span class="form-hint">modelo</span></label>
+        <input type="text" name="bateria" value="${esc(lev.bateria||'')}" placeholder="Ej: LiFePO4 100Ah 48V" ${dis}/>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Breaker de batería
+          <span class="form-hint">protección dedicada, independiente del breaker de paneles</span></label>
+          <input type="text" name="breakerBateria" value="${esc(lev.breakerBateria||'')}" placeholder="Ej: DC 30A" ${dis}/>
+        </div>
+        <div class="form-group"><label>Breaker de paneles</label>
+          <input type="text" name="breakerPanel" value="${esc(lev.breakerPanel||'')}" placeholder="Ej: DC 20A" ${dis}/>
+        </div>
+      </div>
+      ${CAMPOS_SISTEMA_PEQUENO.filter(c=>!['inversor','bateria','breakerPanel'].includes(c.name)).map(c=>`
       <div class="form-group"><label>${esc(c.label)}</label>
         <input type="text" name="${c.name}" value="${esc(lev[c.name]||'')}" placeholder="${esc(c.placeholder)}" ${dis}/>
       </div>`).join('')}

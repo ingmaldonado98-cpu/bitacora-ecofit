@@ -265,10 +265,16 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
     html += wSec('Sistema eléctrico DC');
     if (lev.voltajeSistemaDC)      html += wCampo('Voltaje del sistema', lev.voltajeSistemaDC);
     if (lev.tipoControlador)       html += wCampo('Tipo de regulación de carga', lev.tipoControlador);
+    if (lev.arregloPaneles)        html += wCampo('Arreglo de paneles', lev.arregloPaneles);
+    if (lev.arregloBaterias)       html += wCampo('Arreglo de baterías', lev.arregloBaterias);
+    if (lev.alimentacionRefrigerador) html += wCampo('Alimentación del refrigerador',
+      lev.alimentacionRefrigerador === 'inversor_bateria'
+        ? 'Vía inversor desde batería (CA)' : 'Directo desde salida LOAD del controlador (DC)');
     if (lev.distPanelRefrigerador) html += wCampo('Dist. panel→batería/refrigerador', `${lev.distPanelRefrigerador} m`);
     if (lev.calibreCableDC)        html += wCampo('Calibre de cable DC', lev.calibreCableDC);
     if (lev.exposicionTempExtrema) html += wCampo('Exposición a temperatura extrema', lev.exposicionTempExtrema === 'si' ? 'Sí' : 'No');
     if (lev.bateria)               html += wCampo('Batería', lev.bateria);
+    if (lev.breakerBateria)        html += wCampo('Breaker de batería', lev.breakerBateria);
     if (lev.mppt)                  html += wCampo('Controlador MPPT/PWM', lev.mppt);
     if (lev.potenciaInversorW || lev.inversor) {
       html += wCampo('Inversor', [

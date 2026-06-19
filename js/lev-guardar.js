@@ -112,13 +112,19 @@ window.guardarLevantamiento = async function(e, projectId) {
   if (tipo==='sistema_pequeno') {
     newLev.voltajeSistemaDC      = fd.get('voltajeSistemaDC')      || null;
     newLev.tipoControlador       = fd.get('tipoControlador')       || null;
+    newLev.arregloPaneles        = fd.get('arregloPaneles')        || null;
+    newLev.arregloBaterias       = fd.get('arregloBaterias')       || null;
+    newLev.alimentacionRefrigerador = fd.get('alimentacionRefrigerador') || null;
     newLev.distPanelRefrigerador = parseFloat(fd.get('distPanelRefrigerador')) || null;
     newLev.calibreCableDC        = fd.get('calibreCableDC')        || null;
     newLev.exposicionTempExtrema = fd.get('exposicionTempExtrema') || null;
-    newLev.potenciaInversorW = parseFloat(fd.get('potenciaInversorW')) || null;
-    newLev.bateria       = fd.get('bateria')?.trim()       || null;
+    // Potencia/modelo de inversor solo tienen sentido si el refrigerador es CA
+    const _esInversorBateria = fd.get('alimentacionRefrigerador') === 'inversor_bateria';
+    newLev.potenciaInversorW = _esInversorBateria ? (parseFloat(fd.get('potenciaInversorW')) || null) : null;
+    newLev.inversor          = _esInversorBateria ? (fd.get('inversor')?.trim() || null) : null;
+    newLev.bateria        = fd.get('bateria')?.trim()        || null;
+    newLev.breakerBateria = fd.get('breakerBateria')?.trim() || null;
     newLev.mppt           = fd.get('mppt')?.trim()          || null;
-    newLev.inversor       = fd.get('inversor')?.trim()      || null;
     newLev.breakerPanel   = fd.get('breakerPanel')?.trim()  || null;
     newLev.breakerPolo    = fd.get('breakerPolo')?.trim()   || null;
   }
@@ -254,6 +260,14 @@ window.delFotoMedidor = async function(pid) {
 
 // ── _calcAreaTecho: obsoleto — reemplazado por _calcAreaItem ─────────────────
 window._calcAreaTecho = function() {}; // compat shim
+
+// ── Sistema pequeño: mostrar/ocultar campos de inversor según topología ──────
+// Solo aplica si el refrigerador es CA (vía inversor desde batería); si es DC
+// directo desde la salida LOAD del controlador, no hay inversor en el circuito.
+window._onAlimentacionRefrigeradorChange = function(sel) {
+  const wrap = document.getElementById('inversor-peq-wrap');
+  if (wrap) wrap.style.display = sel.value === 'inversor_bateria' ? '' : 'none';
+};
 
 // ── Fotos del levantamiento ───────────────────────────────────────────────────
 window.capFotoLev = function(pid) {
