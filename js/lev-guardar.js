@@ -115,6 +115,7 @@ window.guardarLevantamiento = async function(e, projectId) {
     newLev.distPanelRefrigerador = parseFloat(fd.get('distPanelRefrigerador')) || null;
     newLev.calibreCableDC        = fd.get('calibreCableDC')        || null;
     newLev.exposicionTempExtrema = fd.get('exposicionTempExtrema') || null;
+    newLev.potenciaInversorW = parseFloat(fd.get('potenciaInversorW')) || null;
     newLev.bateria       = fd.get('bateria')?.trim()       || null;
     newLev.mppt           = fd.get('mppt')?.trim()          || null;
     newLev.inversor       = fd.get('inversor')?.trim()      || null;

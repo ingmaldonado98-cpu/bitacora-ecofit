@@ -228,6 +228,17 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
       </div>
       <div class="form-row">
         <div class="form-group">
+          <label>Potencia del inversor (W)
+            <span class="form-hint">la mayoría de refrigeradores son tipo inverter (compresor de velocidad variable) y necesitan CA, no DC directo</span>
+          </label>
+          <input type="number" name="potenciaInversorW" value="${lev.potenciaInversorW||''}" min="0" step="50" placeholder="Ej: 500" ${dis}/>
+        </div>
+        <div class="form-group"><label>Modelo del inversor</label>
+          <input type="text" name="inversor" value="${esc(lev.inversor||'')}" placeholder="Ej: Victron Phoenix 500VA" ${dis}/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
           <label>Distancia panel→batería/refrigerador (m)
             <span class="form-hint">ideal &lt;3–5 m por caída de voltaje en DC</span>
           </label>
@@ -244,7 +255,7 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
           <option ${lev.exposicionTempExtrema==='no'?'selected':''} value="no">No — bien ventilado/con sombra</option>
         </select>
       </div>
-      ${CAMPOS_SISTEMA_PEQUENO.map(c=>`
+      ${CAMPOS_SISTEMA_PEQUENO.filter(c=>c.name!=='inversor').map(c=>`
       <div class="form-group"><label>${esc(c.label)}</label>
         <input type="text" name="${c.name}" value="${esc(lev[c.name]||'')}" placeholder="${esc(c.placeholder)}" ${dis}/>
       </div>`).join('')}

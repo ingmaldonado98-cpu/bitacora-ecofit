@@ -270,7 +270,12 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
     if (lev.exposicionTempExtrema) html += wCampo('Exposición a temperatura extrema', lev.exposicionTempExtrema === 'si' ? 'Sí' : 'No');
     if (lev.bateria)               html += wCampo('Batería', lev.bateria);
     if (lev.mppt)                  html += wCampo('Controlador MPPT/PWM', lev.mppt);
-    if (lev.inversor)              html += wCampo('Inversor', lev.inversor);
+    if (lev.potenciaInversorW || lev.inversor) {
+      html += wCampo('Inversor', [
+        lev.potenciaInversorW ? `${lev.potenciaInversorW} W` : null,
+        lev.inversor || null,
+      ].filter(Boolean).join(' — '));
+    }
     if (lev.breakerPanel)          html += wCampo('Breaker de paneles', lev.breakerPanel);
     if (lev.breakerPolo)           html += wCampo('Breaker 1 polo', lev.breakerPolo);
   }

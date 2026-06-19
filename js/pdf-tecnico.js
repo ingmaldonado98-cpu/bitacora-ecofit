@@ -159,7 +159,12 @@ window.exportarPDFTecnico = async function(projectId) {
         if (lev.calibreCableDC)        y=campo(doc,'Calibre de cable DC',lev.calibreCableDC,14,y);
         if (lev.bateria)               y=campo(doc,'Batería',lev.bateria,14,y);
         if (lev.mppt)                  y=campo(doc,'Controlador MPPT/PWM',lev.mppt,14,y);
-        if (lev.inversor)              y=campo(doc,'Inversor',lev.inversor,14,y);
+        if (lev.potenciaInversorW || lev.inversor) {
+          y=campo(doc,'Inversor', [
+            lev.potenciaInversorW ? `${lev.potenciaInversorW} W` : null,
+            lev.inversor || null,
+          ].filter(Boolean).join(' — '),14,y);
+        }
         if (lev.breakerPanel)          y=campo(doc,'Breaker de paneles',lev.breakerPanel,14,y);
         if (lev.breakerPolo)           y=campo(doc,'Breaker 1 polo',lev.breakerPolo,14,y);
       }
@@ -574,7 +579,12 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
       if (lev.calibreCableDC)        html += wCampo('Calibre de cable DC', lev.calibreCableDC);
       if (lev.bateria)               html += wCampo('Batería', lev.bateria);
       if (lev.mppt)                  html += wCampo('Controlador MPPT/PWM', lev.mppt);
-      if (lev.inversor)              html += wCampo('Inversor', lev.inversor);
+      if (lev.potenciaInversorW || lev.inversor) {
+        html += wCampo('Inversor', [
+          lev.potenciaInversorW ? `${lev.potenciaInversorW} W` : null,
+          lev.inversor || null,
+        ].filter(Boolean).join(' — '));
+      }
       if (lev.breakerPanel)          html += wCampo('Breaker de paneles', lev.breakerPanel);
       if (lev.breakerPolo)           html += wCampo('Breaker 1 polo', lev.breakerPolo);
     }
