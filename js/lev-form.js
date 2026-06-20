@@ -90,6 +90,16 @@ function renderLevantamiento(project, tipo, edit) {
     </div>
 
     ${acc('sitio', 'Datos del techo y sitio', '🏠', true, `
+      <div class="form-group">
+        <label>Estado del inmueble
+          <span class="form-hint">afecta cómo se planea el anclaje — en obra puede haber cambios al techo antes de instalar</span>
+        </label>
+        <select name="estadoInmueble" ${dis}>
+          <option value="">— Seleccionar —</option>
+          ${['Construcción nueva (en obra)','Remodelación','Casa existente / habitada'].map(t=>
+            `<option ${lev.estadoInmueble===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
       <div class="form-row">
         <div class="form-group"><label>Tipo de techo</label>
           <select name="tipTecho" ${dis} onchange="window._onTipTechoChange(this)">
@@ -246,16 +256,32 @@ function renderLevantamiento(project, tipo, edit) {
             </label>`).join('')}
         </div>
       </div>
+      <details class="pd-details" ${lev.restricciones ? 'open' : ''}>
+        <summary>Restricciones especiales <span class="pd-caret">▾</span></summary>
+        <div class="pd-body">
+          <div class="form-group">
+            <label>Restricciones <span class="form-hint">para la memoria técnica</span></label>
+            <textarea name="restricciones" rows="2" ${dis}
+              placeholder="Ej. Alta salinidad por ambiente marino / Vientos de 180 km/h en temporada de huracanes / Sin conexión a CFE"
+            >${esc(lev.restricciones||'')}</textarea>
+          </div>
+        </div>
+      </details>
     `)}
 
     ${/* Eléctrico y consumo — no aplica para 'otro'. Sistema pequeño usa solo el bloque DC (dinamico) */
       tipo !== 'otro' ? acc('elec_consumo', 'Eléctrico y consumo', '⚡', hasElecConsumo, `
       ${tipo !== 'sistema_pequeno' ? `
       <div class="form-group"><label>Tipo de servicio CFE</label>
-        <select name="tipoServicioCFE" ${dis}>
-          ${tipo==='aislado'?'<option value="NA">N/A (sin CFE)</option>':''}
-          ${['Monofásico 127V','Monofásico 220V','Bifásico','Trifásico','N/A (sin CFE)'].map(t=>
-            `<option ${lev.tipoServicioCFE===t?'selected':''}>${t}</option>`).join('')}
+        <select name="tipoServicioCFE" ${dis} onchange="window._onTipoServicioCFEChange(this)">
+          ${(() => {
+            // 'NA' es el value de un option duplicado que existió antes — se
+            // trata igual que "N/A (sin CFE)" para no perder la selección
+            // en proyectos guardados con el valor viejo.
+            const cfeVal = lev.tipoServicioCFE === 'NA' ? 'N/A (sin CFE)' : lev.tipoServicioCFE;
+            return ['Monofásico 127V','Monofásico 220V','Bifásico','Trifásico','Pendiente de conexión','N/A (sin CFE)'].map(t=>
+              `<option ${cfeVal===t?'selected':''}>${t}</option>`).join('');
+          })()}
         </select>
       </div>
       <div class="form-row">
@@ -276,7 +302,9 @@ function renderLevantamiento(project, tipo, edit) {
       ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
       ${tipo !== 'sistema_pequeno' ? `
       <div class="lev-sep"></div>
-      <details class="pd-details" ${(lev.voltajeFaseFase || lev.voltajeFaseNeutro || lev.voltajeFaseTierra) ? 'open' : ''}>
+      <details id="voltajes-cfe-wrap" class="pd-details"
+        style="${['N/A (sin CFE)','Pendiente de conexión','NA'].includes(lev.tipoServicioCFE)?'display:none':''}"
+        ${(lev.voltajeFaseFase || lev.voltajeFaseNeutro || lev.voltajeFaseTierra) ? 'open' : ''}>
         <summary>Voltajes medidos en sitio <span class="pd-caret">▾</span></summary>
         <div class="pd-body">
           <div class="form-row">
@@ -380,17 +408,6 @@ function renderLevantamiento(project, tipo, edit) {
           placeholder="Condiciones especiales del sitio, acuerdos con el cliente, materiales extra, pendientes…"
         >${esc(lev.observacionesGenerales||'')}</textarea>
       </div>
-      <details class="pd-details" ${lev.restricciones ? 'open' : ''}>
-        <summary>Restricciones especiales <span class="pd-caret">▾</span></summary>
-        <div class="pd-body">
-          <div class="form-group">
-            <label>Restricciones <span class="form-hint">para la memoria técnica</span></label>
-            <textarea name="restricciones" rows="2" ${dis}
-              placeholder="Ej. Alta salinidad por ambiente marino / Vientos de 180 km/h en temporada de huracanes / Sin conexión a CFE"
-            >${esc(lev.restricciones||'')}</textarea>
-          </div>
-        </div>
-      </details>
     `)}
 
     ${edit?`<div class="form-actions lev-actions">

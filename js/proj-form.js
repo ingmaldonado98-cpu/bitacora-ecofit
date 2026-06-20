@@ -142,6 +142,19 @@ export async function renderProjectForm(id, session) {
              value="${esc(project?.direccion||'')}" />
     </div>
 
+    <div class="form-row">
+      <div class="form-group">
+        <label>Ciudad <span class="hint-opt">(opcional)</span></label>
+        <input type="text" name="ciudad" placeholder="Ej: La Paz"
+               value="${esc(project?.ciudad||'')}" />
+      </div>
+      <div class="form-group">
+        <label>Estado <span class="hint-opt">(opcional)</span></label>
+        <input type="text" name="estadoDireccion" placeholder="Ej: Baja California Sur"
+               value="${esc(project?.estadoDireccion||'')}" />
+      </div>
+    </div>
+
     <div class="form-group">
       <label>Fecha de inicio</label>
       <input type="date" name="fechaInicio"
@@ -258,6 +271,8 @@ window._submitProject = async function(e, editId) {
     tecnicoLiderId:  fd.get('tecnicoLiderId') || null,
     tecnicosApoyo:   JSON.parse(fd.get('tecnicosApoyo') || '[]'),
     direccion:       fd.get('direccion').trim(),
+    ciudad:          fd.get('ciudad')?.trim() || null,
+    estadoDireccion: fd.get('estadoDireccion')?.trim() || null,
     fechaInicio:     fd.get('fechaInicio')    ? new Date(fd.get('fechaInicio')).toISOString()    : null,
     fechaEstimada:   fd.get('fechaEstimada') ? new Date(fd.get('fechaEstimada')).toISOString() : null,
     coordenadas,

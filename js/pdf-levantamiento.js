@@ -36,11 +36,13 @@ window.exportarWordLevantamiento = async function(projectId) {
 ${wCampo('Cliente', project.clientName)}
 ${wCampo('Alias / proyecto', project.nombreProyecto)}
 ${wCampo('Dirección', project.direccion)}
+${(project.ciudad || project.estadoDireccion) ? wCampo('Ciudad / Estado', [project.ciudad, project.estadoDireccion].filter(Boolean).join(', ')) : ''}
 ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
 `;
 
   // Techo y sitio
   html += wSec('Techo y sitio');
+  if (lev.estadoInmueble) html += wCampo('Estado del inmueble', lev.estadoInmueble);
   html += wCampo('Tipo de techo', lev.tipTecho);
   if (lev.tipTecho === 'Madera') {
     html += wCampo('Estado de la madera', lev.estadoMadera);
@@ -241,7 +243,7 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
         </table>`;
       };
       html += _wCargas(cCrit, 'Cargas críticas (alta prioridad)', '#dc2626', '#fef2f2');
-      html += _wCargas(cSec,  'Cargas secundarias (baja prioridad)', '#2563eb', '#eff6ff');
+      html += _wCargas(cSec,  'Cargas no críticas (baja prioridad)', '#2563eb', '#eff6ff');
     }
 
     // Configuración de baterías

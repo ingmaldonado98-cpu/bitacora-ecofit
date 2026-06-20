@@ -95,7 +95,7 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
         <div id="cargas-criticas">${renderCargas(lev.cargasCriticas||[],edit,'critica')}</div>
       </div>
       <div class="form-group">
-        <label>Cargas secundarias
+        <label>Cargas no críticas
           <span class="form-hint">pueden esperar a que vuelva la luz</span>
         </label>
         <div id="cargas-secundarias">${renderCargas(lev.cargasSecundarias||[],edit,'secundaria')}</div>
@@ -112,7 +112,7 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
       <div class="form-group"><label>Cargas críticas (Alta prioridad)</label>
         <div id="cargas-criticas">${renderCargas(lev.cargasCriticas||[],edit,'critica')}</div>
       </div>
-      <div class="form-group"><label>Cargas secundarias (Baja prioridad)</label>
+      <div class="form-group"><label>Cargas no críticas (Baja prioridad)</label>
         <div id="cargas-secundarias">${renderCargas(lev.cargasSecundarias||[],edit,'secundaria')}</div>
       </div>
       <div class="form-group"><label>Generador de respaldo</label>
@@ -125,14 +125,19 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
       </div>
       <div id="gen-extra" style="${!lev.generador?'display:none':''}">
         <div class="form-row">
-          <div class="form-group"><label>Arranque</label>
+          <div class="form-group"><label>Arranque
+            <span class="form-hint">Automático = no necesitas estar para encenderlo cuando se va la luz</span>
+          </label>
             <select name="generadorArranque" ${dis}>
               <option ${lev.generadorArranque==='automatico'?'selected':''} value="automatico">Automático</option>
               <option ${lev.generadorArranque==='manual'?'selected':''} value="manual">Manual</option>
             </select>
           </div>
           <div class="form-group"><label>Potencia (kW)</label>
-            <input type="number" name="generadorKw" value="${lev.generadorKw||''}" min="0" step="0.1" ${dis}/></div>
+            <select name="generadorKw" ${dis}>
+              <option value="">— Seleccionar —</option>
+              ${['3-6','6-12','12-20','+20'].map(t=>`<option ${lev.generadorKw===t?'selected':''}>${t}</option>`).join('')}
+            </select></div>
         </div>
       </div>
       <div class="form-group"><label>Crecimiento futuro esperado <span class="req-badge">CRÍTICO</span></label>
@@ -207,7 +212,7 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
       <div class="form-group"><label>Cargas críticas a respaldar</label>
         <div id="cargas-criticas">${renderCargas(lev.cargasCriticas||[],edit,'critica')}</div>
       </div>
-      <div class="form-group"><label>Cargas secundarias</label>
+      <div class="form-group"><label>Cargas no críticas</label>
         <div id="cargas-secundarias">${renderCargas(lev.cargasSecundarias||[],edit,'secundaria')}</div>
       </div>
     </div>`;

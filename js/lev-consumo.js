@@ -242,7 +242,7 @@ export function renderCargas(cargas, edit, tipo) {
   window._lev.cargas[tipo] = [...cargas];
   const totalW   = window._lev.cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
   const totalWh  = window._lev.cargas[tipo].reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1), 0);
-  const labelBtn = tipo === 'critica' ? '+ Carga crítica' : tipo === 'secundaria' ? '+ Carga secundaria' : '+ Carga';
+  const labelBtn = tipo === 'critica' ? '+ Carga crítica' : tipo === 'secundaria' ? '+ Carga no crítica' : '+ Carga';
   const aparatosDisp = (window._lev.aparatos || []).length;
   return `
     ${edit && aparatosDisp > 0 ? `

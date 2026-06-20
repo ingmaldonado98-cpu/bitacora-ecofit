@@ -41,6 +41,7 @@ window.guardarLevantamiento = async function(e, projectId) {
 
   const newLev = {
     ...lev,
+    estadoInmueble:      fd.get('estadoInmueble') || null,
     tipTecho:            tipTechoVal,
     tipoSujecion:        _sujecionPorTecho(tipTechoVal),  // auto, no editable
     areasTecho:          areasTechoVal,
@@ -101,7 +102,7 @@ window.guardarLevantamiento = async function(e, projectId) {
     newLev.cargasSecundarias= window._lev.cargas.secundaria;
     newLev.generador       = fd.get('generador')==='no'?null:fd.get('generador');
     newLev.generadorArranque= fd.get('generadorArranque');
-    newLev.generadorKw     = parseFloat(fd.get('generadorKw'))||null;
+    newLev.generadorKw     = fd.get('generadorKw') || null;
     newLev.crecimientoFuturo= fd.get('crecimientoFuturo')||'';
   }
   if (tipo==='bombeo') {
@@ -283,6 +284,15 @@ window._calcAreaTecho = function() {}; // compat shim
 window._onAlimentacionRefrigeradorChange = function(sel) {
   const wrap = document.getElementById('inversor-peq-wrap');
   if (wrap) wrap.style.display = sel.value === 'inversor_bateria' ? '' : 'none';
+};
+
+// ── Ocultar "Voltajes medidos en sitio" si no hay CFE o está pendiente —
+// no tiene sentido medir voltajes de un servicio que no existe todavía.
+window._onTipoServicioCFEChange = function(sel) {
+  const wrap = document.getElementById('voltajes-cfe-wrap');
+  if (!wrap) return;
+  const sinCFE = ['N/A (sin CFE)', 'Pendiente de conexión'].includes(sel.value);
+  wrap.style.display = sinCFE ? 'none' : '';
 };
 
 // ── Fotos del levantamiento ───────────────────────────────────────────────────

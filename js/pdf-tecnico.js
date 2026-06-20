@@ -37,6 +37,9 @@ window.exportarPDFTecnico = async function(projectId) {
     doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...GRIS);
     doc.text(project.clientName || '—', 14, y); y += 6;
     if (project.direccion) { doc.text(project.direccion, 14, y); y += 6; }
+    if (project.ciudad || project.estadoDireccion) {
+      doc.text([project.ciudad, project.estadoDireccion].filter(Boolean).join(', '), 14, y); y += 6;
+    }
     if (project.coordenadas?.lat) {
       const lat = Number(project.coordenadas.lat).toFixed(6);
       const lng = Number(project.coordenadas.lng).toFixed(6);
@@ -112,6 +115,7 @@ window.exportarPDFTecnico = async function(projectId) {
     if (sec('sec-levant')) {
       doc.addPage(); addHeader(doc,'Levantamiento técnico',project); y=44;
       const lev = project.documentacion?.levantamiento||{};
+      if (lev.estadoInmueble) y=campo(doc,'Estado del inmueble',lev.estadoInmueble,14,y);
       y=campo(doc,'Tipo de techo',lev.tipTecho,14,y);
       if (lev.tipoSujecion) y=campo(doc,'Tipo de sujeción',lev.tipoSujecion,14,y);
       y=campo(doc,'Área disponible',lev.areaDisponible?`${lev.areaDisponible} m²`:'—',14,y);
@@ -469,6 +473,7 @@ window.exportarWordTecnico = async function(projectId) {
 </table>
 ${wCampo('Cliente', project.clientName)}
 ${project.direccion ? wCampo('Dirección', project.direccion) : ''}
+${(project.ciudad || project.estadoDireccion) ? wCampo('Ciudad / Estado', [project.ciudad, project.estadoDireccion].filter(Boolean).join(', ')) : ''}
 ${project.coordenadas?.lat ? wCampo('Coordenadas GPS', `${Number(project.coordenadas.lat).toFixed(6)}, ${Number(project.coordenadas.lng).toFixed(6)}`) : ''}
 ${project.clienteTelefono ? wCampo('Tel. cliente', project.clienteTelefono) : ''}
 ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
@@ -533,6 +538,7 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
   if (sec('sec-levant')) {
     const lev = project.documentacion?.levantamiento || {};
     html += wPage() + wSec('Levantamiento técnico');
+    if (lev.estadoInmueble) html += wCampo('Estado del inmueble', lev.estadoInmueble);
     html += wCampo('Tipo de techo', lev.tipTecho);
     if (lev.tipoSujecion) html += wCampo('Tipo de sujeción', lev.tipoSujecion);
     html += wCampo('Área disponible', lev.areaDisponible ? `${lev.areaDisponible} m²` : '—');
