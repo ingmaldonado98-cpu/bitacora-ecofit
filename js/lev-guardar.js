@@ -85,6 +85,11 @@ window.guardarLevantamiento = async function(e, projectId) {
     newLev.modoConsumo = modoConsumo;
     newLev.recibos     = modoConsumo==='recibo' ? window._lev.recibos : [];
     newLev.aparatos    = modoConsumo==='aparatos' ? window._lev.aparatos : [];
+    // cargasCriticas/cargasSecundarias se renderizan para los 3 tipos (la de
+    // interconectado es opcional, por si lleva batería de respaldo) — antes
+    // solo se guardaban para 'aislado' y se perdían en silencio aquí.
+    newLev.cargasCriticas    = window._lev.cargas.critica;
+    newLev.cargasSecundarias = window._lev.cargas.secundaria;
     if (tipo==='hibrido'||tipo==='hibrido_respaldo') {
       newLev.autonomia     = parseFloat(fd.get('autonomia'))||null;
       newLev.bancoBaterias = parseFloat(fd.get('bancoBaterias'))||null;
@@ -150,6 +155,17 @@ window.guardarLevantamiento = async function(e, projectId) {
   if (!e._auto) {
     toast('✅ Levantamiento guardado');
     logChange(projectId, { modulo: 'Documentación', accion: 'levantamiento guardado', detalle: '', quien: await getSession() });
+    // Aviso no-bloqueante de campos marcados CRÍTICO que quedaron vacíos —
+    // se guarda igual (a veces el dato no está disponible aún en campo),
+    // pero se le avisa al técnico para que no se le pierda sin darse cuenta.
+    if (tipo === 'aislado') {
+      const faltantes = [];
+      if (!newLev.autonomia)       faltantes.push('Autonomía requerida');
+      if (!newLev.crecimientoFuturo) faltantes.push('Crecimiento futuro esperado');
+      if (faltantes.length) {
+        toast(`⚠ Faltan campos críticos: ${faltantes.join(', ')}`, 'error', 6000);
+      }
+    }
     // Auto-carry Tmin → Voc si el valor cambió
     _autoRecalcVocSilent(projectId, newLev.tMin, newLev.tMinZona);
   }

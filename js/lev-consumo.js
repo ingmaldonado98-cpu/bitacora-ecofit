@@ -243,7 +243,13 @@ export function renderCargas(cargas, edit, tipo) {
   const totalW   = window._lev.cargas[tipo].reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
   const totalWh  = window._lev.cargas[tipo].reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1), 0);
   const labelBtn = tipo === 'critica' ? '+ Carga crítica' : tipo === 'secundaria' ? '+ Carga secundaria' : '+ Carga';
+  const aparatosDisp = (window._lev.aparatos || []).length;
   return `
+    ${edit && aparatosDisp > 0 ? `
+    <button type="button" class="btn-outline btn-sm" style="margin-bottom:8px" onclick="copiarAparatosACargas('${tipo}')">
+      ↓ Copiar desde "Consumo del cliente" (${aparatosDisp})
+    </button>
+    <p class="hint" style="margin-top:-4px;margin-bottom:8px">No vuelvas a escribir los aparatos — cópialos de arriba y solo deja los que deben seguir prendidos sin luz.</p>` : ''}
     ${edit ? `<div class="aparatos-rapidos">
       <p class="hint">Acceso rápido:</p>
       <div class="chip-group">
@@ -277,6 +283,23 @@ export function renderCargas(cargas, edit, tipo) {
     <p class="kwh-total" id="cargas-total-${tipo}">Total: <strong>${totalW} W</strong> — <strong>${(totalWh/1000).toFixed(2)} kWh/día</strong></p>
   `;
 }
+// Evita doble captura: trae los aparatos ya escritos en "Consumo del cliente"
+// en vez de obligar a re-teclearlos aquí. El técnico solo borra los que no
+// deban seguir prendidos sin luz.
+window.copiarAparatosACargas = function(tipo) {
+  const fuente = window._lev.aparatos || [];
+  if (!fuente.length) { toast('No hay aparatos capturados en "Consumo del cliente"', 'error'); return; }
+  const yaCopiados = new Set(window._lev.cargas[tipo].map(c => c.nombre));
+  let copiados = 0;
+  fuente.forEach(a => {
+    if (yaCopiados.has(a.nombre)) return;
+    window._lev.cargas[tipo].push({ nombre: a.nombre, potencia: a.potencia, horas: a.horas, cantidad: a.cantidad || 1, area: a.area || 'General' });
+    copiados++;
+  });
+  refreshCargas(tipo);
+  _triggerLevSave();
+  toast(copiados ? `✅ ${copiados} aparato${copiados>1?'s':''} copiado${copiados>1?'s':''} — quita los que no apliquen` : 'Ya estaban copiados todos', copiados?'success':'info');
+};
 window.addCargaRapida = function(tipo, a) { window._lev.cargas[tipo].push({...a, cantidad:1, area:'General'}); refreshCargas(tipo); _triggerLevSave(); };
 window.addCarga = function(tipo) { window._lev.cargas[tipo].push({nombre:'',potencia:0,horas:0,cantidad:1,area:'General'}); refreshCargas(tipo); };
 window.delCarga = function(tipo,i) { window._lev.cargas[tipo].splice(i,1); refreshCargas(tipo); _triggerLevSave(); };

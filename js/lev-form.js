@@ -272,6 +272,10 @@ function renderLevantamiento(project, tipo, edit) {
           </select>
         </div>
       </div>
+      ` : ''}
+      ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
+      ${tipo !== 'sistema_pequeno' ? `
+      <div class="lev-sep"></div>
       <details class="pd-details" ${(lev.voltajeFaseFase || lev.voltajeFaseNeutro || lev.voltajeFaseTierra) ? 'open' : ''}>
         <summary>Voltajes medidos en sitio <span class="pd-caret">▾</span></summary>
         <div class="pd-body">
@@ -336,7 +340,6 @@ function renderLevantamiento(project, tipo, edit) {
         </div>
       </details>
       ` : ''}
-      ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
     `) : ''}
 
     ${acc('logistica', 'Logística de instalación', '🚚', hasLogistica, `
