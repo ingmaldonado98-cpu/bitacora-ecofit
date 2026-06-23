@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ecofit.bitacora",
+      "sha256_cert_fingerprints": [
+        "F7:AC:44:9F:48:68:AF:F0:74:9D:DE:46:7C:C2:12:33:4B:EC:57:34:D7:8B:69:A9:7B:32:DE:CF:B2:39:FF:9C"
+      ]
+    }
+  }
+]
