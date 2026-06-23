@@ -504,6 +504,13 @@ updateOnline();
 // Inicializar mapa de fotos pendientes (para renderizar mientras se sube)
 initPendingMap().catch(() => {})
 
+// Si ya hay señal al abrir la app (aunque no haya ocurrido la transición
+// offline→online en esta sesión — ej. se tomó la foto sin señal, se cerró
+// la app, y se reabre días después ya conectado), sincroniza cualquier foto
+// que quedó pendiente de una sesión anterior. processQueue() ya se
+// autoprotege si no hay conexión, así que es seguro llamarla siempre.
+processQueue().catch(() => {})
+
 // ── SW update banner ──────────────────────────────────────────────────────────
 function showUpdateBanner(newSW) {
   const existing = document.getElementById('sw-update-banner');
