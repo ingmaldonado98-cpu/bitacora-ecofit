@@ -216,6 +216,14 @@ window._submitLogin = async function(e) {
     _loginLockedUntil = 0;
     window.location.hash = '#dashboard';
   } catch (err) {
+    // Sin señal, Firebase nunca llega a validar credenciales — el error crudo
+    // ("auth/network-request-failed") confunde, sobre todo si el técnico ya
+    // había iniciado sesión antes en este dispositivo (esa sesión local de 7
+    // días sigue funcionando offline; lo que falla aquí es solo un login NUEVO).
+    const msg = err.code === 'auth/network-request-failed'
+      ? 'Sin conexión — no se puede iniciar sesión por primera vez sin internet. Si ya habías iniciado sesión antes en este dispositivo, tus proyectos deberían seguir disponibles sin pedir login de nuevo.'
+      : err.message;
+
     _loginAttempts++;
     if (_loginAttempts >= LOGIN_MAX_ATTEMPTS) {
       _loginLockedUntil = Date.now() + LOGIN_LOCKOUT_MS;
@@ -238,7 +246,7 @@ window._submitLogin = async function(e) {
         }
       }, 1000);
     } else {
-      errEl.textContent = err.message;
+      errEl.textContent = msg;
       btn.disabled    = false;
       btn.textContent = 'Iniciar sesión';
     }
