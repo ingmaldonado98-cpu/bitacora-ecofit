@@ -263,9 +263,36 @@ export function calcSeccionCable({ longitud, corriente, vNominal, pctMax = 0.01,
   return {
     aMin:    +aMin.toFixed(2),
     seccion,
+    awg:     mm2ToAwg(seccion),
     pctReal: +(dvReal / vNominal * 100).toFixed(3),
     cumple:  dvReal / vNominal <= pctMax,
   };
+}
+
+// ── Conversión de sección (mm²) a calibre AWG más cercano ─────────────────────
+// Tabla estándar de área de conductor por AWG (referencia fija, no se infiere) —
+// solo cubre los calibres típicos de instalación fotovoltaica residencial/comercial.
+const AWG_TABLE = [
+  { awg: '14',  mm2: 2.08 },
+  { awg: '12',  mm2: 3.31 },
+  { awg: '10',  mm2: 5.26 },
+  { awg: '8',   mm2: 8.37 },
+  { awg: '6',   mm2: 13.3 },
+  { awg: '4',   mm2: 21.2 },
+  { awg: '2',   mm2: 33.6 },
+  { awg: '1/0', mm2: 53.5 },
+  { awg: '2/0', mm2: 67.4 },
+];
+export function mm2ToAwg(mm2) {
+  const found = AWG_TABLE.find(t => t.mm2 >= mm2);
+  return found ? found.awg : AWG_TABLE[AWG_TABLE.length - 1].awg;
+}
+// awg: string tal como se captura en Trayectorias (ej. "10", "2/0") — retorna
+// su sección en mm² o null si no coincide con la tabla (no se adivina).
+export function awgToMm2(awg) {
+  const norm  = String(awg || '').trim();
+  const entry = AWG_TABLE.find(t => t.awg === norm);
+  return entry ? entry.mm2 : null;
 }
 
 // ── Checklist de campo (Sección D) ───────────────────────────────────────────

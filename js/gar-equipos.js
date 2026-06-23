@@ -2,12 +2,13 @@
 // Extraído de garantia.js. Exporta renderEquipos, formEquipo, _clearEqFotos, _serialUbicacion.
 
 import { projects, logChange } from './db.js';
-import { esc, fotoMini, capturePhoto, toast, confirmDialog, uuid, isoNow,
-         MARCAS_EQUIPOS, openScannerOverlay } from './utils.js';
+import { esc, fotoMini, capturePhoto, toast, confirmDialog, inputDialog, uuid, isoNow,
+         fmtFechaHora, MARCAS_EQUIPOS, openScannerOverlay } from './utils.js';
 import { getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { updateQueueItem } from './photo-queue.js';
 import { icon } from './icons.js';
+import { getSerialesFlat } from './gar-paneles.js';
 
 // ── Tipos de equipo ────────────────────────────────────────────────────────────
 const TIPOS_EQUIPO = [
@@ -63,6 +64,20 @@ export function renderEquipos(equipos, projectId, edit, admin) {
         ${fotoMini(eq.fotoAngulo, 'Ángulo')}
       </div>
       ${eq.notas ? `<p class="eq-notas">${esc(eq.notas)}</p>` : ''}
+      ${edit ? `<div class="eq-reemplazo-row">
+        <button class="btn-outline btn-sm" onclick="reportarReemplazo('${projectId}',${i})">🔄 Reportar reemplazo</button>
+        ${(eq.historialReemplazos||[]).length ? `<button class="btn-link-sm" onclick="toggleHistorialReemplazo(${i})">Ver historial (${eq.historialReemplazos.length})</button>` : ''}
+      </div>` : ''}
+      ${(eq.historialReemplazos||[]).length ? `
+      <div class="eq-historial" id="eq-historial-${i}" style="display:none">
+        ${eq.historialReemplazos.slice().reverse().map(h => `
+          <div class="eq-historial-item">
+            <span class="eq-historial-fecha">${esc(fmtFechaHora(h.fecha))}</span>
+            <span class="eq-historial-cambio">${esc(h.serialAnterior||'—')} → ${esc(h.serialNuevo||'—')}</span>
+            ${h.motivo ? `<span class="eq-historial-motivo">${esc(h.motivo)}</span>` : ''}
+            <span class="eq-historial-por">${esc(h.por||'')}</span>
+          </div>`).join('')}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -97,11 +112,18 @@ export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null
              value="${modeloVal}"
              oninput="toggleVocMaxField()" />
     </div>
-    <!-- vocMax: solo para inversores -->
-    <div class="form-group" id="eq-vocmax-wrap" style="${(isEdit ? eq.tipo : '') === 'inversor' ? '' : 'display:none'}">
-      <label>Voc máx. entrada CD (V) <span class="form-hint">Del datasheet del inversor</span></label>
-      <input type="number" id="eq-vocmax" placeholder="Ej: 600" step="1" min="0"
-             value="${isEdit ? esc(eq.vocMax || '') : ''}" />
+    <!-- vocMax / potenciaNominalAC: solo para inversores -->
+    <div class="form-row" id="eq-vocmax-wrap" style="${(isEdit ? eq.tipo : '') === 'inversor' ? '' : 'display:none'}">
+      <div class="form-group">
+        <label>Voc máx. entrada CD (V) <span class="form-hint">Del datasheet del inversor</span></label>
+        <input type="number" id="eq-vocmax" placeholder="Ej: 600" step="1" min="0"
+               value="${isEdit ? esc(eq.vocMax || '') : ''}" />
+      </div>
+      <div class="form-group">
+        <label>Potencia nominal CA (kW) <span class="form-hint">Para chequeo de sobresaturación DC/AC</span></label>
+        <input type="number" id="eq-potencia-ac" placeholder="Ej: 5" step="0.1" min="0"
+               value="${isEdit ? esc(eq.potenciaNominalAC || '') : ''}" />
+      </div>
     </div>
     <div class="form-group">
       <label>Número de serie</label>
@@ -154,7 +176,7 @@ window.capEqFoto = function(tipo, slotId) {
     const slot = document.getElementById(slotId);
     if (slot) slot.innerHTML = fotoMini(_eqFotos[tipo], tipo);
     if (result.url) toast('✅ Foto guardada');
-  });
+  }, { preview: true });
 };
 
 // Mostrar/ocultar campo vocMax según tipo de equipo seleccionado
@@ -168,12 +190,7 @@ window.toggleVocMaxField = function() {
 export function _serialUbicacion(p, serial) {
   const s = (serial || '').trim();
   if (!s) return null;
-  const strings = p?.garantia?.paneles?.strings || [];
-  for (let i = 0; i < strings.length; i++) {
-    if ((strings[i].paneles || []).some(pan => pan.serial === s)) {
-      return strings[i].nombre || `String ${i + 1}`;
-    }
-  }
+  if (getSerialesFlat(p?.garantia).some(pan => pan.serial === s)) return 'Paneles';
   if ((p?.garantia?.equipos || []).some(eq => eq.serial === s)) return 'Equipos';
   return null;
 }
@@ -207,6 +224,8 @@ window.showFormEquipoFromKit = function(projectId, kitId, nombre) {
   _clearEqFotos();
   form.style.display = 'block';
   form.scrollIntoView({ behavior:'smooth' });
+  // Un solo toque → cámara: abre el escáner de serial de inmediato
+  setTimeout(() => scanSerial(projectId), 300);
 };
 
 window.editarEquipo = async function(projectId, idx) {
@@ -241,20 +260,30 @@ window.guardarEquipo = async function(projectId) {
   const editIdx = parseInt(document.getElementById('eq-editing-idx')?.value ?? '-1');
   const isEdit  = editIdx >= 0;
 
-  const p = await projects.getById(projectId);
+  let p;
+  try {
+    p = await projects.getById(projectId);
+  } catch (err) {
+    console.error('guardarEquipo error:', err);
+    toast('No se pudo cargar el proyecto — revisa tu conexión e intenta de nuevo', 'error');
+    return;
+  }
   p.garantia = p.garantia || {};
   p.garantia.equipos = p.garantia.equipos || [];
 
-  const vocMaxRaw = document.getElementById('eq-vocmax')?.value?.trim();
+  const vocMaxRaw      = document.getElementById('eq-vocmax')?.value?.trim();
+  const potenciaAcRaw  = document.getElementById('eq-potencia-ac')?.value?.trim();
   const equipo = {
     id:          isEdit ? (p.garantia.equipos[editIdx]?.id || uuid()) : uuid(),
     tipo, marca, modelo,
-    ...(tipo === 'inversor' && vocMaxRaw ? { vocMax: parseFloat(vocMaxRaw) } : {}),
+    ...(tipo === 'inversor' && vocMaxRaw     ? { vocMax: parseFloat(vocMaxRaw) } : {}),
+    ...(tipo === 'inversor' && potenciaAcRaw ? { potenciaNominalAC: parseFloat(potenciaAcRaw) } : {}),
     serial:      document.getElementById('eq-serial').value.trim(),
     fotoPlaca:   _eqFotos.placa   || (isEdit ? p.garantia.equipos[editIdx]?.fotoPlaca   : null),
     fotoFrontal: _eqFotos.frontal || (isEdit ? p.garantia.equipos[editIdx]?.fotoFrontal : null),
     fotoAngulo:  _eqFotos.angulo  || (isEdit ? p.garantia.equipos[editIdx]?.fotoAngulo  : null),
     notas:       document.getElementById('eq-notas').value.trim(),
+    historialReemplazos: isEdit ? (p.garantia.equipos[editIdx]?.historialReemplazos || []) : [],
     createdAt:   isEdit ? (p.garantia.equipos[editIdx]?.createdAt || isoNow()) : isoNow(),
     updatedAt:   isoNow(),
   };
@@ -263,46 +292,84 @@ window.guardarEquipo = async function(projectId) {
   if (isEdit) {
     newEquipos = [...p.garantia.equipos];
     newEquipos[editIdx] = equipo;
-    toast('✅ Equipo actualizado');
   } else {
     newEquipos = [...p.garantia.equipos, equipo];
-    toast('✅ Equipo registrado');
   }
 
-  // setField en lugar de update() — escribe solo garantia.equipos, no el doc completo
-  await projects.setField(projectId, 'garantia.equipos', newEquipos);
+  try {
+    // setField en lugar de update() — escribe solo garantia.equipos, no el doc completo
+    await projects.setField(projectId, 'garantia.equipos', newEquipos);
 
-  // Si viene del Kit de obra, vincula el item del kit con el equipo ya instalado
-  const kitId = document.getElementById('eq-kit-id')?.value;
-  if (kitId) {
-    await projects.setField(projectId, `checklistData.kitEquipo.${kitId}.garantiaEquipoId`, equipo.id);
-  }
-
-  // Reparchar items de cola con el projectId real y el ID del equipo,
-  // para que processQueue pueda actualizar el campo correcto al reconectar
-  const _fotoCampos = [['placa','fotoPlaca'], ['frontal','fotoFrontal'], ['angulo','fotoAngulo']];
-  for (const [tipo, campo] of _fotoCampos) {
-    const fotoMem = _eqFotos[tipo];
-    if (fotoMem && typeof fotoMem === 'object' && fotoMem.pending && fotoMem.pendingId) {
-      await updateQueueItem(fotoMem.pendingId, {
-        projectId,
-        storagePath: `projects/${projectId}/equipo_${tipo}_${fotoMem.pendingId}.jpg`,
-        op: 'eqFoto',
-        opArgs: { eqId: equipo.id, campo },
-      });
+    // Si viene del Kit de obra, vincula el item del kit con el equipo ya instalado
+    const kitId = document.getElementById('eq-kit-id')?.value;
+    if (kitId) {
+      await projects.setField(projectId, `checklistData.kitEquipo.${kitId}.garantiaEquipoId`, equipo.id);
     }
+
+    // Reparchar items de cola con el projectId real y el ID del equipo,
+    // para que processQueue pueda actualizar el campo correcto al reconectar
+    const _fotoCampos = [['placa','fotoPlaca'], ['frontal','fotoFrontal'], ['angulo','fotoAngulo']];
+    for (const [tipo, campo] of _fotoCampos) {
+      const fotoMem = _eqFotos[tipo];
+      if (fotoMem && typeof fotoMem === 'object' && fotoMem.pending && fotoMem.pendingId) {
+        await updateQueueItem(fotoMem.pendingId, {
+          projectId,
+          storagePath: `projects/${projectId}/equipo_${tipo}_${fotoMem.pendingId}.jpg`,
+          op: 'eqFoto',
+          opArgs: { eqId: equipo.id, campo },
+        });
+      }
+    }
+
+    const _eqSession = await getSession();
+    logChange(projectId, {
+      modulo: 'Garantía',
+      accion: isEdit ? 'equipo editado' : 'equipo agregado',
+      detalle: `${equipo.tipo}: ${equipo.marca} ${equipo.modelo}`,
+      quien: _eqSession,
+    });
+  } catch (err) {
+    console.error('guardarEquipo error:', err);
+    toast('⚠ No se pudo guardar el equipo — revisa tu conexión e intenta de nuevo', 'error', 5000);
+    return;
   }
 
-  const _eqSession = await getSession();
-  logChange(projectId, {
-    modulo: 'Garantía',
-    accion: isEdit ? 'equipo editado' : 'equipo agregado',
-    detalle: `${equipo.tipo}: ${equipo.marca} ${equipo.modelo}`,
-    quien: _eqSession,
-  });
+  toast(isEdit ? '✅ Equipo actualizado' : '✅ Equipo registrado');
   _clearEqFotos();
   sessionStorage.setItem('garantia-tab-target', 'g-equipos');
   navigate(`#proyecto/${projectId}/garantia`);
+};
+
+window.toggleHistorialReemplazo = function(idx) {
+  const el = document.getElementById(`eq-historial-${idx}`);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+};
+
+window.reportarReemplazo = function(projectId, idx) {
+  openScannerOverlay(
+    async (code) => {
+      const motivo = await inputDialog('Motivo del reemplazo', 'Ej: falla en campo, daño en tránsito…');
+      if (motivo === null) return; // cancelado
+      const p = await projects.getById(projectId);
+      const eq = p.garantia?.equipos?.[idx];
+      if (!eq) return;
+      const serialAnterior = eq.serial || '';
+      const quien = await getSession();
+      const entrada = { serialAnterior, serialNuevo: code, motivo: motivo.trim(), fecha: isoNow(), por: quien?.nombre || quien?.email || '—' };
+      const historial = [...(eq.historialReemplazos || []), entrada];
+      const newEquipos = [...p.garantia.equipos];
+      newEquipos[idx] = { ...eq, serial: code, historialReemplazos: historial, updatedAt: isoNow() };
+      await projects.setField(projectId, 'garantia.equipos', newEquipos);
+      logChange(projectId, {
+        modulo: 'Garantía', accion: 'equipo reemplazado',
+        detalle: `${eq.tipo}: ${serialAnterior || '—'} → ${code}`,
+        quien,
+      });
+      toast('✅ Reemplazo registrado');
+      navigate(`#proyecto/${projectId}/garantia`);
+    },
+    { continuous: false, title: 'Escanear nuevo serial' }
+  );
 };
 
 window.delEquipo = async function(projectId, idx) {
@@ -320,6 +387,11 @@ window.delEquipo = async function(projectId, idx) {
     if (orphanId) {
       await projects.setField(projectId, `checklistData.kitEquipo.${orphanId}.garantiaEquipoId`, null);
     }
+    logChange(projectId, {
+      modulo: 'Garantía', accion: 'equipo eliminado',
+      detalle: `${equipo.tipo}: ${equipo.marca} ${equipo.modelo}`,
+      quien: await getSession(),
+    });
   }
 
   sessionStorage.setItem('garantia-tab-target', 'g-equipos');

@@ -242,8 +242,10 @@ function _calcProgress(p) {
   const e = calcFaseEstado(p);
   const { docPct, garPct, audPct } = e;
   const esPequeno = p.tipoSistema === 'sistema_pequeno';
-  // levPct: mismo criterio que el donut en project.js (solo tipTecho)
-  const levPct = p.documentacion?.levantamiento?.tipTecho ? 100 : 0;
+  // levPct: mismo criterio que el donut en project.js — tipTecho ahora se
+  // deriva del área 0, así que también aceptamos areasTecho.length como señal
+  // (cubre el instante entre agregar un área y que corra el autoguardado)
+  const levPct = (p.documentacion?.levantamiento?.tipTecho || p.documentacion?.levantamiento?.areasTecho?.length) ? 100 : 0;
   const pct = esPequeno
     ? Math.round((levPct + garPct) / 2)
     : Math.round((levPct + docPct + garPct) / 3);

@@ -1,15 +1,43 @@
 // gar-voc.js — Validación Voc de string + catálogo de paneles
 // Extraído de garantia.js. Exporta calcVocPuro y renderVocTab.
 
-import { projects } from './db.js';
+import { projects, logChange } from './db.js';
 import { esc, toast, confirmDialog, isoNow } from './utils.js';
-import { getSession } from './auth.js';
+import { getSession, isAdmin } from './auth.js';
 import { icon } from './icons.js';
 import { TMIN_ZONA_LABELS } from './clima.js';
+import { getTotalPanels } from '../modules/calculadora/index.js';
+import { getSerialesFlat } from './gar-paneles.js';
 
 // Fallback cuando el proyecto no tiene T_min capturado en levantamiento
 const VOC_T_MIN  = 3;    // °C — La Paz, BCS (valor por defecto)
 const VOC_COEF   = -0.29; // %/°C  coeficiente típico monocristalino
+
+// ¿El Voc guardado quedó desactualizado respecto a los datos actuales del
+// proyecto (panel, inversor, T mín)? Compartido entre el render de esta
+// pestaña y el candado de firma de Garantía (garantia.js).
+export function vocEstaDesactualizado(project) {
+  const g   = project.garantia || {};
+  const vd  = g.validacionVoc || {};
+  if (!vd.resultado) return false;
+  const inversor = (g.equipos || []).find(e => e.tipo === 'inversor');
+  const lev = project.documentacion?.levantamiento || {};
+
+  const tMin     = (lev.tMin != null) ? lev.tMin : VOC_T_MIN;
+  const tMinZona = lev.tMinZona || 'valle';
+  const vocPanel = g.paneles?.voc || vd.vocPanel || null;
+  const vocMax   = inversor?.vocMax || vd.vocMaxInversor || null;
+
+  // "Paneles en serie" ya no se deriva de strings — es un campo manual
+  // (ver renderVocTab); no hay un valor "vivo" contra el cual compararlo,
+  // así que no participa en la detección de obsolescencia.
+  return !!(
+    (vd.vocPanel     != null && vocPanel     != null && Math.abs(vd.vocPanel - vocPanel) > 0.01) ||
+    (vd.vocMaxInversor != null && vocMax     != null && vd.vocMaxInversor !== vocMax) ||
+    (vd.tMin         != null && vd.tMin     !== tMin) ||
+    (vd.tMinZona     != null && vd.tMinZona !== tMinZona)
+  );
+}
 
 export function renderVocTab(project, projectId, edit) {
   const g        = project.garantia || {};
@@ -28,24 +56,16 @@ export function renderVocTab(project, projectId, edit) {
   const vocPanel     = g.paneles?.voc || vd.vocPanel || null;
   const vocMax       = inversor?.vocMax || vd.vocMaxInversor || null;
 
-  // Paneles en serie: fuente primaria = max(paneles por string registrado)
-  // Fallback: calculadora layout. NO usar el valor guardado en vd — puede estar desactualizado.
-  const strings       = g.paneles?.strings || [];
-  const maxPorString  = strings.length > 0
-    ? Math.max(...strings.map(s => (s.paneles?.length || 0)))
-    : null;
-  const panelesSerie  = maxPorString || project.projectConfig?.layout?.totalPanels || null;
+  // Paneles en serie: campo manual — lo declara el admin/técnico según el
+  // diseño eléctrico real, ya que ya no se deriva de un agrupamiento de
+  // strings. Se siembra con el último valor guardado o, si nunca se ha
+  // calculado, con el total de paneles de la Calculadora como sugerencia.
+  const panelesSerie  = vd.panelesSerie ?? getTotalPanels(project.projectConfig) ?? null;
 
   const resultado = vd.resultado;
 
   // Detectar si el resultado guardado está desactualizado respecto a los datos actuales
-  const stale = resultado && (
-    (vd.panelesSerie != null && panelesSerie != null && vd.panelesSerie !== panelesSerie) ||
-    (vd.vocPanel     != null && vocPanel     != null && Math.abs(vd.vocPanel - vocPanel) > 0.01) ||
-    (vd.vocMaxInversor != null && vocMax     != null && vd.vocMaxInversor !== vocMax) ||
-    (vd.tMin         != null && vd.tMin     !== tMin) ||
-    (vd.tMinZona     != null && vd.tMinZona !== tMinZona)
-  );
+  const stale = vocEstaDesactualizado(project);
 
   const semaforo = resultado === 'seguro'  ? { cls: 'voc-ok',   ico: '🟢', txt: 'Configuración segura' }
                  : resultado === 'limite'  ? { cls: 'voc-warn', ico: '🟡', txt: 'En el límite — sin margen' }
@@ -65,10 +85,16 @@ export function renderVocTab(project, projectId, edit) {
       : `Inversor — registra el inversor en <em>Equipos</em>`),
   ].filter(Boolean);
 
-  // Fuente de paneles en serie para tooltip
-  const serieOrigen = maxPorString
-    ? `${strings.length} string${strings.length>1?'s':''} registrado${strings.length>1?'s':''}`
-    : 'Calculadora';
+  // Coeficiente de temperatura — editable por ficha técnica del fabricante,
+  // default al típico de Si cristalino. Se guarda junto al resultado de Voc.
+  const coefVoc = vd.coefVoc ?? VOC_COEF;
+
+  // ── Sobresaturación DC/AC (independiente del semáforo de Voc) ──────────────
+  const totalPaneles   = getSerialesFlat(g).length;
+  const potenciaDC_kW  = totalPaneles && g.paneles?.wp ? (totalPaneles * g.paneles.wp / 1000) : null;
+  const potenciaAC_kW  = inversor?.potenciaNominalAC || null;
+  const ratioDcAc      = (potenciaDC_kW && potenciaAC_kW) ? (potenciaDC_kW / potenciaAC_kW) * 100 : null;
+  const dcAcSobresatura = ratioDcAc != null && ratioDcAc > 140;
 
   return `
   <div class="card">
@@ -82,7 +108,7 @@ export function renderVocTab(project, projectId, edit) {
     ${stale && edit ? `
     <div class="voc-stale-banner">
       ${icon('arrow-clockwise', 15)}
-      <span>Los strings o el panel cambiaron desde el último cálculo.</span>
+      <span>El panel, el inversor o la temperatura mínima cambiaron desde el último cálculo.</span>
       <button class="btn-primary btn-sm" onclick="calcVocYGuardar('${projectId}')">Recalcular</button>
     </div>` : ''}
 
@@ -91,12 +117,6 @@ export function renderVocTab(project, projectId, edit) {
       <div class="vda-item">
         <span class="vda-lbl">${icon('sun', 14)} Voc del panel</span>
         <span class="vda-val ${vocPanel ? '' : 'vda-missing'}">${vocPanel ? vocPanel + ' V' : '—'}</span>
-      </div>
-      <div class="vda-item">
-        <span class="vda-lbl">${icon('stack', 14)} Paneles en serie
-          <span style="font-size:.65rem;opacity:.7">(${serieOrigen})</span>
-        </span>
-        <span class="vda-val ${panelesSerie ? '' : 'vda-missing'}">${panelesSerie || '—'}</span>
       </div>
       <div class="vda-item">
         <span class="vda-lbl">${icon('cpu', 14)} Voc máx inversor</span>
@@ -129,11 +149,42 @@ export function renderVocTab(project, projectId, edit) {
 
     <!-- Inputs ocultos para la lógica de calcVoc -->
     <input type="hidden" id="voc-panel"   value="${vocPanel    || ''}" />
-    <input type="hidden" id="voc-serie"   value="${panelesSerie|| ''}" />
     <input type="hidden" id="voc-max-inv" value="${vocMax      || ''}" />
     <input type="hidden" id="voc-tmin"     value="${tMin}" />
     <input type="hidden" id="voc-tmin-zona" value="${tMinZona}" />
-    <input type="hidden" id="voc-coef"    value="${VOC_COEF}" />
+
+    <!-- Paneles en serie — campo manual, ya no se agrupa por string -->
+    <div class="form-group" style="margin-top:8px">
+      <label>${icon('stack', 14)} Paneles en serie
+        <span class="form-hint">según el diseño eléctrico real — ya no se deriva de strings</span>
+      </label>
+      <input type="number" id="voc-serie" value="${panelesSerie || ''}" min="1" step="1" ${!edit?'disabled':''}
+             onchange="calcVoc()" style="max-width:120px" />
+    </div>
+
+    <!-- Coeficiente de temperatura — editable según ficha técnica del fabricante -->
+    <div class="form-group" style="margin-top:8px">
+      <label>Coeficiente de temperatura Voc (%/°C)
+        <span class="form-hint">de la ficha técnica del panel — default: -0.29 (Si cristalino típico)</span>
+      </label>
+      <div class="voc-coef-row">
+        <button type="button" class="btn-icon-sm" ${!edit?'disabled':''} onclick="_stepVocCoef(-0.01)">−</button>
+        <input type="number" id="voc-coef" value="${coefVoc}" step="0.01" ${!edit?'disabled':''}
+               onchange="calcVoc()" style="text-align:center;max-width:90px" />
+        <button type="button" class="btn-icon-sm" ${!edit?'disabled':''} onclick="_stepVocCoef(0.01)">+</button>
+      </div>
+    </div>
+
+    <!-- Sobresaturación DC/AC — chequeo independiente del semáforo de Voc -->
+    <div class="voc-dcac-row">
+      ${potenciaDC_kW == null || potenciaAC_kW == null
+        ? `<p class="form-hint" style="margin:0">${icon('info',13)} Esperando asignación de inversor con potencia nominal CA para calcular relación DC/AC.</p>`
+        : `<div class="vda-item">
+            <span class="vda-lbl">${icon('lightning',14)} Relación DC/AC</span>
+            <span class="vda-val ${dcAcSobresatura?'vda-alert':''}">${ratioDcAc.toFixed(0)}%</span>
+          </div>
+          ${dcAcSobresatura ? `<p class="voc-dcac-warn">${icon('warning-circle',14)} Sobresaturación DC/AC — la potencia DC instalada (${potenciaDC_kW.toFixed(1)} kW) supera 140% de la nominal del inversor (${potenciaAC_kW} kW). Verifica la tolerancia del fabricante antes de continuar.</p>` : ''}`}
+    </div>
 
     <!-- Resultado -->
     <div id="voc-resultado" class="voc-resultado" style="${resultado && !alertas.length && !stale ? '' : 'display:none'}">
@@ -226,6 +277,16 @@ export function calcVocPuro({ vocPanel, panelesSerie, vocMaxInversor, tMin, coef
            vocCorregido, vocString, margen, resultado, mensaje };
 }
 
+// Voc esperado de un string, sin requerir inversor registrado — para mostrar
+// como referencia mientras se mide en campo (a diferencia de calcVocPuro, que
+// valida contra el límite del inversor y por eso exige vocMaxInversor).
+export function calcVocEsperadoString({ vocPanel, panelesSerie, tMin, coefVoc }) {
+  if (!vocPanel || !panelesSerie) return null;
+  const coef    = coefVoc ?? VOC_COEF;
+  const tMinVal = tMin ?? VOC_T_MIN;
+  return vocPanel * (1 + (coef / 100) * (tMinVal - 25)) * panelesSerie;
+}
+
 // Cálculo Voc — lee parámetros del DOM, delega lógica a calcVocPuro
 function _calcVocData() {
   const vocP   = parseFloat(document.getElementById('voc-panel')?.value)   || 0;
@@ -233,11 +294,21 @@ function _calcVocData() {
   const vocMax = parseFloat(document.getElementById('voc-max-inv')?.value)  || 0;
   const tMin   = parseFloat(document.getElementById('voc-tmin')?.value || '') || VOC_T_MIN;
   const tMinZona = document.getElementById('voc-tmin-zona')?.value || 'valle';
+  const coef   = parseFloat(document.getElementById('voc-coef')?.value);
 
-  const result = calcVocPuro({ vocPanel: vocP, panelesSerie: serie, vocMaxInversor: vocMax, tMin, coefVoc: VOC_COEF });
+  const result = calcVocPuro({ vocPanel: vocP, panelesSerie: serie, vocMaxInversor: vocMax, tMin, coefVoc: isNaN(coef) ? VOC_COEF : coef });
   if (!result) return null;
   return { ...result, tMinZona };
 }
+
+// Botones [−]/[+] del coeficiente de temperatura (paso 0.01)
+window._stepVocCoef = function(delta) {
+  const inp = document.getElementById('voc-coef');
+  if (!inp || inp.disabled) return;
+  const val = (parseFloat(inp.value) || 0) + delta;
+  inp.value = val.toFixed(2);
+  calcVoc();
+};
 
 window.calcVoc = function() {
   const d = _calcVocData();
@@ -269,6 +340,22 @@ window.guardarVoc = async function(projectId) {
   const proj     = await projects.getById(projectId);
   const inversor = (proj?.garantia?.equipos || []).find(e => e.tipo === 'inversor');
   const savedVocMax = window._vocTemp.vocMaxInversor;
+  const session0 = await getSession();
+
+  // Candado: si el Voc del string excede el límite del inversor, solo un admin
+  // puede guardar de todas formas — y queda como excepción registrada en el
+  // historial, igual que otros candados de la app (ej. bloque del checklist).
+  if (window._vocTemp.resultado === 'excede') {
+    if (!isAdmin(session0)) {
+      toast('🚨 El Voc excede el límite del inversor. Solo un administrador puede autorizar guardar esta configuración.', 'error', 7000);
+      return;
+    }
+    const ok = await confirmDialog(
+      `🚨 El Voc del string (${window._vocTemp.vocString.toFixed(1)} V) excede el límite del inversor (${savedVocMax} V). ` +
+      'Esto es una excepción que quedará registrada en el historial. ¿Guardar de todas formas?'
+    );
+    if (!ok) return;
+  }
 
   if (!inversor) {
     // No hay inversor — advertir y pedir confirmación
@@ -288,12 +375,13 @@ window.guardarVoc = async function(projectId) {
     if (!ok) return;
   }
 
-  const session = await getSession();
+  const session = session0;
   const data = { ...window._vocTemp, savedAt: isoNow(), savedBy: session?.uid || '' };
   await projects.setField(projectId, 'garantia.validacionVoc', data);
   const resMsg = data.resultado === 'seguro' ? 'configuración segura'
-               : data.resultado === 'excede' ? '⚠️ excede el límite'
+               : data.resultado === 'excede' ? '⚠️ excede el límite (excepción de admin)'
                : 'en el límite';
+  logChange(projectId, { modulo: 'Garantía', accion: 'Voc recalculado', detalle: resMsg, quien: session });
   toast(`✅ Voc guardado — ${resMsg}`);
   sessionStorage.setItem('garantia-tab-target', 'g-voc');
   navigate(`#proyecto/${projectId}/garantia`);

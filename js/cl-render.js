@@ -4,7 +4,7 @@ import { projects } from './db.js';
 import { esc, fmtFechaHora } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
 import { HERRAMIENTA, ADMIN_REVIEW_ITEMS, getExecBlocks } from '../modules/checklist/index.js';
-import { buildDiagramSVG, buildGuiaData, buildTorqueTable } from '../modules/calculadora/index.js';
+import { buildDiagramSVG, buildGuiaData, buildTorqueTable, getRowsData, getPanelWidth, getPanelHeight, getTotalPanels } from '../modules/calculadora/index.js';
 import { icon } from './icons.js';
 
 // Convierte nombre de componente en clave segura para Firestore (sin puntos ni espacios)
@@ -112,9 +112,9 @@ function renderGuiaTab(cfg, projectId) {
     </div>
   </div>`;
 
-  const rd     = cfg.layout?.rowsData || [1];
-  const pW     = cfg.panel?.width     || 1.134;
-  const pH     = cfg.panel?.height    || 1.990;
+  const rd     = getRowsData(cfg).length ? getRowsData(cfg) : [1];
+  const pW     = getPanelWidth(cfg)  || 1.134;
+  const pH     = getPanelHeight(cfg) || 1.990;
   const est    = cfg.estructura       || 'k2';
   const techo  = cfg.techo            || 'cemento';
   const isAlx  = est === 'aluminex';
@@ -249,7 +249,7 @@ export async function renderChecklistModule(projectId, session) {
   const bomItems  = cfg?.computed?.bom || [];
   const doneHerr  = herramienta.filter(h => cl.herr?.[h.id]).length;
   const doneCons  = consumibles.filter((_, i) => cl.cons?.[String(i)]).length;
-  const doneBOM   = bomItems.filter((_, i) => cl.bom?.[String(i)]).length;
+  const doneBOM   = bomItems.filter(it => cl.bom?.[it.partNum || it.name]).length;
   const doneAdmin = ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length;
   const allAdmin  = ADMIN_REVIEW_ITEMS.length > 0 && doneAdmin === ADMIN_REVIEW_ITEMS.length;
   const published = !!cl.publishedAt;
@@ -365,15 +365,15 @@ export async function renderChecklistModule(projectId, session) {
       const grpOrder = ['rieles','bases','abrazaderas','accesorios','tierra','otro'];
       const grpLabel = { rieles:'Rieles', bases:'Bases', abrazaderas:'Abrazaderas', accesorios:'Accesorios', tierra:'Tierra / Puesta a tierra', otro:'Otros' };
       const bomByGrp = {};
-      bomItems.forEach((item, i) => {
+      bomItems.forEach((item) => {
         const g = (item.grp || 'otro').toLowerCase();
         if (!bomByGrp[g]) bomByGrp[g] = [];
-        bomByGrp[g].push({ ...item, _idx: i });
+        bomByGrp[g].push({ ...item, _key: item.partNum || item.name });
       });
       const bomSection = bomItems.length ? `
       <div class="card">
         <div class="card-title-row">
-          <h3 class="card-title">Lista de materiales <span style="color:var(--text-muted);font-weight:400;font-size:.8rem">${bomItems.length} ítems · ${cfg.layout?.totalPanels||0} paneles</span></h3>
+          <h3 class="card-title">Lista de materiales <span style="color:var(--text-muted);font-weight:400;font-size:.8rem">${bomItems.length} ítems · ${getTotalPanels(cfg)||0} paneles</span></h3>
           <span class="cl-prog-lbl">${doneBOM}/${bomItems.length}</span>
         </div>
         ${renderProgress(doneBOM, bomItems.length)}
@@ -382,9 +382,9 @@ export async function renderChecklistModule(projectId, session) {
             <span class="cl-bom-grp-lbl">${grpLabel[g] || g}</span>
             <div class="cl-item-list">
               ${bomByGrp[g].map(item => `
-              <label class="cl-item ${cl.bom?.[String(item._idx)] ? 'cl-item-done' : ''}">
-                <input type="checkbox" ${cl.bom?.[String(item._idx)] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
-                  onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleBOM('${projectId}',${item._idx},this.checked)">
+              <label class="cl-item ${cl.bom?.[item._key] ? 'cl-item-done' : ''}">
+                <input type="checkbox" ${cl.bom?.[item._key] ? 'checked' : ''} ${!edit ? 'disabled' : ''}
+                  onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleBOM('${projectId}','${esc(item._key)}',this.checked)">
                 <div class="cl-item-text" style="flex:1">
                   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                     <span class="cl-item-name">${esc(item.name)}</span>

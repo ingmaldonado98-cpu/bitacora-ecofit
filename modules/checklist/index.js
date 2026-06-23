@@ -11,7 +11,7 @@ export const HERRAMIENTA = {
     { id: 'h-mak',    n: 'Makita', note: 'Modo rotomartillo' },
     { id: 'h-mil',    n: 'Milwaukee impacto', note: 'Para apretar tuercas bridadas — llevar adaptador dados' },
     { id: 'h-brocas', n: 'Brocas para concreto', note: 'Set: chica hasta 3/8"' },
-    { id: 'h-guia',   n: 'Tubo guía', note: 'Para medir 5 cm de profundidad' },
+    { id: 'h-guia',   n: 'Tubo guía', note: 'Para medir la profundidad de perforación' },
     { id: 'h-sopla',  n: 'Sopladora de mano' },
     { id: 'h-cepil',  n: 'Cepillo limpiatuberías', note: 'Eliminar polvo del hoyo' },
     { id: 'h-pinzas', n: 'Pinzas de punta larga', note: 'Para manejo del epóxico' },
@@ -106,22 +106,24 @@ export function emptyChecklistState() {
   };
 }
 
-// ── Fases del checklist de ejecución ───────────────────────────────────────────
-// El flujo en campo no sigue el orden de los módulos de datos — sigue la secuencia
-// física de la obra. Cada bloque de ejecución se etiqueta con su fase para que el
-// técnico entienda el orden aunque los bloques se repartan entre las pestañas de
-// sitio (Techo / Centros de carga / Zona del sistema).
-export const FASE_LABELS = {
-  1: 'Fase 1',
-  2: 'Fase 2',
-  3: 'Fase 3',
-  4: 'Fase 4',
+// ── Bloques del checklist de ejecución ─────────────────────────────────────────
+// El flujo en campo no sigue el orden de los módulos de datos — sigue la
+// secuencia física real de la obra, validada con el equipo de campo:
+//   Bloque 1 — techumbre: anclaje/montaje mecánico y canalización FV exterior.
+//   Bloque 2 — cuarto de máquinas: fija primero la médula (ducto central) y
+//              luego monta inversor/baterías/busbars/seccionador sobre ella.
+//   Bloque 3 — cableado, paneles y cierre: tendido/peinado eléctrico, última
+//              validación de techo + montaje de paneles, y el cierre técnico
+//              (protecciones, mediciones, etiquetado, puesta en marcha).
+export const BLOQUE_LABELS = {
+  1: 'Bloque 1',
+  2: 'Bloque 2',
+  3: 'Bloque 3',
 };
-export const FASE_DESC = {
-  1: 'Preparación y obra civil externa',
-  2: 'Canalizaciones e infraestructura de rutas',
-  3: 'Tendido eléctrico y montaje de módulos',
-  4: 'Comisionamiento, verificación y cierre',
+export const BLOQUE_DESC = {
+  1: 'Estructura, Anclaje y Canalización Fotovoltaica',
+  2: 'Canalización Central y Montaje de Equipos',
+  3: 'Cableado, Paneles y Cierre',
 };
 
 // ── Tierra: bloque único compartido por todos los tipos de sistema ────────────
@@ -132,30 +134,118 @@ const _tierraItems = [
   { id: 'ptr-04', n: 'Cable de tierra conectado a inversor / equipo principal' },
 ];
 
-// ── Fase 1 — Preparación y obra civil externa ─────────────────────────────────
-function _anclajeBlock(techo) {
+// ── BLOQUE 1 — Estructura, Anclaje y Canalización Fotovoltaica ───────────────
+
+// Paso 1.1 — Anclaje y Montaje Mecánico (Techumbre). Fusiona perforación/anclaje
+// químico y montaje de rieles en un solo paso de techumbre. La profundidad de
+// perforación se ajusta al grosor real de la losa capturado en Levantamiento
+// (profundidad = grosor − 3 cm, mínimo 3 cm); sin ese dato se usa el genérico
+// de 5 cm. Si la calidad de la losa del área se reportó como "Pobre", se
+// agrega una alerta de revisión.
+function _anclajeMontajeBlock(techo, project) {
   const esCemento = techo !== 'metal';
+  let profundidadTxt = '5 cm';
+  let alertaCalidad = null;
+
+  if (esCemento) {
+    const lev   = project?.documentacion?.levantamiento || {};
+    const areas = lev.areasTecho || [];
+    const areaLosa = areas.find(a => (a.tipTecho || lev.tipTecho) === 'Losa de concreto');
+    if (areaLosa?.grosorLosa) {
+      const prof = Math.max(areaLosa.grosorLosa - 3, 3);
+      profundidadTxt = `${prof} cm (losa de ${areaLosa.grosorLosa} cm)`;
+    }
+    if (areaLosa?.calidadLosa === 'Pobre') {
+      alertaCalidad = { id: 'st-03b', n: '⚠ Calidad de losa reportada como POBRE — confirmar revisión estructural antes de anclar' };
+    }
+  }
+
+  const anclajeItems = esCemento ? [
+    { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
+    { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
+    { id: 'st-02', n: 'Puntos de anclaje marcados según diagrama' },
+    { id: 'st-03', n: `Perforación con rotomartillo — profundidad sugerida: ${profundidadTxt}` },
+    ...(alertaCalidad ? [alertaCalidad] : []),
+    { id: 'st-04', n: 'Hoyos soplados y cepillados (sin polvo)' },
+    { id: 'st-05', n: 'Epóxico inyectado con pipeta (una por hoyo)' },
+    { id: 'st-06', n: 'Varilla roscada instalada y alineada' },
+    { id: 'st-07', n: 'Curado de epóxico completado (≥ 20 min)' },
+  ] : [
+    { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
+    { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
+    { id: 'st-02', n: 'Puntos de anclaje marcados sobre estructura metálica' },
+    { id: 'st-03', n: 'Perforación con WD-40 (broca para metal)' },
+    { id: 'st-04', n: 'Varilla roscada instalada con tuerca + arandelas' },
+  ];
+
+  const armazonItems = esCemento ? [
+    { id: 'st-08', n: 'Bases L-foot colocadas con neopreno' },
+    { id: 'st-09', n: 'Rieles instalados y nivelados' },
+    { id: 'st-10', n: 'Cortes de riel correctos (medidas del diagrama)' },
+    { id: 'pg-01', n: 'Arandelas de aislamiento colocadas entre metales disímiles (acero/aluminio)' },
+    { id: 'ic-01', n: 'Inclinación y orientación validadas con nivel/brújula antes de bloquear estructura' },
+    { id: 'st-13', n: 'Bases y tuercas selladas con sellador blanco' },
+  ] : [
+    { id: 'st-05', n: 'Bases L-foot / soportes colocados' },
+    { id: 'st-06', n: 'Rieles instalados y nivelados' },
+    { id: 'st-07', n: 'Cortes de riel correctos (medidas del diagrama)' },
+    { id: 'pg-01', n: 'Arandelas de aislamiento colocadas entre metales disímiles (acero/aluminio)' },
+    { id: 'ic-01', n: 'Inclinación y orientación validadas con nivel/brújula antes de bloquear estructura' },
+    { id: 'st-10', n: 'Bases y tuercas selladas con sellador transparente' },
+  ];
+
   return {
-    id: 'anclaje', label: 'Anclaje e impermeabilización', fase: 1,
-    items: esCemento ? [
-      { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
-      { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
-      { id: 'st-02', n: 'Puntos de anclaje marcados según diagrama' },
-      { id: 'st-03', n: 'Perforación con rotomartillo — 5 cm profundidad con tubo guía' },
-      { id: 'st-04', n: 'Hoyos soplados y cepillados (sin polvo)' },
-      { id: 'st-05', n: 'Epóxico inyectado con pipeta (una por hoyo)' },
-      { id: 'st-06', n: 'Varilla roscada instalada y alineada' },
-      { id: 'st-07', n: 'Curado de epóxico completado (≥ 20 min)' },
-    ] : [
-      { id: 'st-00', n: 'Área de techo limpia, despejada y segura para trabajar' },
-      { id: 'st-01', n: 'Trazado de paneles con tiralineas' },
-      { id: 'st-02', n: 'Puntos de anclaje marcados sobre estructura metálica' },
-      { id: 'st-03', n: 'Perforación con WD-40 (broca para metal)' },
-      { id: 'st-04', n: 'Varilla roscada instalada con tuerca + arandelas' },
+    id: 'anclaje-montaje', paso: '1.1', label: '1.1 Anclaje y Montaje Mecánico (Techumbre)', bloque: 1,
+    herramientas: ['Rotomartillo con tope', 'Bomba de soplado manual', 'Pistola para epóxico estructural', 'Llave dinamométrica (torquímetro)', 'Nivel de gota largo'],
+    nota: 'Perforar a la profundidad indicada usando tope, sopletear y cepillar al 100%, inyectar epóxico e instalar la varilla roscada de inmediato. Una vez curada, sentar las bases L-foot y montar los rieles aplicando el torque exacto de fabricante.',
+    fotosCierre: [
+      { id: 'testigo-barreno',  label: 'Testigo de Barreno Limpio', obligatoria: false },
+      { id: 'varillas-epoxico', label: 'Varillas Niveladas con Epóxico', obligatoria: false },
+      { id: 'rieles-torque',    label: 'Rieles Nivelados con Torque Aplicado', obligatoria: false },
     ],
+    items: [...anclajeItems, ...armazonItems],
   };
 }
 
+// Paso 1.2 — Canalización Fotovoltaica (Trayectoria Exterior). Canalización
+// EXTERIOR únicamente — la canalización central del cuadro eléctrico vive en
+// el Bloque 2 (paso 2.1, "médula espinal").
+const _conduitFvBlock = {
+  id: 'canal-fv', paso: '1.2', label: '1.2 Canalización Fotovoltaica (Trayectoria Exterior)', bloque: 1,
+  herramientas: ['Dobladora de tubo (conduit bender)', 'Rotomartillo', 'Broca 5/16"', 'Abrazaderas unicanal'],
+  nota: 'Instalar la tubería conduit exterior desde el arreglo de paneles hasta la entrada del cuarto de máquinas. Fijar soportes unicanal a un máximo de 1.5 m por norma.',
+  fotosCierre: [
+    { id: 'conduit-exterior', label: 'Bajada de Conduit hacia Cuarto de Máquinas', obligatoria: false },
+  ],
+  items: [
+    { id: 'cn-01', n: 'Ruta de canalización exterior definida y marcada' },
+    { id: 'cn-02', n: 'Conduit instalado desde paneles hasta entrada del cuarto de máquinas' },
+    { id: 'cn-03', n: 'Soportes unicanal fijos cada 1.5 m máx' },
+    { id: 'in-01', n: 'Coples / conectores estancos contra lluvia y polvo colocados' },
+    { id: 'in-02', n: 'Extremos de cable expuestos sellados' },
+  ],
+};
+
+// ── BLOQUE 2 — Canalización Central y Montaje de Equipos ─────────────────────
+
+// Paso 2.1 — Canalización Central (La Médula). Ducto/canaleta central en la
+// pared del cuadro eléctrico — todos los equipos se alinean con base en esto.
+const _meduluEspinalBlock = {
+  id: 'medula', paso: '2.1', label: '2.1 Canalización Central (La Médula)', bloque: 2,
+  herramientas: ['Nivel de mano', 'Tiralíneas / flexómetro', 'Taladro', 'Taquetes y tornillos'],
+  nota: 'Marcar en el muro el eje central del cuadro eléctrico. Fijar el ducto principal (canaleta ranurada o escalerilla) que servirá como espina dorsal — todos los equipos se alinearán con base en este ducto.',
+  fotosCierre: [
+    { id: 'medula-fijada', label: 'Ducto Central Fijado y Nivelado', obligatoria: false },
+  ],
+  items: [
+    { id: 'me-01', n: 'Eje central del cuadro eléctrico trazado y nivelado en el muro' },
+    { id: 'me-02', n: 'Ducto/canaleta principal fijado y nivelado en la pared, antes de colocar cualquier equipo' },
+  ],
+};
+
+// Paso 2.2 — Infraestructura de Almacenamiento y Equipos. Fusiona el montaje
+// mecánico del inversor/centros de carga con el del banco de baterías
+// (cuando el tipo de sistema lleva baterías) — todo adosado a la médula.
 const _COMPONENTE = {
   interconectado:   { nombre: 'Inversor',            lugar: 'lugar ventilado, protegido de la luz solar directa' },
   hibrido_respaldo: { nombre: 'Inversor híbrido',     lugar: 'lugar ventilado, protegido de la luz solar directa' },
@@ -163,139 +253,123 @@ const _COMPONENTE = {
   bombeo:           { nombre: 'Controlador de bomba', lugar: 'lugar protegido de lluvia' },
   sistema_pequeno:  { nombre: 'Controlador de carga', lugar: 'lugar ventilado' },
 };
-function _invFixBlock(tipo) {
+const _BATERIAS_NOTA = 'Colocar las baterías en su rack. Conectar los puentes en serie/paralelo, instalar el fusible de protección dedicado y canalizar el cable de fuerza y el de datos (BMS) hacia la médula espinal.';
+function _infraEquiposBlock(tipo) {
   const c = _COMPONENTE[tipo] || _COMPONENTE.interconectado;
+  const tieneBaterias = tipo === 'hibrido_respaldo' || tipo === 'aislado';
+  const bateriasItems = tieneBaterias ? [
+    { id: 'bat-01', n: 'Baterías instaladas en rack o caja ventilada' },
+    { id: 'bat-02', n: 'Conexión en serie/paralelo según especificación del banco' },
+    { id: 'bat-03', n: tipo === 'aislado' ? 'Fusible de batería instalado' : 'Fusible o seccionador de batería instalado' },
+    { id: 'bat-04', n: tipo === 'aislado' ? 'BMS configurado (si aplica)' : 'BMS configurado y comunicación verificada (si aplica)' },
+    { id: 'bat-05', n: tipo === 'aislado' ? 'Voltaje del banco medido y correcto' : 'Voltaje del banco medido y dentro del rango' },
+  ] : [];
   return {
-    id: 'inv-fix', label: `Fijación de ${c.nombre.toLowerCase()} y tableros`, fase: 1,
+    id: 'infra-equipos', paso: '2.2', label: '2.2 Infraestructura de Almacenamiento y Equipos', bloque: 2,
+    herramientas: ['Nivel de gota', 'Destornilladores aislados', 'Brocas adecuadas para el muro', 'Llave de torque aislada', 'Multímetro'],
+    nota: `Colgar la placa del ${c.nombre.toLowerCase()} y los gabinetes de protecciones AC/DC adosados a la médula espinal.${tieneBaterias ? ' ' + _BATERIAS_NOTA : ''} Montar el gabinete de barras colectoras y el seccionador general de CD antes de cualquier conexión eléctrica.`,
+    fotosCierre: [
+      { id: 'equipos-montados', label: 'Inversor y Tableros Montados sobre la Médula', obligatoria: false },
+      ...(tieneBaterias ? [{ id: 'baterias-instaladas', label: 'Banco de Baterías Instalado con Fusible', obligatoria: false }] : []),
+      { id: 'busbar-instalada', label: 'Gabinete de Barra Colectora Instalado', obligatoria: false },
+    ],
     items: [
-      { id: 'if-01', n: `${c.nombre} montado y nivelado en ${c.lugar}` },
+      { id: 'if-01', n: `${c.nombre} montado y nivelado en ${c.lugar}, adosado a la médula espinal` },
       { id: 'if-02', n: 'Gabinetes vacíos de protección CD/CA instalados (si aplica)' },
+      ...bateriasItems,
+      { id: 'busb-01', n: 'Instalación de gabinete de barras colectoras de CD (busbars)' },
+      { id: 'sec-01', n: 'Montaje físico del seccionador general de CD (corte de baterías/arreglo)' },
     ],
   };
 }
 
-function _armazonBlock(techo) {
-  const esCemento = techo !== 'metal';
-  const base = esCemento ? [
-    { id: 'st-08', n: 'Bases L-foot colocadas con neopreno' },
-    { id: 'st-09', n: 'Rieles instalados y nivelados' },
-    { id: 'st-10', n: 'Cortes de riel correctos (medidas del diagrama)' },
-  ] : [
-    { id: 'st-05', n: 'Bases L-foot / soportes colocados' },
-    { id: 'st-06', n: 'Rieles instalados y nivelados' },
-    { id: 'st-07', n: 'Cortes de riel correctos (medidas del diagrama)' },
-  ];
-  const sellado = esCemento
-    ? { id: 'st-13', n: 'Bases y tuercas selladas con sellador blanco' }
-    : { id: 'st-10', n: 'Bases y tuercas selladas con sellador transparente' };
-  return {
-    id: 'armazon', label: 'Montaje de armazón y par galvánico', fase: 1,
-    items: [
-      ...base,
-      { id: 'pg-01', n: 'Arandelas de aislamiento colocadas entre metales disímiles (acero/aluminio)' },
-      { id: 'ic-01', n: 'Inclinación y orientación validadas con nivel/brújula antes de bloquear estructura' },
-      sellado,
-    ],
-  };
-}
-
-// ── Fase 2 — Canalizaciones e infraestructura de rutas ────────────────────────
-function _canalBlock() {
-  return {
-    id: 'canal', label: 'Canalización y protección', fase: 2,
-    items: [
-      { id: 'cn-01', n: 'Ruta de canalización definida y marcada' },
-      { id: 'cn-02', n: 'Conduit/canaleta instalado desde paneles hasta tablero' },
-      { id: 'cn-03', n: 'Sujetadores y abrazaderas fijos cada 1.5 m máx' },
-      { id: 'cn-04', n: 'Entradas a tablero selladas (sin luz exterior)' },
-      { id: 'in-01', n: 'Coples / conectores estancos contra lluvia y polvo colocados' },
-      { id: 'in-02', n: 'Extremos de cable expuestos sellados' },
-    ],
-  };
-}
-
-// ── Fase 3 — Tendido eléctrico y montaje de módulos ───────────────────────────
-function _panelFixBlock(techo) {
-  const esCemento = techo !== 'metal';
-  return {
-    id: 'panel-fix', label: 'Fijación física y torque de paneles', fase: 3,
-    items: esCemento ? [
-      { id: 'st-11', n: 'Paneles montados con mid/end-clamps' },
-      { id: 'st-12', n: 'Torque aplicado con torquímetro — alineación y estética verificadas' },
-    ] : [
-      { id: 'st-08', n: 'Paneles montados con mid/end-clamps' },
-      { id: 'st-09', n: 'Torque aplicado con torquímetro — alineación y estética verificadas' },
-    ],
-  };
-}
-
-// Cableado CA y protecciones — trimmed por tipo (sin montaje, sin tierra, sin energizado;
-// esos pasos viven en inv-fix / tierra / puesta-marcha respectivamente)
+// Cableado CA y conexiones internas por tipo de sistema (sin montaje físico,
+// sin tierra, sin energizado — esos viven en sus propios pasos).
 const _cableAcBlocks = {
   interconectado: [
-    { id: 'cable-ac', label: 'Cableado CA y protecciones', fase: 3, items: [
-      { id: 'inv-02', n: 'Conexión DC al inversor verificada' },
-      { id: 'inv-03', n: 'Cable AC tendido hasta tablero principal' },
-      { id: 'inv-04', n: 'Protección AC (interruptor dedicado) instalada en tablero' },
-    ]},
+    { id: 'cable-ac', n: 'Conexión DC al inversor verificada' },
+    { id: 'cable-ac2', n: 'Cable AC tendido hasta tablero principal' },
+    { id: 'cable-ac3', n: 'Protección AC (interruptor dedicado) instalada en tablero' },
   ],
   hibrido_respaldo: [
-    { id: 'cable-ac', label: 'Cableado CA y protecciones', fase: 3, items: [
-      { id: 'inv-02', n: 'Conexión DC (paneles) al inversor verificada' },
-      { id: 'inv-03', n: 'Cable AC tendido hasta tablero' },
-      { id: 'inv-04', n: 'Protección AC instalada en tablero' },
-    ]},
-    { id: 'baterias', label: 'Banco de baterías', fase: 3, items: [
-      { id: 'bat-01', n: 'Baterías instaladas en rack o caja ventilada' },
-      { id: 'bat-02', n: 'Conexión en serie/paralelo según especificación del banco' },
-      { id: 'bat-03', n: 'Fusible o seccionador de batería instalado' },
-      { id: 'bat-04', n: 'BMS configurado y comunicación verificada (si aplica)' },
-      { id: 'bat-05', n: 'Voltaje del banco medido y dentro del rango' },
-    ]},
+    { id: 'cable-ac', n: 'Conexión DC (paneles) al inversor verificada' },
+    { id: 'cable-ac2', n: 'Cable AC tendido hasta tablero' },
+    { id: 'cable-ac3', n: 'Protección AC instalada en tablero' },
   ],
   aislado: [
-    { id: 'cable-ac', label: 'Cableado CA (si aplica)', fase: 3, items: [
-      { id: 'inv-02', n: 'Conexión DC desde paneles verificada' },
-      { id: 'inv-03', n: 'Salida AC configurada y protegida (si aplica)' },
-    ]},
-    { id: 'baterias', label: 'Banco de baterías', fase: 3, items: [
-      { id: 'bat-01', n: 'Baterías instaladas en rack o caja ventilada' },
-      { id: 'bat-02', n: 'Conexión en serie/paralelo según especificación del banco' },
-      { id: 'bat-03', n: 'Fusible de batería instalado' },
-      { id: 'bat-04', n: 'BMS configurado (si aplica)' },
-      { id: 'bat-05', n: 'Voltaje del banco medido y correcto' },
-    ]},
+    { id: 'cable-ac', n: 'Conexión DC desde paneles verificada' },
+    { id: 'cable-ac2', n: 'Salida AC configurada y protegida (si aplica)' },
   ],
   bombeo: [
-    { id: 'cable-ac', label: 'Cableado del controlador', fase: 3, items: [
-      { id: 'ctrl-02', n: 'Conexión DC desde paneles al controlador verificada' },
-      { id: 'ctrl-03', n: 'Conexión del motor al controlador verificada' },
-    ]},
-    { id: 'bomba', label: 'Motor / Bomba', fase: 3, items: [
-      { id: 'bom-01', n: 'Bomba instalada en pozo o toma de agua' },
-      { id: 'bom-02', n: 'Tuberías conectadas y sin fugas' },
-      { id: 'bom-03', n: 'Nivel de agua suficiente para bomba sumergible' },
-    ]},
+    { id: 'ctrl-02', n: 'Conexión DC desde paneles al controlador verificada' },
+    { id: 'ctrl-03', n: 'Conexión del motor al controlador verificada' },
   ],
   sistema_pequeno: [
-    { id: 'cable-ac', label: 'Conexión de equipos', fase: 3, items: [
-      { id: 'eq-01', n: 'Panel(es) instalados y correctamente orientados' },
-      { id: 'eq-02', n: 'Controlador de carga conectado entre paneles y batería' },
-      { id: 'eq-03', n: 'Batería conectada (si incluye)' },
-      { id: 'eq-04', n: 'Carga / equipo (congelador, etc.) conectado' },
-    ]},
+    { id: 'eq-01', n: 'Panel(es) instalados y correctamente orientados' },
+    { id: 'eq-02', n: 'Controlador de carga conectado entre paneles y batería' },
+    { id: 'eq-03', n: 'Batería conectada (si incluye)' },
+    { id: 'eq-04', n: 'Carga / equipo (congelador, etc.) conectado' },
   ],
 };
 
-const _etiquetadoBlock = {
-  id: 'etiquetado', label: 'Identificación', fase: 3,
+const _bombaItems = [
+  { id: 'bom-01', n: 'Bomba instalada en pozo o toma de agua' },
+  { id: 'bom-02', n: 'Tuberías conectadas y sin fugas' },
+  { id: 'bom-03', n: 'Nivel de agua suficiente para bomba sumergible' },
+];
+
+// ── BLOQUE 3 — Cableado, Paneles y Cierre ────────────────────────────────────
+
+// Paso 3.1 — Tendido de Conductores y Peinado Eléctrico. Fusiona el tendido
+// de cable DC, el peinado de cables traseros de módulos y el ponchado MC4.
+const _cableadoPeinadoBlock = {
+  id: 'cableado-peinado', paso: '3.1', label: '3.1 Tendido de Conductores y Peinado Eléctrico', bloque: 3,
+  herramientas: ['Guía jalacables (de nylon o acero)', 'Lubricante para cableado eléctrico', 'Clips para cable solar', 'Pinza ponchadora MC4', 'Pelacables solar', 'Llaves de apriete MC4'],
+  nota: 'Guiar el cable fotovoltaico desde los paneles hasta el inversor sin empalmes expuestos. Peinar los excedentes con clips de acero inoxidable y armar los conectores MC4 respetando la polaridad de cada string.',
+  fotosCierre: [
+    { id: 'cable-dc-tendido', label: 'Cable DC Tendido sin Empalmes', obligatoria: false },
+    { id: 'cables-peinados',  label: 'Cables Traseros Peinados con Clips', obligatoria: false },
+    { id: 'mc4-armados',      label: 'Conectores MC4 Armados', obligatoria: false },
+  ],
   items: [
-    { id: 'et-01', n: 'Cables identificados: positivo, negativo, fases, neutro, tierra' },
-    { id: 'et-02', n: 'Calcomanías de advertencia "Sistema Fotovoltaico" colocadas' },
+    { id: 'dc-01', n: 'Cable DC tendido por canalización sin empalmes expuestos' },
+    { id: 'dc-02', n: 'Polaridad positiva/negativa verificada en cada string' },
+    { id: 'dc-04', n: 'Continuidad DC medida con multímetro' },
+    { id: 'pc-01', n: 'Excedentes de cable sujetos con clips de acero inoxidable bajo el panel' },
+    { id: 'pc-02', n: 'Ningún cable solar toca o arrastra en el suelo del techo' },
+    { id: 'dc-03', n: 'Conectores MC4 engarzados y asegurados' },
+    { id: 'mc-01', n: 'Sello de goma del conector correctamente posicionado antes de acoplar' },
   ],
 };
 
-// ── Fase 4 — Comisionamiento, verificación y cierre ───────────────────────────
+// Paso 3.2 — Validación de Techo y Montaje de Paneles. Última inspección del
+// techo antes de cubrirlo de forma permanente con el arreglo de paneles.
+function _validacionTechoPanelesBlock(techo) {
+  const esCemento = techo !== 'metal';
+  const panelItems = esCemento ? [
+    { id: 'st-11', n: 'Paneles montados con mid/end-clamps' },
+    { id: 'st-12', n: 'Torque aplicado con torquímetro — alineación y estética verificadas' },
+  ] : [
+    { id: 'st-08', n: 'Paneles montados con mid/end-clamps' },
+    { id: 'st-09', n: 'Torque aplicado con torquímetro — alineación y estética verificadas' },
+  ];
+  return {
+    id: 'techo-paneles', paso: '3.2', label: '3.2 Validación de Techo y Montaje de Paneles', bloque: 3,
+    herramientas: ['Racht', 'Llaves de cruz o españolas según el herraje', 'Sellador blanco para tuercas expuestas'],
+    nota: 'Inspeccionar y limpiar el techo por última vez antes de cubrirlo. Colocar abrazaderas intermedias (mid-clamps) y finales (end-clamps) aplicando presión uniforme para no estrellar las celdas.',
+    fotosCierre: [
+      { id: 'inspeccion-techo', label: 'Inspección Final — Condición de Techo', obligatoria: false },
+      { id: 'paneles-montados', label: 'Arreglo de Paneles Montado y Alineado', obligatoria: false },
+    ],
+    items: [
+      { id: 'chk-techo', n: 'Inspección visual y limpieza final de la condición del techo' },
+      ...panelItems,
+    ],
+  };
+}
+
+// Paso 3.3 — Mediciones, Etiquetado y Puesta en Marcha. Fusiona protecciones
+// internas/peinado de tableros con las pruebas eléctricas y el arranque.
 function _medicionItems(project) {
   const strings = project?.garantia?.paneles?.strings || [];
   if (!strings.length) {
@@ -305,16 +379,6 @@ function _medicionItems(project) {
     { id: `med-voc-${i}`, n: `Voc — ${s.nombre || `String ${i+1}`}`, hasInput: true, inputPlaceholder: 'Ej: 380 V' },
     { id: `med-isc-${i}`, n: `Isc — ${s.nombre || `String ${i+1}`}`, hasInput: true, inputPlaceholder: 'Ej: 8.2 A' },
   ]));
-}
-function _verificacionBlock(project) {
-  return {
-    id: 'verificacion', label: 'Verificación previa al encendido', fase: 4,
-    items: [
-      ..._medicionItems(project),
-      { id: 'med-02', n: 'Voltajes CA medidos (fase-fase, fase-neutro, fase-tierra)', hasInput: true, inputPlaceholder: 'Ej: 220V / 127V / 127V' },
-      { id: 'med-03', n: 'Resistencia de la red de tierra física medida', hasInput: true, inputPlaceholder: 'Ej: 4.8 Ω' },
-    ],
-  };
 }
 
 const _ENERGIZADO_ITEMS = {
@@ -326,82 +390,77 @@ const _ENERGIZADO_ITEMS = {
                       { id: 'bom-04', n: 'Prueba de operación — flujo verificado' }],
   sistema_pequeno:  [{ id: 'eq-05', n: 'Sistema energizado — sin fallas' }],
 };
-function _puestaMarchaBlock(tipo) {
-  const energ = _ENERGIZADO_ITEMS[tipo] || _ENERGIZADO_ITEMS.interconectado;
-  return {
-    id: 'puesta-marcha', label: 'Puesta en marcha y monitoreo', fase: 4,
-    items: [
-      { id: 'pm-05', n: 'Estándar de red/país configurado en el inversor (si aplica)' },
-      { id: 'pm-06', n: 'Encendido secuencial realizado — CD primero, luego CA' },
-      ...energ,
-      { id: 'mon-01', n: 'Vinculado a WiFi/Ethernet del sitio o módem dedicado (si aplica)' },
-      { id: 'mon-02', n: 'Planta creada en la plataforma del fabricante y cliente registrado (si aplica)' },
-    ],
-  };
-}
 
 // Interconexión CFE en modo Zero Export — sin contrato de interconexión vigente.
 // cfe-01/cfe-02 se conservan por si en el futuro aplica un trámite formal con CFE.
-function _cfeBlock(tipo) {
-  if (!['interconectado', 'hibrido_respaldo'].includes(tipo)) return null;
+function _cfeItems(tipo) {
+  if (!['interconectado', 'hibrido_respaldo'].includes(tipo)) return [];
+  return [
+    { id: 'zx-01', n: 'Inversor configurado en modo Zero Export (límite de exportación = 0%)' },
+    { id: 'zx-02', n: 'CT / sensor de exportación instalado y calibrado en la acometida' },
+    { id: 'zx-03', n: 'Verificado con pinza amperométrica — sin flujo inverso hacia la red en operación normal' },
+    { id: 'cfe-03', n: 'Etiquetas reglamentarias colocadas en tablero y punto de desconexión' },
+    { id: 'cfe-01', n: 'Solicitud de interconexión presentada a CFE (solo si se gestiona contrato — no aplica en zero export)' },
+    { id: 'cfe-02', n: 'Medidor bidireccional instalado (solo si CFE aprobó contrato de interconexión)' },
+  ];
+}
+
+function _medicionesPuestaMarchaBlock(project, tipo) {
+  const energ = _ENERGIZADO_ITEMS[tipo] || _ENERGIZADO_ITEMS.interconectado;
   return {
-    id: 'cfe', label: 'Interconexión CFE — Zero Export', fase: 4,
+    id: 'mediciones-marcha', paso: '3.3', label: '3.3 Mediciones, Etiquetado y Puesta en Marcha', bloque: 3,
+    herramientas: ['Multímetro digital (hasta 1000V DC)', 'Pinza amperométrica', 'Pinza pelacables', 'Ponchadora de terminales', 'Destornillador de torque para breakers'],
+    nota: 'Bajar los cables desde la médula hacia los interruptores y fusibles, peinar los tableros AC/DC, medir continuidad y Voc de los strings, energizar en secuencia y etiquetar conforme a NOM.',
+    fotosCierre: [
+      { id: 'tablero-dc',        label: 'Tablero DC Peinado', obligatoria: true },
+      { id: 'tablero-ac',        label: 'Tablero AC Peinado', obligatoria: true },
+      { id: 'arranque-pantalla', label: 'Pantalla del Inversor — Generación sin Alarmas, Tapas Puestas', obligatoria: false },
+    ],
     items: [
-      { id: 'zx-01', n: 'Inversor configurado en modo Zero Export (límite de exportación = 0%)' },
-      { id: 'zx-02', n: 'CT / sensor de exportación instalado y calibrado en la acometida' },
-      { id: 'zx-03', n: 'Verificado con pinza amperométrica — sin flujo inverso hacia la red en operación normal' },
-      { id: 'cfe-03', n: 'Etiquetas reglamentarias colocadas en tablero y punto de desconexión' },
-      { id: 'cfe-01', n: 'Solicitud de interconexión presentada a CFE (solo si se gestiona contrato — no aplica en zero export)' },
-      { id: 'cfe-02', n: 'Medidor bidireccional instalado (solo si CFE aprobó contrato de interconexión)' },
+      { id: 'pd-01', n: 'Fusibles DC instalados — calibre correcto por string' },
+      { id: 'pd-02', n: 'Seccionador DC instalado y accesible' },
+      { id: 'pd-03', n: 'DPS DC instalado (si aplica por normativa)' },
+      ..._tierraItems,
+      ...(_cableAcBlocks[tipo] || _cableAcBlocks.interconectado),
+      ...(tipo === 'bombeo' ? _bombaItems : []),
+      { id: 'et-01', n: 'Cables identificados: positivo, negativo, fases, neutro, tierra' },
+      { id: 'et-02', n: 'Calcomanías de advertencia "Sistema Fotovoltaico" colocadas' },
+      ..._medicionItems(project),
+      { id: 'med-02', n: 'Voltajes CA medidos (fase-fase, fase-neutro, fase-tierra)', hasInput: true, inputPlaceholder: 'Ej: 220V / 127V / 127V' },
+      { id: 'med-03', n: 'Resistencia de la red de tierra física medida', hasInput: true, inputPlaceholder: 'Ej: 4.8 Ω' },
+      { id: 'med-04', n: 'Torque verificado en conexiones eléctricas (breakers, terminales) según especificación del fabricante' },
+      { id: 'pm-05', n: 'Estándar de red/país configurado en el inversor (si aplica)' },
+      { id: 'pm-06', n: 'Encendido secuencial realizado — CD primero, luego CA' },
+      ...energ,
+      { id: 'pm-07', n: 'Protección anti-isla verificada — el inversor deja de exportar al simular pérdida de red (si aplica)' },
+      { id: 'mon-01', n: 'Vinculado a WiFi/Ethernet del sitio o módem dedicado (si aplica)' },
+      { id: 'mon-02', n: 'Planta creada en la plataforma del fabricante y cliente registrado (si aplica)' },
+      ..._cfeItems(tipo),
+      { id: 'ci-01', n: 'Herramientas y materiales sobrantes retirados del techo' },
+      { id: 'ci-02', n: 'Revisión de raspaduras o daños en impermeabilización' },
+      { id: 'ci-03', n: 'Módulos lavados con agua pura — sin polvo de obra' },
+      { id: 'pm-03', n: 'Fotos técnicas subidas en módulo Garantía', isNav: true, navRoute: 'garantia' },
+      { id: 'pm-04', n: 'Cliente informado y uso del sistema explicado' },
+      { id: 'pm-08', n: 'Ducto principal cerrado con su tapa, pantalla del inversor mostrando generación sin alarmas' },
     ],
   };
 }
 
-const _cierreBlock = {
-  id: 'cierre', label: 'Limpieza, revisión y entrega', fase: 4,
-  items: [
-    { id: 'ci-01', n: 'Herramientas y materiales sobrantes retirados del techo' },
-    { id: 'ci-02', n: 'Revisión de raspaduras o daños en impermeabilización' },
-    { id: 'ci-03', n: 'Módulos lavados con agua pura — sin polvo de obra' },
-    { id: 'pm-03', n: 'Fotos técnicas subidas en módulo Garantía', isNav: true, navRoute: 'garantia' },
-    { id: 'pm-04', n: 'Cliente informado y uso del sistema explicado' },
-  ],
-};
-
-// ── Ensamble final — orden = secuencia física de la obra, no el orden de los módulos ──
+// ── Ensamble final — orden = secuencia física real de la obra ────────────────
 export function getExecBlocks(project, techo) {
-  const tipo     = project?.tipoSistema || 'interconectado';
-  const t        = techo || 'cemento';
-  const cableAc  = _cableAcBlocks[tipo] || _cableAcBlocks.interconectado;
-  const cfe      = _cfeBlock(tipo);
+  const tipo = project?.tipoSistema || 'interconectado';
+  const t    = techo || 'cemento';
   return [
-    // Fase 1 — Preparación y obra civil externa
-    _anclajeBlock(t),
-    _invFixBlock(tipo),
-    _armazonBlock(t),
-    // Fase 2 — Canalizaciones e infraestructura de rutas
-    _canalBlock(),
-    // Fase 3 — Tendido eléctrico y montaje de módulos
-    _panelFixBlock(t),
-    { id: 'cable-dc', label: 'Cableado DC', fase: 3, items: [
-      { id: 'dc-01', n: 'Cable DC tendido por canalización sin empalmes expuestos' },
-      { id: 'dc-02', n: 'Polaridad positiva/negativa verificada en cada string' },
-      { id: 'dc-03', n: 'Conectores MC4 engarzados y asegurados' },
-      { id: 'dc-04', n: 'Continuidad DC medida con multímetro' },
-    ]},
-    { id: 'prot-dc', label: 'Protecciones DC', fase: 3, items: [
-      { id: 'pd-01', n: 'Fusibles DC instalados — calibre correcto por string' },
-      { id: 'pd-02', n: 'Seccionador DC instalado y accesible' },
-      { id: 'pd-03', n: 'DPS DC instalado (si aplica por normativa)' },
-    ]},
-    { id: 'tierra', label: 'Puesta a tierra', fase: 3, items: [..._tierraItems] },
-    ...cableAc,
-    _etiquetadoBlock,
-    // Fase 4 — Comisionamiento, verificación y cierre
-    _verificacionBlock(project),
-    _puestaMarchaBlock(tipo),
-    ...(cfe ? [cfe] : []),
-    _cierreBlock,
+    // Bloque 1 — Estructura, Anclaje y Canalización Fotovoltaica
+    _anclajeMontajeBlock(t, project),
+    _conduitFvBlock,
+    // Bloque 2 — Canalización Central y Montaje de Equipos
+    _meduluEspinalBlock,
+    _infraEquiposBlock(tipo),
+    // Bloque 3 — Cableado, Paneles y Cierre
+    _cableadoPeinadoBlock,
+    _validacionTechoPanelesBlock(t),
+    _medicionesPuestaMarchaBlock(project, tipo),
   ];
 }
 

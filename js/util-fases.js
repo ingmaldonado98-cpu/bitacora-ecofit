@@ -55,12 +55,32 @@ export function calcFaseEstado(project) {
   const fZona    = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(doc.fases,'zonaDelSistema',f), 0);
 
   // Sistema pequeño solo necesita levantamiento; no requiere juego completo de fotos
+  const lev      = doc.levantamiento || {};
+  const levHecho = !!(lev.tipTecho || lev.areasTecho?.length);
+
+  // Puntos adicionales según tipo de sistema — qué tan completo está el
+  // Levantamiento eléctrico/de consumo, no solo el de techo.
+  const tipo     = project.tipoSistema;
+  const tieneCFE = ['interconectado', 'hibrido', 'hibrido_respaldo', 'respaldo'].includes(tipo);
+  const extraItems = [];
+  if (tieneCFE) {
+    const cfeHecho    = !!(lev.tarifaCFE && ((lev.recibos?.length || 0) > 0 || (lev.aparatos?.length || 0) > 0));
+    const cargasHecho = (lev.cargasCriticas?.length || 0) > 0 || (lev.cargasSecundarias?.length || 0) > 0;
+    extraItems.push(['Eléctrico / consumo CFE', cfeHecho]);
+    extraItems.push(['Cargas críticas/secundarias', cargasHecho]);
+  } else if (tipo === 'aislado') {
+    extraItems.push(['Autonomía y cargas críticas', !!(lev.autonomia && (lev.cargasCriticas?.length || 0) > 0)]);
+  } else if (tipo === 'bombeo') {
+    extraItems.push(['Datos de bombeo', !!(lev.tipoBomba && lev.caudal && lev.profundidadPozo)]);
+  }
+
   const docItemsL = esPequeno
-    ? [ ['Levantamiento', !!(doc.levantamiento?.tipTecho)] ]
-    : [ ['Levantamiento',              !!(doc.levantamiento?.tipTecho)],
+    ? [ ['Levantamiento', levHecho] ]
+    : [ ['Levantamiento',              levHecho],
         ['fotos de Techo',             fTecho > 0],
         ['fotos de Centros de carga',  fCentros > 0],
-        ['fotos de Zona del inversor', fZona > 0] ];
+        ['fotos de Zona del inversor', fZona > 0],
+        ...extraItems ];
   const docItems = docItemsL.map(([,ok]) => ok);
   const docFaltantes = docItemsL.filter(([,ok]) => !ok).map(([l]) => l);
   const docItemsOk = docItems.filter(Boolean).length;
@@ -70,7 +90,9 @@ export function calcFaseEstado(project) {
 
   // ── Garantía ─────────────────────────────────────────────────────────────────
   const garDesbloqueada = docCompleta;
-  const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st) => s + (st.paneles?.length||0), 0);
+  // Lectura en línea (no se importa gar-paneles.js — este archivo es autocontenido):
+  // seriales planos, con fallback a strings viejos para proyectos no migrados.
+  const totalPaneles = (gar.paneles?.seriales ?? (gar.paneles?.strings||[]).flatMap(s=>s.paneles||[])).length;
 
   // Sistema pequeño no tiene tablero AC / inversor de red
   const garItemsL = esPequeno

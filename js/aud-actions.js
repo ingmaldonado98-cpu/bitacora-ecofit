@@ -163,7 +163,7 @@ window.guardarFormal = async function(e, projectId) {
       observaciones:        fd.get('observaciones').trim(),
       condicionesAprobacion:fd.get('condicionesAprobacion').trim(),
       incluirEnPDF:         fd.get('incluirEnPDF') === 'on',
-      docFirmado:           AS.docFirmadoB64 || aud.docFirmado || null,
+      docFirmado:           (typeof AS.docFirmadoB64 === 'string' ? AS.docFirmadoB64 : null) || aud.docFirmado || null,
       fecha:                isoNow(),
     });
 
@@ -179,22 +179,16 @@ window.guardarFormal = async function(e, projectId) {
 
 // ── Foto documento firmado ────────────────────────────────────────────────────
 window.capDocFirmado = function(projectId) {
-  capturePhoto(async (b64, _files, fileMeta) => {
+  capturePhoto(async (b64) => {
     const slot = document.getElementById('slot-doc-firmado');
     if (slot) slot.innerHTML = fotoMini(b64, 'Documento firmado');
     toast('Subiendo documento…');
-    try {
-      const url = await uploadPhotoQueued(b64, `projects/${projectId}/auditoria/doc-firmado-${Date.now()}.jpg`, projectId, 'auditoria.docFirmado');
-      AS.docFirmadoB64 = url;
-      toast('✅ Documento subido');
-    } catch (err) {
-      if (err.code === 'offline') {
-        AS.docFirmadoB64 = b64;
-        toast('Sin conexión — se subirá al reconectarte', 'warn', 5000);
-      } else {
-        toast('Error al subir: ' + err.message, 'error');
-      }
-    }
+    const result = await uploadPhotoQueued(
+      b64, `projects/${projectId}/auditoria/doc-firmado-${Date.now()}.jpg`,
+      projectId, 'auditoriaDocFirmado'
+    );
+    AS.docFirmadoB64 = result.url || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
+    toast(result.url ? '✅ Documento subido' : 'Sin conexión — se subirá al reconectarte');
   }, { projectId, fase: 'auditoria', campo: 'DocFirmado', preview: true });
 };
 

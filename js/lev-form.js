@@ -5,7 +5,7 @@ import { esc, fotoMini } from './utils.js';
 import { canEdit } from './auth.js';
 import { icon } from './icons.js';
 import { renderCamposDinamicos } from './lev-campos.js';
-import { _renderAreasTecho, _sujecionPorTecho } from './lev-areas.js';
+import { _renderAreasTecho, CATEGORIAS_FOTO } from './lev-areas.js';
 import { _TMIN_CIUDADES, _TMIN_ZONAS, _TMIN_ZONA_DESC, _tminDescripcion } from './lev-tmin.js';
 import './lev-guardar.js';
 import './lev-gps.js';
@@ -25,6 +25,10 @@ const _lev = {
 window._lev = _lev;
 
 // ── Levantamiento dinámico ─────────────────────────────────────────────────────
+// Tipos de sistema sin conexión a la red CFE — no aplican campos de
+// tarifa/tablero/voltajes medidos (antes solo se excluía sistema_pequeno).
+const _SIN_CFE = ['sistema_pequeno', 'aislado', 'bombeo'];
+
 function renderLevantamiento(project, tipo, edit) {
   const lev = project.documentacion?.levantamiento || {};
   const dis = edit ? '' : 'disabled';
@@ -52,6 +56,7 @@ function renderLevantamiento(project, tipo, edit) {
                            lev.condicionesAmbientales?.length);
   const hasLogistica  = !!(lev.accesoTecho || lev.almacenamientoTemporal || lev.conectividadInversor || lev.logisticaNotas);
   const hasNotas      = !!(lev.observacionesGenerales);
+  const hasCamposLibres = _lev.camposLibres.length > 0;
 
   // Helper para wrapper de acordeón
   const acc = (id, title, emoji, open, content) => `
@@ -100,35 +105,9 @@ function renderLevantamiento(project, tipo, edit) {
             `<option ${lev.estadoInmueble===t?'selected':''}>${t}</option>`).join('')}
         </select>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>Tipo de techo</label>
-          <select name="tipTecho" ${dis} onchange="window._onTipTechoChange(this)">
-            ${['Losa de concreto','Lámina','Metálico','Madera','Otro'].map(t=>
-              `<option ${lev.tipTecho===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Sujeción / anclaje</label>
-          <div id="sujecion-label" class="input-info-badge">
-            ${_sujecionPorTecho(lev.tipTecho)}
-          </div>
-        </div>
-      </div>
-      <!-- Estado del techo — solo visible cuando tipo = Madera -->
-      <div id="madera-fields" style="display:${lev.tipTecho==='Madera'?'':'none'}">
-        <div class="form-row">
-          <div class="form-group"><label>Estado de la madera</label>
-            <select name="estadoMadera" ${dis}>
-              ${['Nueva (< 2 años)','Buena (2–10 años)','Regular (10–20 años)','Deteriorada (requiere revisión)'].map(t=>
-                `<option ${lev.estadoMadera===t?'selected':''}>${t}</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group"><label>Distancia entre vigas (cm)</label>
-            <input type="number" name="distVigas" value="${lev.distVigas||''}"
-                   placeholder="40–60 típico BCS" min="10" max="150" ${dis}/>
-          </div>
-        </div>
-      </div>
+      <!-- Tipo de techo, sujeción y campos estructurales (madera/PTR/losa) ahora
+           viven por área — ver "Áreas del techo" abajo. Un selector general aquí
+           duplicaba la decisión y podía contradecir lo capturado por área. -->
       <!-- Temperatura mínima del sitio — colapsable -->
       <details class="pd-details" ${lev.tMinCiudad ? 'open' : ''}>
         <summary>Temperatura mínima del sitio <span class="pd-caret">▾</span></summary>
@@ -207,7 +186,7 @@ function renderLevantamiento(project, tipo, edit) {
           ${edit ? `<button type="button" class="btn-sm btn-outline" onclick="window._addAreaTecho()">+ Área</button>` : ''}
         </div>
         <div id="lev-areas-list">
-          ${_renderAreasTecho(lev.areasTecho || [], edit, pid)}
+          ${_renderAreasTecho(lev.areasTecho || [], edit, pid, lev.tipTecho)}
         </div>
         ${(lev.areasTecho||[]).length === 0 && !edit ? `<p style="font-size:.78rem;color:var(--text-muted);padding:8px 0">Sin áreas registradas</p>` : ''}
       </div>
@@ -216,7 +195,14 @@ function renderLevantamiento(project, tipo, edit) {
         <div class="ft-label">${icon('camera',14)} Fotos del levantamiento</div>
         <div id="slot-fotos-lev" class="ft-slot" style="flex-wrap:wrap;gap:6px">
           ${(lev.fotosLevantamiento||[]).map((f,i)=>
-            `${fotoMini(f.url||f,'Foto '+(i+1))}${edit?`<button type="button" class="btn-del-foto" onclick="delFotoLev('${pid}',${i})">✕</button>`:''}`
+            `<div class="lev-area-foto-wrap">
+              ${fotoMini(f.url||f,'Foto '+(i+1))}
+              ${edit && f.id ? `<select class="foto-categoria-select" title="Tipo de evidencia"
+                  onchange="window._setFotoCategoria('${pid}',null,'${f.id}',this.value)">
+                ${CATEGORIAS_FOTO.map(c=>`<option ${(f.categoria||'Vista general')===c?'selected':''}>${c}</option>`).join('')}
+              </select>` : ''}
+              ${edit?`<button type="button" class="btn-del-foto" onclick="delFotoLev('${pid}',${i})">✕</button>`:''}
+            </div>`
           ).join('')}
           ${edit ? `<button type="button" class="btn-foto-sm" onclick="capFotoLev('${pid}')">${icon('camera')} Agregar foto</button>` : ''}
         </div>
@@ -271,7 +257,7 @@ function renderLevantamiento(project, tipo, edit) {
 
     ${/* Eléctrico y consumo — no aplica para 'otro'. Sistema pequeño usa solo el bloque DC (dinamico) */
       tipo !== 'otro' ? acc('elec_consumo', 'Eléctrico y consumo', '⚡', hasElecConsumo, `
-      ${tipo !== 'sistema_pequeno' ? `
+      ${!_SIN_CFE.includes(tipo) ? `
       <div class="form-group"><label>Tipo de servicio CFE</label>
         <select name="tipoServicioCFE" ${dis} onchange="window._onTipoServicioCFEChange(this)">
           ${(() => {
@@ -300,22 +286,61 @@ function renderLevantamiento(project, tipo, edit) {
       </div>
       ` : ''}
       ${dinamico ? `<div class="lev-sep"></div>${dinamico}` : ''}
-      ${tipo !== 'sistema_pequeno' ? `
+      ${!_SIN_CFE.includes(tipo) ? `
       <div class="lev-sep"></div>
       <details id="voltajes-cfe-wrap" class="pd-details"
         style="${['N/A (sin CFE)','Pendiente de conexión','NA'].includes(lev.tipoServicioCFE)?'display:none':''}"
-        ${(lev.voltajeFaseFase || lev.voltajeFaseNeutro || lev.voltajeFaseTierra) ? 'open' : ''}>
+        ${(lev.voltajeFaseFaseL1L2 || lev.voltajeFaseNeutroL1 || lev.voltajeNeutroTierra) ? 'open' : ''}>
         <summary>Voltajes medidos en sitio <span class="pd-caret">▾</span></summary>
         <div class="pd-body">
-          <div class="form-row">
-            <div class="form-group"><label>Fase-fase (V)</label>
-              <input type="number" name="voltajeFaseFase" value="${lev.voltajeFaseFase||''}" min="0" step="0.1" placeholder="Ej: 220" ${dis}/></div>
-            <div class="form-group"><label>Fase-neutro (V)</label>
-              <input type="number" name="voltajeFaseNeutro" value="${lev.voltajeFaseNeutro||''}" min="0" step="0.1" placeholder="Ej: 127" ${dis}/></div>
+          <!-- Monofásico 127V: una sola línea — fase-neutro y neutro-tierra -->
+          <div id="volt-mono127" style="display:${lev.tipoServicioCFE==='Monofásico 127V'?'':'none'}">
+            <div class="form-row">
+              <div class="form-group"><label>Fase-neutro (V)</label>
+                <input type="number" name="voltajeFaseNeutroL1" value="${lev.voltajeFaseNeutroL1||''}" min="0" step="0.1" placeholder="Ej: 127" ${dis}/></div>
+              <div class="form-group"><label>Neutro-tierra (V)</label>
+                <input type="number" name="voltajeNeutroTierra" value="${lev.voltajeNeutroTierra||''}" min="0" step="0.1" ${dis}/></div>
+            </div>
           </div>
-          <div class="form-row">
-            <div class="form-group"><label>Fase-tierra (V)</label>
-              <input type="number" name="voltajeFaseTierra" value="${lev.voltajeFaseTierra||''}" min="0" step="0.1" ${dis}/></div>
+          <!-- Monofásico 220V / Bifásico: dos líneas — fase-fase, fase-neutro de cada línea, neutro-tierra -->
+          <div id="volt-2lineas" style="display:${['Monofásico 220V','Bifásico'].includes(lev.tipoServicioCFE)?'':'none'}">
+            <div class="form-row">
+              <div class="form-group"><label>Fase-fase (V)</label>
+                <input type="number" name="voltajeFaseFaseL1L2" value="${lev.voltajeFaseFaseL1L2||''}" min="0" step="0.1" placeholder="Ej: 220" ${dis}/></div>
+              <div class="form-group"><label>Neutro-tierra (V)</label>
+                <input type="number" name="voltajeNeutroTierra" value="${lev.voltajeNeutroTierra||''}" min="0" step="0.1" ${dis}/></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Fase-neutro L1 (V)</label>
+                <input type="number" name="voltajeFaseNeutroL1" value="${lev.voltajeFaseNeutroL1||''}" min="0" step="0.1" placeholder="Ej: 127" ${dis}/></div>
+              <div class="form-group"><label>Fase-neutro L2 (V)</label>
+                <input type="number" name="voltajeFaseNeutroL2" value="${lev.voltajeFaseNeutroL2||''}" min="0" step="0.1" placeholder="Ej: 127" ${dis}/></div>
+            </div>
+          </div>
+          <!-- Trifásico: tres líneas — fase-fase entre cada par, fase-neutro de cada línea, neutro-tierra -->
+          <div id="volt-trifasico" style="display:${lev.tipoServicioCFE==='Trifásico'?'':'none'}">
+            <div class="form-row">
+              <div class="form-group"><label>Fase-fase L1-L2 (V)</label>
+                <input type="number" name="voltajeFaseFaseL1L2" value="${lev.voltajeFaseFaseL1L2||''}" min="0" step="0.1" ${dis}/></div>
+              <div class="form-group"><label>Fase-fase L2-L3 (V)</label>
+                <input type="number" name="voltajeFaseFaseL2L3" value="${lev.voltajeFaseFaseL2L3||''}" min="0" step="0.1" ${dis}/></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Fase-fase L1-L3 (V)</label>
+                <input type="number" name="voltajeFaseFaseL1L3" value="${lev.voltajeFaseFaseL1L3||''}" min="0" step="0.1" ${dis}/></div>
+              <div class="form-group"><label>Neutro-tierra (V)</label>
+                <input type="number" name="voltajeNeutroTierra" value="${lev.voltajeNeutroTierra||''}" min="0" step="0.1" ${dis}/></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Fase-neutro L1 (V)</label>
+                <input type="number" name="voltajeFaseNeutroL1" value="${lev.voltajeFaseNeutroL1||''}" min="0" step="0.1" ${dis}/></div>
+              <div class="form-group"><label>Fase-neutro L2 (V)</label>
+                <input type="number" name="voltajeFaseNeutroL2" value="${lev.voltajeFaseNeutroL2||''}" min="0" step="0.1" ${dis}/></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Fase-neutro L3 (V)</label>
+                <input type="number" name="voltajeFaseNeutroL3" value="${lev.voltajeFaseNeutroL3||''}" min="0" step="0.1" ${dis}/></div>
+            </div>
           </div>
           <p class="form-hint" style="margin:0">Mide con multímetro en horas de mayor sol — voltajes altos pueden disparar la protección anti-isla del inversor.</p>
         </div>
@@ -327,8 +352,14 @@ function renderLevantamiento(project, tipo, edit) {
             <div class="form-group">
               <label>Tipo de montaje</label>
               <select name="tipoTablero" ${dis}>
-                ${['','Empotrado (flush)','Superficie','N/A'].map(t=>
-                  `<option ${(lev.tipoTablero||'')===(t)?'selected':''}>${t}</option>`).join('')}
+                ${(() => {
+                  // Normaliza valores viejos guardados con la nomenclatura técnica
+                  // anterior para que sigan apareciendo seleccionados.
+                  const legacy = { 'Empotrado (flush)': 'Empotrado / Oculto (Ahogado)', 'Superficie': 'Superficie (Sobrepuesto)' };
+                  const val = legacy[lev.tipoTablero] || lev.tipoTablero || '';
+                  return ['','Empotrado / Oculto (Ahogado)','Superficie (Sobrepuesto)','N/A'].map(t=>
+                    `<option ${val===t?'selected':''}>${t}</option>`).join('');
+                })()}
               </select>
             </div>
             <div class="form-group">
@@ -344,8 +375,14 @@ function renderLevantamiento(project, tipo, edit) {
           <div class="form-row">
             <div class="form-group">
               <label>Capacidad <span class="form-hint">polos / espacios</span></label>
-              <input type="text" name="capacidadTablero" value="${esc(lev.capacidadTablero||'')}"
-                     placeholder="Ej: 12 polos" list="cap-tablero-list" ${dis}/>
+              <div style="position:relative">
+                <input type="text" name="capacidadTablero" id="capacidadTablero-input" value="${esc(lev.capacidadTablero||'')}"
+                       placeholder="Ej: 12 polos" list="cap-tablero-list" style="padding-right:34px" ${dis}/>
+                ${edit ? `<button type="button" class="btn-del-foto"
+                  style="position:absolute;right:6px;top:50%;transform:translateY(-50%)"
+                  title="Limpiar y volver a elegir"
+                  onclick="const i=document.getElementById('capacidadTablero-input');i.value='';i.focus()">✕</button>` : ''}
+              </div>
               <datalist id="cap-tablero-list">
                 ${[4,6,8,10,12,16,20,24,30,40].map(n=>`<option value="${n} polos">`).join('')}
               </datalist>
@@ -391,7 +428,7 @@ function renderLevantamiento(project, tipo, edit) {
         <span class="form-hint">para el sistema de monitoreo</span></label>
         <select name="conectividadInversor" ${dis}>
           <option value="">— Seleccionar —</option>
-          ${['Buena (WiFi/datos estables)','Regular (intermitente)','Sin señal — requiere módem/SIM dedicado'].map(t=>
+          ${['Buena (WiFi/datos estables)','Regular (intermitente)','Extensión de red / WiFi','Sin señal — requiere módem/SIM dedicado'].map(t=>
             `<option ${lev.conectividadInversor===t?'selected':''}>${t}</option>`).join('')}
         </select>
       </div>
@@ -408,6 +445,18 @@ function renderLevantamiento(project, tipo, edit) {
           placeholder="Condiciones especiales del sitio, acuerdos con el cliente, materiales extra, pendientes…"
         >${esc(lev.observacionesGenerales||'')}</textarea>
       </div>
+    `)}
+
+    ${acc('campos_libres', 'Campos libres', '➕', hasCamposLibres, `
+      <div id="campos-libres">
+        ${_lev.camposLibres.map((c,i) => `
+        <div class="campo-libre-row">
+          <input type="text" placeholder="Nombre" value="${esc(c.nombre||'')}" oninput="_lev.camposLibres[${i}].nombre=this.value" ${dis}/>
+          <input type="text" placeholder="Valor" value="${esc(c.valor||'')}" oninput="_lev.camposLibres[${i}].valor=this.value" ${dis}/>
+          ${edit ? `<button type="button" class="btn-del-sm" onclick="delCampoLibre(${i})">✕</button>` : ''}
+        </div>`).join('')}
+      </div>
+      ${edit ? `<button type="button" class="btn-outline btn-sm" onclick="addCampoLibre()">+ Agregar campo</button>` : ''}
     `)}
 
     ${edit?`<div class="form-actions lev-actions">

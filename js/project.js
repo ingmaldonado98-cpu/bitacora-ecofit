@@ -9,6 +9,7 @@ import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } fro
 import { icon } from './icons.js';
 import { renderFirmaBlock } from './proj-firmas.js';
 import { renderObservaciones } from './proj-obs.js';
+import { getSerialesFlat } from './gar-paneles.js';
 import './proj-form.js';   // registra window.selChip, toggleApoyo, _submitProject, etc.
 import './proj-obs.js';    // registra window._showAddObs, _submitObs, _delObs, _resolverObs
 
@@ -28,8 +29,7 @@ export async function renderProjectDetail(id, session) {
   const prio  = PRIORIDADES[project.prioridad] || PRIORIDADES.normal;
   const tipo  = TIPOS_SISTEMA[project.tipoSistema];
 
-  const totalPaneles = (project.garantia?.paneles?.strings || [])
-    .reduce((s, str) => s + (str.paneles?.length || 0), 0);
+  const totalPaneles = getSerialesFlat(project.garantia).length;
   const totalEquipos = project.garantia?.equipos?.length || 0;
 
   const transitions = Object.keys(TRANSITIONS[project.estado] || {})
@@ -47,7 +47,7 @@ export async function renderProjectDetail(id, session) {
   const _fT = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'techo',f),0);
   const _fC = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'centrosCarga',f),0);
   const _fZ = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'zonaDelSistema',f),0);
-  const levPct  = _dDoc.levantamiento?.tipTecho ? 100 : 0;
+  const levPct  = (_dDoc.levantamiento?.tipTecho || _dDoc.levantamiento?.areasTecho?.length) ? 100 : 0;
   const _dItems = _esPeq ? [] : [_fT>0, _fC>0, _fZ>0];
   const docPct  = _dItems.length ? Math.round(_dItems.filter(Boolean).length / _dItems.length * 100) : 0;
   const _gItems = _esPeq
@@ -260,7 +260,7 @@ function renderModulosProgreso(project, id, session, admin) {
   const docDone = docItems.length ? docItems.filter(i=>i.ok).length : 0;
   const docPct  = docItems.length ? Math.round(docDone / docItems.length * 100) : 0;
 
-  const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
+  const totalPaneles = getSerialesFlat(gar).length;
   const garItems = esPequenoTipo
     ? [
         { label: 'Foto del sistema',                    ok: !!gar.fotoSistema },
@@ -336,9 +336,9 @@ function renderModulosProgreso(project, id, session, admin) {
     <button class="tool-btn" onclick="navigate('#proyecto/${id}/trayecto')">
       ${icon('list-numbers', 18)}<span>Trayecto</span>
     </button>
-    <button class="tool-btn" onclick="navigate('#proyecto/${id}/trayectorias')">
-      ${icon('path', 18)}<span>Trayectorias</span>
-    </button>
+    <!-- Trayectorias se documenta ahora dentro de Progreso de obra → Fase 2 (Ruteo);
+         la ruta standalone (#proyecto/{id}/trayectorias) sigue activa por si hay
+         links/QR antiguos que apunten ahí, solo se quitó el acceso directo de aquí. -->
     <button class="tool-btn" onclick="navigate('#calculadora/${id}')">
       ${icon('calculator', 18)}<span>Calculadora</span>
     </button>
@@ -372,9 +372,9 @@ function renderQuickCheck(project, id, admin, inline = false) {
   const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'techo',f),0);
   const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'centrosCarga',f),0);
   const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'zonaDelSistema',f),0);
-  const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
+  const totalPaneles = getSerialesFlat(gar).length;
 
-  const levItems = [ { label: 'Levantamiento (tipo de techo)', ok: !!(doc.levantamiento?.tipTecho) } ];
+  const levItems = [ { label: 'Levantamiento (tipo de techo)', ok: !!(doc.levantamiento?.tipTecho || doc.levantamiento?.areasTecho?.length) } ];
   const docItems = esPequeno
     ? []
     : [
@@ -574,7 +574,7 @@ function _getFaltantes(project) {
   const faltantes = [];
   const esPequeno = project.tipoSistema === 'sistema_pequeno';
   if (!project.garantia?.fotoSistema) faltantes.push('Foto general del sistema');
-  const totalPaneles = (project.garantia?.paneles?.strings||[]).reduce((s,str)=>s+(str.paneles?.length||0),0);
+  const totalPaneles = getSerialesFlat(project.garantia).length;
   if (totalPaneles === 0) faltantes.push('Al menos un panel registrado con número de serie');
   if (!esPequeno) {
     const f = project.documentacion?.fases;

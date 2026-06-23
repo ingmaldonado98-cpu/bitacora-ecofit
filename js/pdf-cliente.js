@@ -8,6 +8,7 @@ import {
   savePDF, pdfYield, btnLoading, btnDone, getContacto,
   VERDE, GRIS,
 } from './pdf-helpers.js';
+import { getSerialesFlat } from './gar-paneles.js';
 
 window.exportarPDFCliente = async function(projectId) {
   const btn = document.querySelector('.pdf-card .btn-primary');
@@ -23,7 +24,7 @@ window.exportarPDFCliente = async function(projectId) {
     ]);
     const doc = newDoc(); if (!doc) return;
     const tipo = TIPOS_SISTEMA[project.tipoSistema];
-    const totalPaneles = (project.garantia?.paneles?.strings||[]).reduce((s,str)=>s+(str.paneles?.length||0),0);
+    const totalPaneles = getSerialesFlat(project.garantia).length;
     const totalKwp = totalPaneles * ((project.garantia?.paneles?.wp||0)/1000);
 
     // Portada

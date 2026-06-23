@@ -6,6 +6,7 @@ import { projects } from './db.js';
 import { HERRAMIENTA, getConsumibles, ADMIN_REVIEW_ITEMS, getExecBlocks } from '../modules/checklist/index.js';
 import { buildTorqueTable } from '../modules/calculadora/index.js';
 import { _tkey } from './cl-render.js';
+import { toggleExecItem } from './doc-exec.js';
 
 // ── Persistencia ──────────────────────────────────────────────────────────────
 // Usa updateDoc con dot-notation para evitar race condition entre toggles rápidos
@@ -15,9 +16,9 @@ async function _saveField(projectId, field, key, value) {
 
 window.clToggleHerr  = (pid, id, v)  => _saveField(pid, 'herr',  id,         v);
 window.clToggleCons  = (pid, idx, v) => _saveField(pid, 'cons',  String(idx), v);
-window.clToggleBOM   = (pid, idx, v) => _saveField(pid, 'bom',   String(idx), v);
+window.clToggleBOM   = (pid, key, v) => _saveField(pid, 'bom',   String(key), v);
 window.clToggleAdmin = (pid, id, v)  => _saveField(pid, 'admin', id,         v);
-window.clToggleExec  = (pid, id, v)  => _saveField(pid, 'exec',  id,         v);
+window.clToggleExec  = (pid, id, v)  => toggleExecItem(pid, id, v);
 
 // ── Kit de obra — equipo principal a llevar a la instalación ────────────────
 // Independiente del inventario de bodega (ese se hace una vez al mes; con 2-3

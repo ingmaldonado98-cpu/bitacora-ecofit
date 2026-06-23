@@ -1,6 +1,6 @@
 // calc-state.js — Estado compartido de la Calculadora BOM
 
-import { PANEL_PRESETS } from '../modules/calculadora/index.js';
+import { PANEL_PRESETS, getRowsData, getPanelWidth, getPanelHeight } from '../modules/calculadora/index.js';
 
 export const BOM_INV_MAP = {
   'NXT-AUA-30/46-2': 'C2-006',
@@ -66,9 +66,9 @@ export function loadFromConfig(cfg) {
   cs.distMode       = cfg.layout?.distMode  ?? 'grid';
   cs.cols           = cfg.layout?.cols      ?? 1;
   cs.rows           = cfg.layout?.rows      ?? 1;
-  cs.irrRows        = cfg.layout?.rowsData  ?? [1];
-  cs.pW             = cfg.panel?.width      ?? 0;
-  cs.pH             = cfg.panel?.height     ?? 0;
+  cs.irrRows        = getRowsData(cfg).length ? getRowsData(cfg) : [1];
+  cs.pW             = getPanelWidth(cfg)  ?? 0;
+  cs.pH             = getPanelHeight(cfg) ?? 0;
   cs.presetId       = cfg.panel?.presetId   ?? null;
   cs.subtipoMadera  = cfg.madera?.subtipoMadera ?? null;
   cs.distVigas      = cfg.madera?.distVigas      ?? 40;
@@ -90,4 +90,20 @@ export function wizardStep() {
   if (cs.techo === 'madera' && !cs.subtipoMadera)   return 3;
   if (!cs.pW || cs.pW === 0)                        return 4;
   return 5;
+}
+
+// Validación dura antes de permitir guardar/exportar — más estricta que
+// wizardStep(), que solo controla qué secciones se muestran. Cubre el caso
+// de borde alcanzable desde la UI (calcIrrRemove vaciando todas las filas).
+export function calcValidacion() {
+  const faltantes = [];
+  if (!cs.estructura) faltantes.push('Sistema de estructura');
+  else if (cs.estructura === 'k2' && !cs.subtipo) faltantes.push('Subtipo K2');
+  else if (cs.estructura === 'aluminex' && !cs.base) faltantes.push('Base Aluminex');
+  if (!cs.techo) faltantes.push('Tipo de techo');
+  else if (cs.techo === 'madera' && !cs.subtipoMadera) faltantes.push('Subtipo de techo de madera');
+  if (!cs.pW || cs.pW <= 0) faltantes.push('Dimensiones del panel');
+  const rd = getRowData();
+  if (!rd.length || rd.every(c => c <= 0)) faltantes.push('Al menos una fila de paneles');
+  return { ok: faltantes.length === 0, faltantes };
 }

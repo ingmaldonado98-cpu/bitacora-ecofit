@@ -2,7 +2,7 @@
 // Extraído de pdf.js. Registra window.exportarWordLevantamiento.
 
 import { projects } from './db.js';
-import { esc, fmtFecha, TIPOS_SISTEMA } from './utils.js';
+import { esc, fmtFecha, TIPOS_SISTEMA, fotoToDataURI } from './utils.js';
 
 window.exportarWordLevantamiento = async function(projectId) {
   const project = await projects.getById(projectId);
@@ -16,11 +16,10 @@ window.exportarWordLevantamiento = async function(projectId) {
     value ? `<p style="margin:0 0 8pt"><small style="color:#6b7280;text-transform:uppercase;font-size:8pt">${esc(label)}</small><br><span style="font-size:11pt">${esc(String(value))}</span></p>` : '';
   const wSec = (title) =>
     `<h2 style="color:#16a34a;font-size:13pt;margin:18pt 0 8pt;border-bottom:1px solid #e5e7eb;padding-bottom:4pt">${esc(title)}</h2>`;
-  const wImg = (src, maxW='260pt') => {
-    if (!src || typeof src !== 'string') return '';
-    const imgSrc = (src.startsWith('data:') || src.startsWith('http'))
-      ? src : `data:image/jpeg;base64,${src}`;
-    return `<img src="${imgSrc}" style="max-width:${maxW};height:auto;margin:4pt 0;display:block">`;
+  const wImg = async (src, maxW='260pt') => {
+    const dataUri = await fotoToDataURI(src);
+    if (!dataUri) return '';
+    return `<img src="${dataUri}" style="max-width:${maxW};height:auto;margin:4pt 0;display:block">`;
   };
   const TH = 'style="background:#16a34a;color:white;padding:4pt 8pt;text-align:left;font-size:10pt"';
   const TD = 'style="padding:4pt 8pt;border:1px solid #e5e7eb;font-size:10pt"';
@@ -43,11 +42,6 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
   // Techo y sitio
   html += wSec('Techo y sitio');
   if (lev.estadoInmueble) html += wCampo('Estado del inmueble', lev.estadoInmueble);
-  html += wCampo('Tipo de techo', lev.tipTecho);
-  if (lev.tipTecho === 'Madera') {
-    html += wCampo('Estado de la madera', lev.estadoMadera);
-    html += wCampo('Distancia entre vigas', lev.distVigas ? `${lev.distVigas} cm` : null);
-  }
   html += wCampo('Temperatura mínima del sitio', lev.tMin != null ? `${lev.tMin} °C` : null);
   if (lev.tMinCiudad && lev.tMinCiudad !== 'otro') {
     html += wCampo('Estado de referencia', `${lev.tMinCiudad} (zona: ${lev.tMinZona || 'valle'})`);
@@ -78,19 +72,46 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
     }
     html += '</table>';
     for (const a of areas) {
-      const fotos = Array.isArray(a.fotos) ? a.fotos : [];
-      if (fotos.length) {
-        html += `<p style="font-size:9pt;color:#6b7280;margin-bottom:4pt">${esc(a.nombre || 'Área')} — fotos</p>`;
-        for (const f of fotos.slice(0, 4)) html += wImg(f.url || f.data || f);
+      const efectivo = a.tipTecho || lev.tipTecho;
+      if (efectivo === 'Losa de concreto' && a.grosorLosa) {
+        html += `<p style="font-size:9pt;color:#6b7280;margin:2pt 0">${esc(a.nombre || 'Área')} — Grosor de losa: ${a.grosorLosa} cm</p>`;
+      } else if (efectivo === 'Madera' && (a.estadoMadera || a.distVigas)) {
+        html += `<p style="font-size:9pt;color:#6b7280;margin:2pt 0">${esc(a.nombre || 'Área')} — Estado de la madera: ${esc(a.estadoMadera || '—')}; Distancia entre vigas: ${a.distVigas ? `${a.distVigas} cm` : '—'}</p>`;
+      } else if ((efectivo === 'Lámina' || efectivo === 'Carport') && (a.tipoPTR || a.calibrePTR || a.grosorPTRmm || a.distVigas)) {
+        html += `<p style="font-size:9pt;color:#6b7280;margin:2pt 0">${esc(a.nombre || 'Área')} — Tipo de PTR: ${esc(a.tipoPTR || '—')}; Calibre: ${esc(a.calibrePTR || '—')}${a.grosorPTRmm ? ` (${a.grosorPTRmm} mm)` : ''}; Distancia entre PTR: ${a.distVigas ? `${a.distVigas} cm` : '—'}</p>`;
+      }
+      if (a.posicionReferencia || a.puntoReferencia) {
+        html += `<p style="font-size:9pt;color:#6b7280;margin:2pt 0">${esc(a.nombre || 'Área')} — Punto de partida: ${esc(a.posicionReferencia || '—')}${a.puntoReferencia ? ` — ${esc(a.puntoReferencia)}` : ''}</p>`;
       }
     }
   }
 
-  // Fotos generales del levantamiento
+  // Evidencia fotográfica — todas las fotos de áreas + generales del levantamiento,
+  // agrupadas por tipo de evidencia (no por área) para que el documento se lea
+  // como un reporte técnico por sistema, no como un álbum por techo.
   const fotosLev = lev.fotosLevantamiento || [];
-  if (fotosLev.length) {
-    html += `<p style="font-weight:bold;color:#16a34a;margin:12pt 0 4pt">Fotos del levantamiento</p>`;
-    for (const f of fotosLev.slice(0, 8)) html += wImg(f.url || f.data || f);
+  const evidenciaItems = [
+    ...areas.flatMap(a => (Array.isArray(a.fotos) ? a.fotos : []).map(f =>
+      ({ foto: f, categoria: f.categoria || 'Vista general', etiqueta: a.nombre || 'Área' }))),
+    ...fotosLev.map(f => ({ foto: f, categoria: f.categoria || 'Vista general', etiqueta: 'General' })),
+  ];
+  if (evidenciaItems.length) {
+    html += wSec('Evidencia fotográfica');
+    const CATEGORIAS_ORDEN = ['Estructura/anclaje','Cableado','Paneles','Tablero/conexión','Vista general'];
+    for (const cat of CATEGORIAS_ORDEN) {
+      const items = evidenciaItems.filter(it => it.categoria === cat);
+      if (!items.length) continue;
+      html += `<p style="font-weight:bold;color:#16a34a;margin:10pt 0 4pt">${esc(cat)}</p>`;
+      for (const it of items) {
+        const dataUri = await fotoToDataURI(it.foto);
+        if (dataUri) {
+          html += `<p style="font-size:8pt;color:#9ca3af;margin:2pt 0 0">${esc(it.etiqueta)}</p>`;
+          html += `<img src="${dataUri}" style="max-width:260pt;height:auto;margin:2pt 0 8pt;display:block">`;
+        } else {
+          html += `<p style="font-size:9pt;color:#dc2626;margin:4pt 0">[Foto pendiente de subir — ${esc(it.etiqueta)}]</p>`;
+        }
+      }
+    }
   }
 
   // Sombras
@@ -103,7 +124,7 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
       ).join('')}</p>`;
     }
     if (sombras.notas) html += wCampo('Notas de sombras', sombras.notas);
-    if (sombras.foto) html += wImg(sombras.foto);
+    if (sombras.foto) html += await wImg(sombras.foto);
   }
   if (lev.condicionesAmbientales?.length) {
     html += wCampo('Condiciones ambientales del sitio', lev.condicionesAmbientales.join(', '));
@@ -136,20 +157,23 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
       if (lev.demandaKW)      html += wCampo('Demanda contratada', `${lev.demandaKW} kW`);
       if (lev.factorPotencia) html += wCampo('Factor de potencia', `${lev.factorPotencia}`);
       if (lev.horarioUso)     html += wCampo('Horario de uso', lev.horarioUso);
-      if (lev.voltajeFaseFase || lev.voltajeFaseNeutro || lev.voltajeFaseTierra) {
-        html += wCampo('Voltajes medidos', [
-          lev.voltajeFaseFase   ? `Fase-fase: ${lev.voltajeFaseFase} V`     : null,
-          lev.voltajeFaseNeutro ? `Fase-neutro: ${lev.voltajeFaseNeutro} V` : null,
-          lev.voltajeFaseTierra ? `Fase-tierra: ${lev.voltajeFaseTierra} V` : null,
-        ].filter(Boolean).join(' · '));
-      }
+      const voltajesTxt = [
+        lev.voltajeFaseFaseL1L2 ? `Fase-fase L1-L2: ${lev.voltajeFaseFaseL1L2} V` : null,
+        lev.voltajeFaseFaseL2L3 ? `Fase-fase L2-L3: ${lev.voltajeFaseFaseL2L3} V` : null,
+        lev.voltajeFaseFaseL1L3 ? `Fase-fase L1-L3: ${lev.voltajeFaseFaseL1L3} V` : null,
+        lev.voltajeFaseNeutroL1 ? `Fase-neutro L1: ${lev.voltajeFaseNeutroL1} V` : null,
+        lev.voltajeFaseNeutroL2 ? `Fase-neutro L2: ${lev.voltajeFaseNeutroL2} V` : null,
+        lev.voltajeFaseNeutroL3 ? `Fase-neutro L3: ${lev.voltajeFaseNeutroL3} V` : null,
+        lev.voltajeNeutroTierra ? `Neutro-tierra: ${lev.voltajeNeutroTierra} V`  : null,
+      ].filter(Boolean);
+      if (voltajesTxt.length) html += wCampo('Voltajes medidos', voltajesTxt.join(' · '));
       if (lev.capacidadInterruptorPrincipal || lev.capacidadBarrasTablero) {
         html += wCampo('Interruptor principal / Barras (busbar)',
           `${lev.capacidadInterruptorPrincipal||'—'} A / ${lev.capacidadBarrasTablero||'—'} A`);
       }
-      if (typeof lev.fotoMedidor === 'string') {
+      if (lev.fotoMedidor) {
         html += `<p style="font-size:9pt;color:#78888c;text-transform:uppercase;margin-bottom:2pt">Base del medidor</p>`;
-        html += wImg(lev.fotoMedidor);
+        html += await wImg(lev.fotoMedidor);
       }
     }
 

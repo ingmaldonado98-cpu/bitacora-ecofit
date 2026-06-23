@@ -7,7 +7,8 @@ import { isAdmin } from './auth.js';
 import { icon } from './icons.js';
 import './pdf-helpers.js';       // sin exports propios que pdf.js necesite directamente
 import './pdf-cliente.js';       // registra window.exportarPDFCliente
-import './pdf-tecnico.js';       // registra window.exportarPDFTecnico, exportarWordTecnico
+import './pdf-tecnico.js';       // registra window.exportarPDFTecnico
+import './word-tecnico.js';      // registra window.exportarWordTecnico
 import './pdf-levantamiento.js'; // registra window.exportarWordLevantamiento
 
 // ── Vista selector de secciones ───────────────────────────────────────────────

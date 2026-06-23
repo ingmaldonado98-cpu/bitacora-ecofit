@@ -4,7 +4,7 @@ import { projects } from './db.js';
 import { esc, toast, fmtFechaHora } from './utils.js';
 import { isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
-import { calcDimensionamiento, detectarRiesgos, getChecklistCampo, calcSeccionCable } from '../modules/dimensionamiento/index.js';
+import { calcDimensionamiento, detectarRiesgos, getChecklistCampo, calcSeccionCable, awgToMm2 } from '../modules/dimensionamiento/index.js';
 
 // ── Render principal ──────────────────────────────────────────────────────────
 export async function renderDimensionamiento(projectId, session) {
@@ -113,7 +113,7 @@ export async function renderDimensionamiento(projectId, session) {
       <span class="dim-section-letter">C</span>
       <h2 class="dim-section-title">Dimensionamiento Técnico</h2>
     </div>
-    ${_renderDimTable(res, lev)}
+    ${_renderDimTable(res, lev, project.trayectorias)}
   </div>
 
   <!-- D. CHECKLIST DE COMISIONAMIENTO -->
@@ -168,7 +168,7 @@ const _MOD_LABELS = {
 };
 function _labelModelo(k) { return _MOD_LABELS[k] || k; }
 
-function _renderDimTable(res, lev) {
+function _renderDimTable(res, lev, trayectorias = []) {
   const rows = [];
 
   if (res.pvKwpReal != null)
@@ -192,7 +192,18 @@ function _renderDimTable(res, lev) {
     const voltStr = res.tipo === 'interconectado' ? 400 : (res.batVbus || 48) * 3;
     const iStr = res.nPaneles ? Math.ceil(res.nPaneles / 12) * 10 : 10;
     const cable = calcSeccionCable({ longitud: lev.distInversorPaneles, corriente: iStr, vNominal: voltStr, pctMax: 0.01, tipo: 'DC' });
-    rows.push(['Cable DC recomendado', `${cable.seccion} mm² Cu — ΔV = ${cable.pctReal}% (límite 1%)`]);
+    rows.push(['Cable DC recomendado', `${cable.seccion} mm² Cu ≈ AWG ${cable.awg} — ΔV = ${cable.pctReal}% (límite 1%)`]);
+
+    // Advertencia (no bloqueo) si algún tramo ya capturado en Trayectorias para
+    // este mismo recorrido (paneles↔inversor) quedó con un calibre insuficiente.
+    const tramoDC = (trayectorias || []).find(t =>
+      /panel/i.test(t.nombre || '') && /(invers|combinad)/i.test(t.nombre || t.hasta || ''));
+    if (tramoDC?.awg) {
+      const mm2Capturado = awgToMm2(tramoDC.awg);
+      if (mm2Capturado != null && mm2Capturado < cable.seccion) {
+        rows.push(['⚠ Calibre insuficiente', `Tramo "${esc(tramoDC.nombre)}" capturado en AWG ${esc(tramoDC.awg)} (${mm2Capturado} mm²) — se requieren ${cable.seccion} mm² (AWG ${cable.awg}) para ΔV ≤ 1%.`]);
+      }
+    }
   }
 
   return `
@@ -280,7 +291,7 @@ window.dimExportPDF = async function(projectId) {
   <table>${modeloRows}</table>
 
   <h2>C. Dimensionamiento Técnico</h2>
-  ${_renderDimTable(res,lev).replace(/<div[^>]*>/g,'').replace(/<\/div>/g,'')}
+  ${_renderDimTable(res, lev, project.trayectorias).replace(/<div[^>]*>/g,'').replace(/<\/div>/g,'')}
 
   <h2>D. Pruebas Eléctricas de Campo</h2>
   <table><tbody>${campoRows}</tbody></table>

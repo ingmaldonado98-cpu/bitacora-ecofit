@@ -7,6 +7,7 @@ import { getSession } from './auth.js';
 import { calcVocPuro } from './garantia.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { _sujecionPorTecho } from './lev-areas.js';
+import { getTotalPanels } from '../modules/calculadora/index.js';
 
 // ── Guardar levantamiento ─────────────────────────────────────────────────────
 window.guardarLevantamiento = async function(e, projectId) {
@@ -20,43 +21,61 @@ window.guardarLevantamiento = async function(e, projectId) {
   const condiciones = Array.from(e.target.querySelectorAll('[name^="cond_"]:checked')).map(cb=>cb.value);
   const modoConsumo = e.target.dataset.modoConsumo || (lev.modoConsumo||'recibo');
 
-  const tipTechoVal = fd.get('tipTecho');
   // Áreas: leer del state en memoria (ya actualizadas vía _updateAreaTecho)
+  // El tipo de techo y su sujeción ahora se definen por área (ya no hay un
+  // selector general del sitio que pudiera contradecir lo capturado por área).
   const areasTechoVal = window._lev.areasTecho
     .filter(a => a.nombre || a.ancho || a.largo)
     .map(a => ({
       nombre:             a.nombre || `Área ${window._lev.areasTecho.indexOf(a)+1}`,
-      tipTecho:           a.tipTecho || null, // null = usa el tipo de techo general del sitio
+      tipTecho:           a.tipTecho || null,
       ancho:              a.ancho  || null,
       largo:              a.largo  || null,
       area:               (a.ancho && a.largo) ? parseFloat((a.ancho*a.largo).toFixed(2)) : null,
       orientacion:        a.orientacion || null,
       pisos:              a.pisos || null,
       inclinacion:        a.inclinacion || null,
+      posicionReferencia: a.posicionReferencia || null,
+      puntoReferencia:    a.puntoReferencia    || null,
       distTableroInversor: a.distTableroInversor || null,
       distInversorPaneles: a.distInversorPaneles || null,
+      grosorLosa:         a.grosorLosa  || null,
+      calidadLosa:        a.calidadLosa || null,
+      estadoMadera:       a.estadoMadera || null,
+      distVigas:          a.distVigas    || null,
+      tipoPTR:            a.tipoPTR      || null,
+      calibrePTR:         a.calibrePTR   || null,
+      grosorPTRmm:        a.grosorPTRmm  || null,
       fotos:              Array.isArray(a.fotos) ? a.fotos : [],
     }));
   const areaTotal = areasTechoVal.reduce((s,a)=>s+(a.area||0), 0) || null;
+  // Resumen a nivel sitio — derivado de la primera área, usado por indicadores
+  // de progreso y encabezados de PDF que esperan un único "tipo de techo".
+  const tipTechoVal = areasTechoVal[0]?.tipTecho || null;
 
   const newLev = {
     ...lev,
     estadoInmueble:      fd.get('estadoInmueble') || null,
     tipTecho:            tipTechoVal,
-    tipoSujecion:        _sujecionPorTecho(tipTechoVal),  // auto, no editable
+    tipoSujecion:        tipTechoVal ? _sujecionPorTecho(tipTechoVal) : null,  // auto, no editable
     areasTecho:          areasTechoVal,
     areaDisponible:      areaTotal ? parseFloat(areaTotal.toFixed(2)) : (lev.areaDisponible || null),
-    estadoMadera:        tipTechoVal === 'Madera' ? (fd.get('estadoMadera') || null) : null,
-    distVigas:           tipTechoVal === 'Madera' ? (parseFloat(fd.get('distVigas')) || null) : null,
     tMin:                parseFloat(fd.get('tMin')) ?? 3,
     tMinCiudad:          fd.get('tMinCiudad') || null,
     tMinZona:            fd.get('tMinZona') || 'valle',
     tipoServicioCFE:     fd.get('tipoServicioCFE'),
     tierraFisica:        fd.get('tierraFisica'),
     centroCarga:         fd.get('centroCarga'),
-    voltajeFaseFase:     parseFloat(fd.get('voltajeFaseFase'))   || null,
-    voltajeFaseNeutro:   parseFloat(fd.get('voltajeFaseNeutro')) || null,
-    voltajeFaseTierra:   parseFloat(fd.get('voltajeFaseTierra')) || null,
+    // Cada campo solo se renderiza para el tipo de servicio CFE actual — si no
+    // está en el form (fd.has===false) se conserva el valor previo en vez de
+    // borrarlo, para no perder lecturas al cambiar de tipo de servicio y volver.
+    voltajeFaseFaseL1L2: fd.has('voltajeFaseFaseL1L2') ? (parseFloat(fd.get('voltajeFaseFaseL1L2')) || null) : (lev.voltajeFaseFaseL1L2 ?? null),
+    voltajeFaseFaseL2L3: fd.has('voltajeFaseFaseL2L3') ? (parseFloat(fd.get('voltajeFaseFaseL2L3')) || null) : (lev.voltajeFaseFaseL2L3 ?? null),
+    voltajeFaseFaseL1L3: fd.has('voltajeFaseFaseL1L3') ? (parseFloat(fd.get('voltajeFaseFaseL1L3')) || null) : (lev.voltajeFaseFaseL1L3 ?? null),
+    voltajeFaseNeutroL1: fd.has('voltajeFaseNeutroL1') ? (parseFloat(fd.get('voltajeFaseNeutroL1')) || null) : (lev.voltajeFaseNeutroL1 ?? null),
+    voltajeFaseNeutroL2: fd.has('voltajeFaseNeutroL2') ? (parseFloat(fd.get('voltajeFaseNeutroL2')) || null) : (lev.voltajeFaseNeutroL2 ?? null),
+    voltajeFaseNeutroL3: fd.has('voltajeFaseNeutroL3') ? (parseFloat(fd.get('voltajeFaseNeutroL3')) || null) : (lev.voltajeFaseNeutroL3 ?? null),
+    voltajeNeutroTierra: fd.has('voltajeNeutroTierra') ? (parseFloat(fd.get('voltajeNeutroTierra')) || null) : (lev.voltajeNeutroTierra ?? null),
     tipoTablero:         fd.get('tipoTablero')      || null,
     marcaTablero:        fd.get('marcaTablero')     || null,
     capacidadTablero:    fd.get('capacidadTablero') || null,
@@ -74,6 +93,7 @@ window.guardarLevantamiento = async function(e, projectId) {
     almacenamientoTemporal:  fd.get('almacenamientoTemporal')  || null,
     conectividadInversor:    fd.get('conectividadInversor')    || null,
     logisticaNotas:          fd.get('logisticaNotas')           || '',
+    camposLibres:            window._lev.camposLibres || [],
   };
 
   if (tipo==='interconectado'||tipo==='hibrido'||tipo==='hibrido_respaldo') {
@@ -94,6 +114,9 @@ window.guardarLevantamiento = async function(e, projectId) {
     if (tipo==='hibrido'||tipo==='hibrido_respaldo') {
       newLev.autonomia     = parseFloat(fd.get('autonomia'))||null;
       newLev.bancoBaterias = parseFloat(fd.get('bancoBaterias'))||null;
+      newLev.generador         = fd.get('generador')==='no' ? null : fd.get('generador');
+      newLev.generadorArranque = fd.get('generadorArranque');
+      newLev.generadorKw       = fd.get('generadorKw') || null;
     }
   }
   if (tipo==='aislado') {
@@ -111,8 +134,8 @@ window.guardarLevantamiento = async function(e, projectId) {
     newLev.profundidadPozo = parseFloat(fd.get('profundidadPozo'))||null;
     newLev.horasBombeo     = parseFloat(fd.get('horasBombeo'))||null;
   }
-  if (tipo==='respaldo') { // legacy
-    newLev.tiempoRespaldo  = parseFloat(fd.get('tiempoRespaldo'))||null;
+  if (tipo==='respaldo') { // legacy — el form renderiza "autonomia", no "tiempoRespaldo"
+    newLev.autonomia       = parseFloat(fd.get('autonomia'))||null;
     newLev.cargasRespaldo  = window._lev.cargas.critica;
   }
   if (tipo==='sistema_pequeno') {
@@ -189,9 +212,9 @@ async function _autoRecalcVocSilent(projectId, newTMin, newTMinZona) {
     const vocPanel     = g.paneles?.voc || null;
     const inversor     = (g.equipos || []).find(e => e.tipo === 'inversor');
     const vocMax       = inversor?.vocMax || null;
-    const strings      = g.paneles?.strings || [];
-    const maxPorString = strings.length > 0 ? Math.max(...strings.map(s => s.paneles?.length || 0)) : null;
-    const panelesSerie = maxPorString || p.projectConfig?.layout?.totalPanels || null;
+    // "Paneles en serie" ya es un campo manual (ver gar-voc.js) — se preserva
+    // el último valor guardado en vez de re-derivarlo de strings.
+    const panelesSerie = vd.panelesSerie ?? getTotalPanels(p.projectConfig) ?? null;
 
     if (!vocPanel || !vocMax || !panelesSerie) return; // datos insuficientes — silencio
 
@@ -246,7 +269,7 @@ window.capSombraFoto = function(pid) {
       || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
     await projects.update(pid, { documentacion: p.documentacion });
     navigate(`#proyecto/${pid}/documentacion`);
-  });
+  }, { preview: true });
 };
 window.delSombraFoto = async function(pid) {
   const p = await projects.getById(pid);
@@ -266,7 +289,7 @@ window.capFotoMedidor = function(pid) {
       || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
     await projects.update(pid, { documentacion: p.documentacion });
     navigate(`#proyecto/${pid}/levantamiento`);
-  });
+  }, { preview: true });
 };
 window.delFotoMedidor = async function(pid) {
   const p = await projects.getById(pid);
@@ -287,12 +310,20 @@ window._onAlimentacionRefrigeradorChange = function(sel) {
 };
 
 // ── Ocultar "Voltajes medidos en sitio" si no hay CFE o está pendiente —
-// no tiene sentido medir voltajes de un servicio que no existe todavía.
+// no tiene sentido medir voltajes de un servicio que no existe todavía. Además
+// alterna cuál de los 3 sub-bloques (mono127 / 2 líneas / trifásico) aplica.
 window._onTipoServicioCFEChange = function(sel) {
   const wrap = document.getElementById('voltajes-cfe-wrap');
   if (!wrap) return;
   const sinCFE = ['N/A (sin CFE)', 'Pendiente de conexión'].includes(sel.value);
   wrap.style.display = sinCFE ? 'none' : '';
+
+  const mono127 = document.getElementById('volt-mono127');
+  const dosLineas = document.getElementById('volt-2lineas');
+  const trifasico = document.getElementById('volt-trifasico');
+  if (mono127)   mono127.style.display   = sel.value === 'Monofásico 127V' ? '' : 'none';
+  if (dosLineas) dosLineas.style.display = ['Monofásico 220V','Bifásico'].includes(sel.value) ? '' : 'none';
+  if (trifasico) trifasico.style.display = sel.value === 'Trifásico' ? '' : 'none';
 };
 
 // ── Fotos del levantamiento ───────────────────────────────────────────────────
@@ -312,7 +343,7 @@ window.capFotoLev = function(pid) {
     p.documentacion.levantamiento.fotosLevantamiento = fotos;
     await projects.update(pid, { documentacion: p.documentacion });
     navigate(`#proyecto/${pid}/levantamiento`);
-  });
+  }, { preview: true });
 };
 
 window.delFotoLev = async function(pid, idx) {

@@ -1,16 +1,27 @@
-// documentacion.js — Módulo 2: Progreso de obra (Antes/Durante/Después)
+// documentacion.js — Módulo 2: Progreso de obra
+// Navega por los 3 bloques del checklist de instalación (no por sitio físico) —
+// ver doc-exec.js para el porqué.
 
 import { projects, logChange } from './db.js';
-import { esc, calcFaseEstado, countFotos } from './utils.js';
+import { esc, calcFaseEstado } from './utils.js';
 import { renderFirmaBlock } from './project.js';
 import { canEdit, isAdmin, getSession } from './auth.js';
 import { icon } from './icons.js';
-import { getExecBlocks } from '../modules/checklist/index.js';
-import { renderSitio, _countCierreExtra } from './doc-sitio.js';
+import { getExecBlocks, BLOQUE_LABELS, BLOQUE_DESC } from '../modules/checklist/index.js';
+import { renderSitio } from './doc-sitio.js';
 import { renderNotasDoc } from './lev-notas.js';
-import { EXEC_POR_SITIO, renderExecPorSitio } from './doc-exec.js';
+import { renderExecPorBloque, computeBloqueStatus, toggleExecItem, SITIO_BLOQUE_PRIMARIA, renderReferenciaIngenieria } from './doc-exec.js';
+import './pdf-avance.js'; // registra window.exportarAvanceObra
 
 export { renderLevantamientoView } from './lev-form.js';
+
+// Sitio(s) cuya galería de fotos se muestra en cada bloque — inverso de SITIO_BLOQUE_PRIMARIA.
+const _SITIOS_POR_BLOQUE = Object.entries(SITIO_BLOQUE_PRIMARIA).reduce((acc, [sitio, bloque]) => {
+  (acc[bloque] = acc[bloque] || []).push(sitio);
+  return acc;
+}, {});
+
+const SITIO_LABEL = { techo: '🏠 Techo', centrosCarga: '⚡ Centros de carga', zonaDelSistema: '🔌 Zona del sistema' };
 
 // ── Vista principal — Progreso de obra ────────────────────────────────────────
 export async function renderDocumentacion(projectId, session) {
@@ -21,34 +32,19 @@ export async function renderDocumentacion(projectId, session) {
   const cl    = project.checklistData || {};
   const techo = project.projectConfig?.techo || cl.techo || 'cemento';
 
-  // Contar fotos por sitio para badges del tab
-  const fases = project.documentacion?.fases || {};
-  const cTecho   = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(fases,'techo',f), 0)
-    + _countCierreExtra(project, 'techo');
-  const cCentros = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(fases,'centrosCarga',f), 0)
-    + _countCierreExtra(project, 'centrosCarga');
-  const cZona    = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(fases,'zonaDelSistema',f), 0)
-    + _countCierreExtra(project, 'zonaDelSistema');
-  const cNotas   = (project.documentacion?.notas || []).length;
-
-  // Exec blocks por sección
   const allExecBlocks = getExecBlocks(project, techo);
-  const _exCount = (sitio) => {
-    const items = allExecBlocks.filter(b => EXEC_POR_SITIO[sitio]?.includes(b.id)).flatMap(b => b.items);
-    return { done: items.filter(it => cl.exec?.[it.id]).length, total: items.length };
-  };
-  const exT = _exCount('techo');
-  const exC = _exCount('centrosCarga');
-  const exZ = _exCount('zonaDelSistema');
+  const bloqueStatus   = computeBloqueStatus(allExecBlocks, cl);
+  const cNotas        = (project.documentacion?.notas || []).length;
 
-  const _badge = (fotos, ex) => {
-    if (!fotos && !ex.total) return '';
-    if (fotos > 0 && ex.total > 0 && ex.done === ex.total) return `<span class="tab-badge tab-ok">✓</span>`;
-    const parts = [];
-    if (fotos)    parts.push(`${fotos}📷`);
-    if (ex.total) parts.push(`${ex.done}/${ex.total}`);
-    return `<span class="tab-badge">${parts.join(' · ')}</span>`;
+  const _badge = (bloque) => {
+    const s = bloqueStatus[bloque];
+    if (!s || !s.total) return '';
+    if (s.done === s.total) return `<span class="tab-badge tab-ok">✓</span>`;
+    if (s.done === 0) return '';
+    return `<span class="tab-badge">${s.done}/${s.total}</span>`;
   };
+
+  const BLOQUES = [1, 2, 3];
 
   return `
   <div class="view-header">
@@ -57,40 +53,39 @@ export async function renderDocumentacion(projectId, session) {
     </button>
     <h1 class="hdr-title">Progreso de obra</h1>
     <span class="hdr-sub">${esc(project.displayId)}</span>
+    <button class="btn-outline btn-sm" onclick="exportarAvanceObra('${projectId}')" title="Descargar reporte de avance (Word)">
+      ${icon('file-arrow-down', 15)} Avance
+    </button>
   </div>
 
-  <div class="tab-bar" id="doc-tabs" role="tablist" aria-label="Secciones de progreso de obra">
-    <button class="tab-btn tab-active" role="tab" aria-selected="true"  aria-controls="d-techo"   tabindex="0"  data-tab="d-techo"   onclick="switchTab('doc-tabs','d-techo',this)">
-      🏠 Techo${_badge(cTecho, exT)}
-    </button>
-    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-centros" tabindex="-1" data-tab="d-centros" onclick="switchTab('doc-tabs','d-centros',this)">
-      ⚡ Centros${_badge(cCentros, exC)}
-    </button>
-    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-zona"    tabindex="-1" data-tab="d-zona"    onclick="switchTab('doc-tabs','d-zona',this)">
-      🔌 Zona${_badge(cZona, exZ)}
-    </button>
-    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-notas"   tabindex="-1" data-tab="d-notas"   onclick="switchTab('doc-tabs','d-notas',this)">
+  <div class="tab-bar" id="doc-tabs" role="tablist" aria-label="Bloques de progreso de obra">
+    ${BLOQUES.map((b, i) => `
+    <button class="tab-btn ${i===0?'tab-active':''}" role="tab" aria-selected="${i===0}" aria-controls="d-bloque${b}" tabindex="${i===0?'0':'-1'}"
+            data-tab="d-bloque${b}" onclick="switchTab('doc-tabs','d-bloque${b}',this)" title="${esc(BLOQUE_DESC[b])}">
+      ${esc(BLOQUE_LABELS[b])}${_badge(b)}
+    </button>`).join('')}
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="d-notas" tabindex="-1" data-tab="d-notas" onclick="switchTab('doc-tabs','d-notas',this)">
       ${icon('note', 14)} Notas${cNotas ? `<span class="tab-badge tab-ok">${cNotas}</span>` : ''}
     </button>
   </div>
 
-  <!-- Techo -->
-  <div id="d-techo" class="tab-panel tab-panel-active">
-    ${renderSitio(project, 'techo', edit, projectId)}
-    ${renderExecPorSitio(project, 'techo', allExecBlocks, edit, admin)}
-  </div>
-
-  <!-- Centros de carga -->
-  <div id="d-centros" class="tab-panel">
-    ${renderSitio(project, 'centrosCarga', edit, projectId)}
-    ${renderExecPorSitio(project, 'centrosCarga', allExecBlocks, edit, admin)}
-  </div>
-
-  <!-- Zona del sistema -->
-  <div id="d-zona" class="tab-panel">
-    ${renderSitio(project, 'zonaDelSistema', edit, projectId)}
-    ${renderExecPorSitio(project, 'zonaDelSistema', allExecBlocks, edit, admin)}
-  </div>
+  ${BLOQUES.map((b, i) => `
+  <div id="d-bloque${b}" class="tab-panel ${i===0?'tab-panel-active':''}">
+    <p class="form-hint" style="margin:0 0 10px">${esc(BLOQUE_DESC[b])}</p>
+    ${renderReferenciaIngenieria(project, b)}
+    ${b === 2 ? `
+      <details class="cl-exec-block" open>
+        <summary class="cl-exec-block-hdr"><span class="cl-exec-block-title">⚡ Equipos (Cuarto de máquinas)</span><span class="cl-exec-caret">▾</span></summary>
+        <div style="padding:0 4px 8px">${renderSitio(project, 'centrosCarga', edit, projectId, 2)}</div>
+      </details>` : ''}
+    ${(_SITIOS_POR_BLOQUE[b] || []).map(sitio => `
+      <details class="cl-exec-block" open>
+        <summary class="cl-exec-block-hdr"><span class="cl-exec-block-title">${SITIO_LABEL[sitio] || sitio}</span><span class="cl-exec-caret">▾</span></summary>
+        <div style="padding:0 4px 8px">${renderSitio(project, sitio, edit, projectId, b)}</div>
+      </details>
+    `).join('')}
+    ${renderExecPorBloque(project, b, allExecBlocks, edit, admin)}
+  </div>`).join('')}
 
   <!-- Notas -->
   <div id="d-notas" class="tab-panel">
@@ -121,22 +116,12 @@ export async function renderDocumentacion(projectId, session) {
 
   <script>
     (function() {
-      const tabTarget   = sessionStorage.getItem('doc-tab-target');
-      const subfaTarget = sessionStorage.getItem('doc-subfa-target');
+      const tabTarget = sessionStorage.getItem('doc-tab-target');
       sessionStorage.removeItem('doc-tab-target');
-      sessionStorage.removeItem('doc-subfa-target');
       sessionStorage.removeItem('doc-sitio-target');
       if (tabTarget) {
         const tabBtn = document.querySelector('[data-tab="' + tabTarget + '"]');
         if (tabBtn) tabBtn.click();
-      }
-      if (subfaTarget && tabTarget) {
-        const sitioMap = { 'd-techo':'techo', 'd-centros':'centrosCarga', 'd-zona':'zonaDelSistema' };
-        const sitio = sitioMap[tabTarget] || 'techo';
-        setTimeout(() => {
-          const btn = document.getElementById('sf-btn-' + sitio + '-' + subfaTarget);
-          if (btn) btn.click();
-        }, 50);
       }
     })();
   </script>
@@ -148,20 +133,33 @@ export async function renderDocumentacion(projectId, session) {
 // ── Exec toggle — disponibles aquí para cuando Progreso de obra se carga sin checklist.js
 {
   let _docExecTextTimer = null;
-  window.clToggleExec   = (pid, id, v)   => projects.setField(pid, `checklistData.exec.${id}`, v);
+  window.clToggleExec   = async (pid, id, v) => {
+    const bloque = await toggleExecItem(pid, id, v);
+    if (bloque == null) return;
+    const wrap = document.getElementById(`cl-bloque-hitos-${bloque}`);
+    if (!wrap) return;
+    const p  = await projects.getById(pid);
+    const ft = p.checklistData?.bloqueFechas?.[bloque];
+    if (ft?.inicio) {
+      const fmt = iso => new Date(iso).toLocaleDateString('es-MX', { day:'2-digit', month:'short' });
+      const partes = [`Iniciado ${fmt(ft.inicio)}`];
+      if (ft.cierre) partes.push(`Cerrado ${fmt(ft.cierre)}${ft.cerradoPor ? ` por ${ft.cerradoPor}` : ''}`);
+      wrap.innerHTML = `<p class="cl-bloque-hitos">${partes.join(' · ')}</p>`;
+    }
+  };
   window.clSaveExecText = (pid, id, val) => {
     clearTimeout(_docExecTextTimer);
     _docExecTextTimer = setTimeout(() => projects.setField(pid, `checklistData.execText.${id}`, val), 600);
   };
 }
 
-// ── Candado por fase: override de admin (excepción registrada en el historial) ─
-window._clOverrideFase = async function(pid, fase, on) {
-  await projects.setField(pid, `checklistData.faseOverride.${fase}`, on || null);
+// ── Candado por bloque: override de admin (excepción registrada en el historial) ─
+window._clOverrideBloque = async function(pid, bloque, on) {
+  await projects.setField(pid, `checklistData.bloqueOverride.${bloque}`, on || null);
   const session = await getSession();
   logChange(pid, {
     modulo: 'Checklist',
-    accion: on ? `Fase ${fase} desbloqueada manualmente (excepción)` : `Fase ${fase} re-bloqueada`,
+    accion: on ? `Bloque ${bloque} desbloqueado manualmente (excepción)` : `Bloque ${bloque} re-bloqueado`,
     detalle: '',
     quien: session,
   });

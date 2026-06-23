@@ -1,0 +1,50 @@
+name: Deploy to GitHub Pages
+
+# Se dispara cuando "Auto-bump SW cache version" termina (haya o no bumpeado
+# sw.js) en vez de en cada push directo — así el deploy siempre toma el sw.js
+# YA incrementado, sin publicar nunca una versión de caché desactualizada.
+on:
+  workflow_run:
+    workflows: ["Auto-bump SW cache version"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Quitar archivos internos antes de publicar
+        # upload-pages-artifact sube TODO lo que haya en path tal cual (no respeta
+        # .gitignore) — se borra solo en esta copia efímera del runner, nunca en
+        # el repo real. .git no debe servirse públicamente (historial completo).
+        run: rm -rf .git .github .claude
+
+      - name: Subir el sitio completo (sin build — es JS/CSS/HTML estático)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Desplegar a GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

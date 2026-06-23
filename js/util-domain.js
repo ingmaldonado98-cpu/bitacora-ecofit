@@ -44,7 +44,7 @@ export const TIPOS_SISTEMA = {
 // Campos extra que aplican solo a Sistema Pequeño
 export const CAMPOS_SISTEMA_PEQUENO = [
   { name: 'bateria',       label: 'Batería',             placeholder: 'Ej: LiFePO4 100Ah 48V' },
-  { name: 'mppt',          label: 'Controlador MPPT',    placeholder: 'Ej: Victron SmartSolar 100/30' },
+  { name: 'mppt',          label: 'Modelo del controlador', placeholder: 'Ej: Victron SmartSolar 100/30' },
   { name: 'inversor',      label: 'Inversor',            placeholder: 'Ej: Victron Phoenix 800VA (vacío si no aplica)' },
   { name: 'breakerPanel',  label: 'Breaker de paneles',  placeholder: 'Ej: DC 20A' },
   { name: 'breakerPolo',   label: 'Breaker 1 polo',      placeholder: 'Ej: AC 16A 1 polo' },

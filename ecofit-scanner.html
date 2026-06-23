@@ -592,6 +592,13 @@
 
   function stopScan() {
     if (codeReader) { try { codeReader.reset(); } catch(e) {} }
+    // codeReader.reset() no garantiza parar todos los tracks del stream — liberar
+    // explícitamente para que la cámara no se quede encendida tras cerrar/reabrir
+    // el escáner varias veces en la misma sesión.
+    if (video.srcObject) {
+      try { video.srcObject.getTracks().forEach(function(t) { t.stop(); }); } catch(e) {}
+      video.srcObject = null;
+    }
     scanning = false;
     torchOn = false; videoTrack = null;
     torchBtn.classList.remove('torch-on');
@@ -606,7 +613,7 @@
 
   function sendToParent(code, fmtName) {
     if (window.parent !== window) {
-      window.parent.postMessage({ type: 'ECOFIT_SCAN', code: code, format: fmtName }, '*');
+      window.parent.postMessage({ type: 'ECOFIT_SCAN', code: code, format: fmtName }, window.location.origin);
     }
   }
 

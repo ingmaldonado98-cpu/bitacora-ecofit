@@ -7,25 +7,33 @@ import { esc, fotoMini, capturePhoto, toast, uuid,
          uploadProgressBar, getFotosTecnicas }         from './utils.js';
 import { uploadPhotoQueued }                           from './firebase.js';
 import { icon }                                        from './icons.js';
+import { SITIO_BLOQUE_PRIMARIA }                       from './doc-exec.js';
 
-// ── Mapeo sitio → tab ID  (también usado en documentacion.js) ────────────────
-export const SITIO_TAB = {
-  techo:          'd-techo',
-  centrosCarga:   'd-centros',
-  zonaDelSistema: 'd-zona',
-};
+// ── Mapeo sitio → tab ID — Progreso de obra navega por bloque, no por sitio,
+// así que el tab de cada sitio es el de su bloque primario (SITIO_BLOQUE_PRIMARIA).
+export const SITIO_TAB = Object.fromEntries(
+  Object.entries(SITIO_BLOQUE_PRIMARIA).map(([sitio, bloque]) => [sitio, `d-bloque${bloque}`])
+);
 
 // ── Slots técnicos de cierre por sitio ───────────────────────────────────────
+// `bloque` es solo de presentación: decide en qué pestaña de bloque se PINTA
+// el slot — el dato sigue guardándose siempre en garantia.fotosTecnicas[key]
+// del mismo `sitio` de siempre (centrosCarga/zonaDelSistema), sin crear un
+// sitio/bloque nuevo en el modelo de datos.
 const SLOTS_CIERRE_SITIO = {
   centrosCarga: [
-    { key:'tableroAC',          label:'Tablero AC terminado',    req:true  },
-    { key:'tableroDC',          label:'Tablero DC terminado',    req:true  },
-    { key:'protecciones',       label:'Protecciones instaladas', req:false },
-    { key:'puestaATierra',      label:'Puesta a tierra',         req:false },
+    { key:'tableroAC',          label:'Tablero AC terminado',           req:true,  bloque:3 },
+    { key:'tableroDC',          label:'Tablero DC terminado',           req:true,  bloque:3 },
+    { key:'protecciones',       label:'Protecciones instaladas',        req:false, bloque:3 },
+    { key:'puestaATierra',      label:'Puesta a tierra',                req:false, bloque:3 },
+    { key:'inversorMontado',    label:'Inversor montado y nivelado',    req:true,  bloque:2 },
+    { key:'bancoBaterias',      label:'Banco de baterías anclado',      req:false, bloque:2 },
+    { key:'seccionadorCD',      label:'Seccionador de CD en posición',  req:false, bloque:2 },
+    { key:'barraColectora',     label:'Detalle de barra colectora',     req:false, bloque:2 },
   ],
   zonaDelSistema: [
-    { key:'inversorEnergizado', label:'Inversor energizado',     req:true  },
-    { key:'etiquetado',         label:'Etiquetado',              req:false },
+    { key:'inversorEnergizado', label:'Inversor energizado',     req:true,  bloque:3 },
+    { key:'etiquetado',         label:'Etiquetado',              req:false, bloque:3 },
   ],
 };
 
@@ -33,16 +41,12 @@ function _sitioForFTKey(key) {
   return SLOTS_CIERRE_SITIO.centrosCarga.some(s => s.key === key) ? 'centrosCarga' : 'zonaDelSistema';
 }
 
-export function _countCierreExtra(project, sitio) {
-  const g = project.garantia || {};
-  if (sitio === 'techo') {
-    return (g.fotoSistema ? 1 : 0) + (g.fotosAdicionales || []).length;
-  }
-  return (SLOTS_CIERRE_SITIO[sitio] || []).reduce((s, slot) => s + getFotosTecnicas(g.fotosTecnicas, slot.key).length, 0);
-}
-
 // ── Bloque de cierre por sitio ────────────────────────────────────────────────
-function renderCierreSitio(project, sitio, edit, projectId) {
+// `bloqueFiltro` opcional: si se pasa, solo renderiza los slots de
+// SLOTS_CIERRE_SITIO[sitio] cuyo `bloque === bloqueFiltro` (para repartir un
+// mismo sitio entre dos pestañas de bloque sin duplicar slots). Sin filtro,
+// renderiza todos — compatibilidad con otros llamadores existentes.
+function renderCierreSitio(project, sitio, edit, projectId, bloqueFiltro) {
   const g = project.garantia || {};
 
   if (sitio === 'techo') {
@@ -57,7 +61,7 @@ function renderCierreSitio(project, sitio, edit, projectId) {
               <div class="empty-state-icon">📷</div>
               <p class="empty-state-msg">Foto general del sistema terminado.</p>
               <button class="empty-state-cta" onclick="capFotoSistemaDoc('${projectId}')">
-                ${icon('camera')} Tomar foto</button>
+                ${icon('camera', 16)} Tomar foto</button>
              </div>` : '<p class="empty-msg-sm">Sin foto.</p>')}
       </div>
     </div>
@@ -66,7 +70,7 @@ function renderCierreSitio(project, sitio, edit, projectId) {
       <div class="card-title-row">
         <h3 class="card-title">Fotos adicionales de cierre</h3>
         ${edit ? `<button class="btn-primary btn-sm" onclick="capFotoAdicionalDoc('${projectId}')">
-          ${icon('camera')} Agregar</button>` : ''}
+          ${icon('camera', 16)} Agregar</button>` : ''}
       </div>
       <div class="fotos-grid">
         ${(g.fotosAdicionales || []).map((f, i) => `
@@ -82,8 +86,42 @@ function renderCierreSitio(project, sitio, edit, projectId) {
     </div>` : ''}`;
   }
 
-  const slots = SLOTS_CIERRE_SITIO[sitio] || [];
+  const slots = (SLOTS_CIERRE_SITIO[sitio] || [])
+    .filter(s => bloqueFiltro == null || s.bloque === bloqueFiltro);
   if (!slots.length) return '';
+
+  // Render compacto: cuando se filtra por bloque, los slots se ven como una
+  // sola cuadrícula de tarjetas pequeñas (foto/botón + caption corta) en vez
+  // de una fila completa por slot — evita scroll largo para revisar 4+ puntos.
+  if (bloqueFiltro != null) {
+    return `
+    <div class="card">
+      <h3 class="card-title">Fotos técnicas de cierre</h3>
+      <div class="ft-slot-grid">
+        ${slots.map(s => {
+          const fotos = getFotosTecnicas(g.fotosTecnicas, s.key);
+          const tiene = fotos.length > 0;
+          const primera = fotos[0];
+          return `
+          <div class="ft-slot-card" title="${esc(s.label)}${s.req ? ' (obligatoria)' : ''}">
+            ${tiene ? `
+              <div class="ft-slot-thumb">
+                ${fotoMini(primera, s.label)}
+                ${fotos.length > 1 ? `<span class="ft-slot-more">+${fotos.length - 1}</span>` : ''}
+                ${edit ? `<button class="btn-del-foto-abs" onclick="delFotoTecnicaDoc('${projectId}','${s.key}',0)">✕</button>` : ''}
+              </div>
+            ` : (edit ? `
+              <button class="btn-foto-sm ft-slot-addbtn" onclick="capFotoTecnicaDoc('${projectId}','${s.key}')">
+                ${icon('camera', 16)}
+              </button>
+            ` : `<div class="ft-slot-thumb ft-slot-empty">—</div>`)}
+            <span class="ft-slot-caption">${s.req ? '<span class="ft-slot-req">•</span> ' : ''}${esc(s.label)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
   return `
   <div class="card">
     <h3 class="card-title">Fotos técnicas de cierre</h3>
@@ -105,7 +143,7 @@ function renderCierreSitio(project, sitio, edit, projectId) {
               ${edit ? `<button class="btn-del-foto-abs" onclick="delFotoTecnicaDoc('${projectId}','${s.key}',${i})">✕</button>` : ''}
             </div>`).join('')}
           ${edit ? `<button class="btn-foto-sm ft-add-btn" onclick="capFotoTecnicaDoc('${projectId}','${s.key}')">
-            ${icon('camera')} ${tiene ? '+' : 'Tomar'}
+            ${icon('camera', 16)} ${tiene ? '+' : 'Tomar'}
           </button>` : (!tiene ? '<span class="ft-empty">—</span>' : '')}
         </div>
       </div>`;
@@ -114,31 +152,33 @@ function renderCierreSitio(project, sitio, edit, projectId) {
 }
 
 function _gotoCierre(sitio) {
-  sessionStorage.setItem('doc-tab-target',  SITIO_TAB[sitio] || 'd-techo');
-  sessionStorage.setItem('doc-subfa-target', 'cierre');
+  sessionStorage.setItem('doc-tab-target', SITIO_TAB[sitio] || 'd-bloque1');
 }
 
 // ── Handlers de fotos de cierre (guardan en garantia.*) ──────────────────────
 window.capFotoSistemaDoc = function(projectId) {
   capturePhoto(async (b64) => {
     toast('Subiendo foto…');
-    const result = await uploadPhotoQueued(b64, `projects/${projectId}/sistema.jpg`, projectId, 'fotoSistema');
-    const p = await projects.getById(projectId);
-    p.garantia = p.garantia || {};
-    p.garantia.fotoSistema = result.url
-      || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
-    await projects.update(projectId, { garantia: p.garantia });
-    _gotoCierre('techo');
-    navigate(`#proyecto/${projectId}/documentacion`);
-    if (!result.pending) toast('✅ Foto guardada');
-  });
+    try {
+      const result = await uploadPhotoQueued(b64, `projects/${projectId}/sistema.jpg`, projectId, 'fotoSistema');
+      const fotoSistema = result.url
+        || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
+      // setField puntual en vez de getById+update completo — evita pisar cambios
+      // de otro técnico editando el mismo proyecto al mismo tiempo.
+      await projects.setField(projectId, 'garantia.fotoSistema', fotoSistema);
+      _gotoCierre('techo');
+      navigate(`#proyecto/${projectId}/documentacion`);
+      if (!result.pending) toast('✅ Foto guardada');
+    } catch (err) {
+      console.error('capFotoSistemaDoc error:', err);
+      toast('⚠ No se pudo guardar la foto — revisa tu conexión e intenta de nuevo', 'error', 5000);
+    }
+  }, { preview: true });
 };
 
 window.delFotoSistemaDoc = async function(projectId) {
   if (!await confirmDialog('¿Eliminar foto del sistema?')) return;
-  const p = await projects.getById(projectId);
-  p.garantia.fotoSistema = null;
-  await projects.update(projectId, { garantia: p.garantia });
+  await projects.setField(projectId, 'garantia.fotoSistema', null);
   _gotoCierre('techo');
   navigate(`#proyecto/${projectId}/documentacion`);
 };
@@ -149,9 +189,8 @@ window.capFotoTecnicaDoc = function(projectId, key) {
     const total = fotos.length;
     const prog = uploadProgressBar(total);
     const p = await projects.getById(projectId);
-    p.garantia.fotosTecnicas = p.garantia.fotosTecnicas || {};
     const existentes = (() => {
-      const v = p.garantia.fotosTecnicas[key];
+      const v = p.garantia?.fotosTecnicas?.[key];
       if (!v) return [];
       if (typeof v === 'string') return [{ url: v, id: 'legacy' }];
       return Array.isArray(v) ? v : [];
@@ -173,9 +212,10 @@ window.capFotoTecnicaDoc = function(projectId, key) {
     } finally {
       prog.done();
     }
-    // Guardar lo que sí se subió, aunque haya fallado a la mitad
-    p.garantia.fotosTecnicas[key] = existentes;
-    await projects.update(projectId, { garantia: p.garantia });
+    // Guardar lo que sí se subió, aunque haya fallado a la mitad — setField
+    // puntual en la clave exacta, no pisa el resto de garantia.fotosTecnicas
+    // ni otros campos editados por otro técnico al mismo tiempo.
+    await projects.setField(projectId, `garantia.fotosTecnicas.${key}`, existentes);
     if (fallo) {
       toast(`⚠ Se guardaron ${subidas} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
       return;
@@ -189,11 +229,10 @@ window.capFotoTecnicaDoc = function(projectId, key) {
 window.delFotoTecnicaDoc = async function(projectId, key, idx) {
   if (!await confirmDialog('¿Eliminar esta foto?')) return;
   const p = await projects.getById(projectId);
-  const v = p.garantia.fotosTecnicas[key];
+  const v = p.garantia?.fotosTecnicas?.[key];
   const fotos = typeof v === 'string' ? [{ url: v, id: 'legacy' }] : (Array.isArray(v) ? v : []);
   fotos.splice(idx, 1);
-  p.garantia.fotosTecnicas[key] = fotos.length ? fotos : null;
-  await projects.update(projectId, { garantia: p.garantia });
+  await projects.setField(projectId, `garantia.fotosTecnicas.${key}`, fotos.length ? fotos : null);
   _gotoCierre(_sitioForFTKey(key));
   navigate(`#proyecto/${projectId}/documentacion`);
 };
@@ -225,9 +264,8 @@ window.capFotoAdicionalDoc = function(projectId) {
       nuevas[0].nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
     }
     const p = await projects.getById(projectId);
-    p.garantia = p.garantia || {};
-    p.garantia.fotosAdicionales = [...(p.garantia.fotosAdicionales || []), ...nuevas];
-    await projects.update(projectId, { garantia: p.garantia });
+    const fotosAdicionales = [...(p.garantia?.fotosAdicionales || []), ...nuevas];
+    await projects.setField(projectId, 'garantia.fotosAdicionales', fotosAdicionales);
     if (fallo) {
       toast(`⚠ Se guardaron ${nuevas.length} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
       return;
@@ -241,19 +279,21 @@ window.capFotoAdicionalDoc = function(projectId) {
 window.delFotoAdicionalDoc = async function(projectId, idx) {
   if (!await confirmDialog('¿Eliminar esta foto?')) return;
   const p = await projects.getById(projectId);
-  p.garantia.fotosAdicionales.splice(idx, 1);
-  await projects.update(projectId, { garantia: p.garantia });
+  const fotosAdicionales = [...(p.garantia?.fotosAdicionales || [])];
+  fotosAdicionales.splice(idx, 1);
+  await projects.setField(projectId, 'garantia.fotosAdicionales', fotosAdicionales);
   _gotoCierre('techo');
   navigate(`#proyecto/${projectId}/documentacion`);
 };
 
 window.editFotoAdicionalDoc = async function(projectId, idx) {
   const p = await projects.getById(projectId);
-  const actual = p.garantia.fotosAdicionales[idx]?.nota || '';
+  const fotosAdicionales = [...(p.garantia?.fotosAdicionales || [])];
+  const actual = fotosAdicionales[idx]?.nota || '';
   const nueva = await inputDialog('Editar nota:', actual);
   if (nueva === null) return;
-  p.garantia.fotosAdicionales[idx].nota = nueva;
-  await projects.update(projectId, { garantia: p.garantia });
+  fotosAdicionales[idx] = { ...fotosAdicionales[idx], nota: nueva };
+  await projects.setField(projectId, 'garantia.fotosAdicionales', fotosAdicionales);
   _gotoCierre('techo');
   navigate(`#proyecto/${projectId}/documentacion`);
 };
@@ -266,185 +306,11 @@ window.toggleAcc = function(btn, bodyId) {
   body.classList.toggle('acc-collapsed', !isOpen);
 };
 
-// ── Render sitio (3 subfases: Antes / Durante / Cierre) ──────────────────────
-export function renderSitio(project, sitio, edit, projectId) {
-  const SUBFASES = [
-    { id: 'antes',   ico: '📷', label: 'Antes',   hint: 'Referencia visual previa al trabajo' },
-    { id: 'durante', ico: '🔧', label: 'Durante',  hint: 'Proceso y avances de instalación' },
-    { id: 'cierre',  ico: '✅', label: 'Cierre',   hint: 'Estado final del sitio' },
-  ];
-  const fases = project.documentacion?.fases || {};
-
-  const getFotos = (sub) => {
-    if (fases?.[sitio]?.[sub]?.length) return fases[sitio][sub];
-    if (sitio === 'techo') {
-      const m = { antes:'antes', durante:'durante', cierre:'despues' };
-      return fases?.[m[sub]] || [];
-    }
-    return [];
-  };
-
-  const cierreExtra = _countCierreExtra(project, sitio);
-
-  return `
-  <div class="subfase-bar" id="sfbar-${sitio}">
-    ${SUBFASES.map((sf, idx) => {
-      const cnt = getFotos(sf.id).length + (sf.id === 'cierre' ? cierreExtra : 0);
-      return `<button class="subfase-btn ${idx===0?'sf-active':''}"
-                      id="sf-btn-${sitio}-${sf.id}"
-                      onclick="switchSubfase('${sitio}','${sf.id}',this)"
-                      title="${sf.hint}">
-        <span>${sf.ico} ${sf.label}</span>
-        ${cnt ? `<span class="subfase-count">${cnt}</span>` : ''}
-      </button>`;
-    }).join('')}
-  </div>
-  ${SUBFASES.map((sf, idx) => {
-    const fotos = getFotos(sf.id);
-    return `
-    <div id="sf-panel-${sitio}-${sf.id}" class="subfase-panel ${idx===0?'sf-active':''}">
-      ${sf.id === 'cierre' ? renderCierreSitio(project, sitio, edit, projectId) : ''}
-      ${renderFotosGrid(fotos, sitio, sf.id, sf.label, projectId, edit)}
-    </div>`;
-  }).join('')}`;
+// ── Render sitio — evidencia de cierre integrada, sin pestañas Antes/Durante/
+// Cierre (se quitaron: la galería genérica era redundante con los slots
+// técnicos nombrados de renderCierreSitio, y obligaba a un clic extra para
+// llegar a la evidencia real).
+export function renderSitio(project, sitio, edit, projectId, bloqueFiltro) {
+  return renderCierreSitio(project, sitio, edit, projectId, bloqueFiltro);
 }
 
-function renderFotosGrid(fotos, sitio, subfase, titulo, projectId, edit) {
-  if (!fotos.length) {
-    return edit ? `
-    <div class="empty-state">
-      <div class="empty-state-icon">📷</div>
-      <p class="empty-state-msg">Sin fotos de <strong>${titulo}</strong> aún.</p>
-      <button class="empty-state-cta" onclick="agregarFotoSitio('${projectId}','${sitio}','${subfase}')">
-        ${icon('camera')} Agregar fotos
-      </button>
-    </div>` : `<p class="empty-msg-sm">Sin fotos aún.</p>`;
-  }
-  return `
-  <div class="fotos-grid-header">
-    ${edit ? `<button class="btn-sm btn-outline" onclick="agregarFotoSitio('${projectId}','${sitio}','${subfase}')">
-      ${icon('camera')} + Agregar fotos
-    </button>` : ''}
-  </div>
-  <div class="fotos-grid" id="fotos-${sitio}_${subfase}">
-    ${fotos.map((f,i)=>`
-      <div class="foto-card">
-        ${fotoMini(f,`Foto ${i+1}`)}
-        ${f.nota?`<p class="foto-nota">${esc(f.nota)}</p>`:''}
-        ${edit?`
-          <button class="btn-del-foto-abs" onclick="editFotoNotaSitio('${projectId}','${sitio}','${subfase}',${i})">✎</button>
-          <button class="btn-del-foto" onclick="delFotoSitio('${projectId}','${sitio}','${subfase}',${i})">✕</button>
-        `:''}
-      </div>`).join('')}
-  </div>`;
-}
-
-// ── Navegación de subfases ────────────────────────────────────────────────────
-window.switchSitio = function(sitio, btn) {
-  document.querySelectorAll('.sitio-btn').forEach(b => b.classList.remove('sitio-active'));
-  btn.classList.add('sitio-active');
-  document.querySelectorAll('.sitio-panel').forEach(p => p.classList.remove('sitio-panel-active'));
-  const panel = document.getElementById(`sitio-panel-${sitio}`);
-  if (panel) panel.classList.add('sitio-panel-active');
-};
-
-window.switchSubfase = function(sitio, subfase, btn) {
-  const bar = document.getElementById(`sfbar-${sitio}`);
-  bar?.querySelectorAll('.subfase-btn').forEach(b => b.classList.remove('sf-active'));
-  btn.classList.add('sf-active');
-  const panelContainer = document.getElementById(`sitio-panel-${sitio}`);
-  panelContainer?.querySelectorAll('.subfase-panel').forEach(p => p.classList.remove('sf-active'));
-  const panel = document.getElementById(`sf-panel-${sitio}-${subfase}`);
-  if (panel) panel.classList.add('sf-active');
-};
-
-function _ensureFasesSitio(p, sitio, subfase) {
-  p.documentacion = p.documentacion || {};
-  p.documentacion.fases = p.documentacion.fases || {};
-  p.documentacion.fases[sitio] = p.documentacion.fases[sitio] || {};
-  p.documentacion.fases[sitio][subfase] = p.documentacion.fases[sitio][subfase] || [];
-  return p.documentacion.fases[sitio][subfase];
-}
-
-// ── Handlers de fotos de sitio (fases: antes / durante / cierre) ─────────────
-window.agregarFotoSitio = function(projectId, sitio, subfase) {
-  capturePhoto(async (b64Array, _files, fileMeta) => {
-    const fotos = Array.isArray(b64Array) ? b64Array : [b64Array];
-    const total = fotos.length;
-    const prog  = uploadProgressBar(total);
-    const nuevas = [];
-    let fallo = null;
-
-    try {
-      for (let i = 0; i < total; i++) {
-        prog.update(i + 1);
-        const fid = uuid();
-        const result = await uploadPhotoQueued(
-          fotos[i], `projects/${projectId}/${sitio}_${subfase}_${fid}.jpg`,
-          projectId, 'fotoFase', { sitio, subfase, itemId: fid }
-        );
-        nuevas.push({
-          data: result.url || null,
-          nota: '', id: fid, createdAt: isoNow(),
-          fuente: fileMeta?.fuente || 'camera',
-          ...(result.pending && { pending: true, pendingId: result.pendingId }),
-        });
-      }
-    } catch (err) {
-      console.error('agregarFotoSitio error:', err);
-      fallo = err;
-    } finally {
-      prog.done();
-    }
-
-    if (!fallo && total === 1 && nuevas.length === 1) {
-      nuevas[0].nota = await inputDialog('Nota para esta foto (opcional):', '') || '';
-    }
-
-    const p = await projects.getById(projectId);
-    const arr = _ensureFasesSitio(p, sitio, subfase);
-    arr.push(...nuevas);
-    await projects.update(projectId, { documentacion: p.documentacion });
-
-    sessionStorage.setItem('doc-tab-target',  SITIO_TAB[sitio] || 'd-techo');
-    sessionStorage.setItem('doc-subfa-target', subfase);
-    if (fallo) {
-      toast(`⚠ Se guardaron ${nuevas.length} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
-      navigate(`#proyecto/${projectId}/documentacion`);
-      return;
-    }
-    navigate(`#proyecto/${projectId}/documentacion`);
-    toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
-  }, { multiple: true, projectId, fase: sitio, campo: subfase });
-};
-
-window.delFotoSitio = async function(projectId, sitio, subfase, idx) {
-  if (!await confirmDialog('¿Eliminar esta foto?')) return;
-  const p = await projects.getById(projectId);
-  const arr = p.documentacion?.fases?.[sitio]?.[subfase];
-  if (arr) {
-    arr.splice(idx, 1);
-  } else if (sitio === 'techo') {
-    const m = { antes:'antes', durante:'durante', cierre:'despues' };
-    (p.documentacion.fases[m[subfase]] || []).splice(idx, 1);
-  }
-  await projects.update(projectId, { documentacion: p.documentacion });
-  sessionStorage.setItem('doc-tab-target',  SITIO_TAB[sitio] || 'd-techo');
-  sessionStorage.setItem('doc-subfa-target', subfase);
-  navigate(`#proyecto/${projectId}/documentacion`);
-};
-
-window.editFotoNotaSitio = async function(projectId, sitio, subfase, idx) {
-  const p = await projects.getById(projectId);
-  const arr = p.documentacion?.fases?.[sitio]?.[subfase]
-    || (sitio==='techo' ? p.documentacion?.fases?.[ {antes:'antes',durante:'durante',cierre:'despues'}[subfase] ] : null)
-    || [];
-  const actual = arr[idx]?.nota || '';
-  const nueva = await inputDialog('Editar nota:', actual);
-  if (nueva === null) return;
-  if (arr[idx]) arr[idx].nota = nueva;
-  await projects.update(projectId, { documentacion: p.documentacion });
-  sessionStorage.setItem('doc-tab-target',  SITIO_TAB[sitio] || 'd-techo');
-  sessionStorage.setItem('doc-subfa-target', subfase);
-  navigate(`#proyecto/${projectId}/documentacion`);
-};

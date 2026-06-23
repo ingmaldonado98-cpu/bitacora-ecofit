@@ -50,6 +50,21 @@ function _makeThumb(dataUrl, maxDim = 400, quality = 0.55) {
   });
 }
 
+// Evita que una subida en red muy lenta/intermitente bloquee indefinidamente
+// la cola de fotos — el timeout se trata como cualquier otro error de subida,
+// así uploadPhotoQueued cae a la cola offline en vez de colgarse.
+const UPLOAD_TIMEOUT_MS = 20000;
+function _withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      const err = new Error(`${label} excedió ${ms / 1000}s — red muy lenta`);
+      err.code = 'timeout';
+      reject(err);
+    }, ms);
+    promise.then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
+  });
+}
+
 // ── Subir foto a Firebase Storage ─────────────────────────────────────────
 export async function uploadPhoto(base64DataUrl, path) {
   if (!navigator.onLine) {
@@ -58,8 +73,8 @@ export async function uploadPhoto(base64DataUrl, path) {
     throw err;
   }
   const sRef = storageRef(_storage, path);
-  await uploadString(sRef, base64DataUrl, 'data_url');
-  const url = await getDownloadURL(sRef);
+  await _withTimeout(uploadString(sRef, base64DataUrl, 'data_url'), UPLOAD_TIMEOUT_MS, 'Subida de foto');
+  const url = await _withTimeout(getDownloadURL(sRef), UPLOAD_TIMEOUT_MS, 'Obtener URL de foto');
 
   // Subir miniatura fire-and-forget (no bloquea el flujo principal)
   _makeThumb(base64DataUrl).then(async thumbB64 => {
@@ -75,13 +90,23 @@ export async function uploadPhoto(base64DataUrl, path) {
 // ── Subir foto con cola offline ────────────────────────────────────────────
 // op / opArgs: describen cómo actualizar Firestore al completar el sync.
 // Retorna { url, pending, pendingId }
+//
+// navigator.onLine solo refleja la interfaz de red del sistema, no si Firebase
+// es realmente alcanzable — en campo (señal mala/intermitente) es común que
+// reporte true mientras la subida real falla. Por eso intentamos subir directo
+// y, si falla por CUALQUIER motivo (no solo offline real), caemos a la cola en
+// vez de perder la foto.
 export async function uploadPhotoQueued(base64DataUrl, path, projectId, op, opArgs = {}) {
   if (navigator.onLine) {
-    const url = await uploadPhoto(base64DataUrl, path);
-    return { url, pending: false, pendingId: null };
+    try {
+      const url = await uploadPhoto(base64DataUrl, path);
+      return { url, pending: false, pendingId: null };
+    } catch (err) {
+      console.warn('[uploadPhotoQueued] Subida directa falló, se encola:', err.message);
+    }
   }
 
-  // Sin internet → guardar en cola
+  // Sin internet o falló la subida directa → guardar en cola
   const { enqueuePhoto } = await import('./photo-queue.js');
   const { uuid } = await import('./utils.js');
   const pendingId = uuid();
@@ -177,13 +202,13 @@ function _dispatchWriteError(label, err) {
 // ── Schema versioning ─────────────────────────────────────────────────────
 // Bump cuando el formato del documento cambia. Los docs antiguos (sin _v o
 // con _v < SCHEMA_VERSION) se migran al leerlos y se reescriben en Firestore.
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 3;
 
 function _migrateProject(data) {
   if ((data._v || 0) >= SCHEMA_VERSION) return data;
 
   const lev = data.documentacion?.levantamiento;
-  if (lev) {
+  if (lev && (data._v || 0) < 1) {
     // v0→v1: areasTecho.fotos {antes,durante,cierre} → array plano
     if (Array.isArray(lev.areasTecho)) {
       lev.areasTecho = lev.areasTecho.map(a => {
@@ -198,6 +223,24 @@ function _migrateProject(data) {
       lev.cargasCriticas = lev.cargasRespaldo;
       delete lev.cargasRespaldo;
     }
+  }
+  if (lev && (data._v || 0) < 2) {
+    // v1→v2: tipo de techo 'Metálico' renombrado a 'Carport' (sitio + áreas)
+    if (lev.tipTecho === 'Metálico') lev.tipTecho = 'Carport';
+    if (Array.isArray(lev.areasTecho)) {
+      lev.areasTecho = lev.areasTecho.map(a =>
+        a.tipTecho === 'Metálico' ? { ...a, tipTecho: 'Carport' } : a);
+    }
+  }
+  if (lev && (data._v || 0) < 3) {
+    // v2→v3: "Voltajes medidos" pasó de 3 campos genéricos a un desglose por
+    // tipo de servicio CFE (líneas L1/L2/L3) — se mapean los valores viejos.
+    if (lev.voltajeFaseFase != null && lev.voltajeFaseFaseL1L2 == null) lev.voltajeFaseFaseL1L2 = lev.voltajeFaseFase;
+    if (lev.voltajeFaseNeutro != null && lev.voltajeFaseNeutroL1 == null) lev.voltajeFaseNeutroL1 = lev.voltajeFaseNeutro;
+    if (lev.voltajeFaseTierra != null && lev.voltajeNeutroTierra == null) lev.voltajeNeutroTierra = lev.voltajeFaseTierra;
+    delete lev.voltajeFaseFase;
+    delete lev.voltajeFaseNeutro;
+    delete lev.voltajeFaseTierra;
   }
 
   return { ...data, _v: SCHEMA_VERSION };

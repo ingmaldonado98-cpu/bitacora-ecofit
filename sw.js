@@ -1,8 +1,8 @@
 // sw.js — Service Worker Bitácora Ecofit V6
 // ⚠ Cambiar BUILD_DATE y CACHE_NAME en cada deploy para invalidar caché
-const BUILD_DATE  = '2026-06-16';
-const CACHE_NAME  = 'ecofit-v6-v124';
-const SW_VERSION  = '6.76.3';
+const BUILD_DATE  = '2026-06-23';
+const CACHE_NAME  = 'ecofit-v6-v157';
+const SW_VERSION  = '6.76.4';
 
 const APP_SHELL = [
   './',
@@ -21,6 +21,8 @@ const APP_SHELL = [
   './js/calculadora.js',
   './js/calc-state.js',
   './js/calc-render.js',
+  './js/calc-render-bom.js',
+  './js/calc-render-diagrama.js',
   './js/calc-actions.js',
   './js/dashboard.js',
   './js/db.js',
@@ -53,6 +55,7 @@ const APP_SHELL = [
   './js/pdf-helpers.js',
   './js/pdf-cliente.js',
   './js/pdf-tecnico.js',
+  './js/word-tecnico.js',
   './js/pdf-levantamiento.js',
   './js/project.js',
   './js/proj-firmas.js',
@@ -61,6 +64,9 @@ const APP_SHELL = [
   './js/qr.js',
   './js/scanner.js',
   './js/settings.js',
+  './js/settings-users.js',
+  './js/settings-backup.js',
+  './js/settings-paneles.js',
   './js/recordatorios.js',
   './js/onedrive.js',
   './js/utils.js',
@@ -86,6 +92,8 @@ const APP_SHELL = [
   './js/vendor/qrcode.min.js',
   './js/vendor/jspdf.umd.min.js',
   './icons/icon.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
   './icons/logo.png',
   './icons/k2-systems.png',
   './icons/aluminext.png',

@@ -1,12 +1,15 @@
 // settings.js — Configuración Admin
 
-import { users, config, kv, exportBackup, importBackup } from './db.js';
-import { esc, isoNow, toast, confirmDialog } from './utils.js';
+import { users, config, kv } from './db.js';
+import { esc, toast } from './utils.js';
 import { isAdmin, ROLES } from './auth.js';
 import { icon } from './icons.js';
-import { createFbUser, fbUsers, resetPassword } from './firebase.js';
-import { getStatus as getOneDriveStatusObj, pickFolder, requestPermission, testAccess } from './onedrive.js';
+import { getStatus as getOneDriveStatusObj } from './onedrive.js';
 import { isNative } from './platform.js';
+import { renderTableroPlaceholder } from './calc-tablero.js';
+import './settings-users.js';   // registra window.* de perfil/usuarios
+import './settings-backup.js';  // registra window.* de OneDrive/backup/borrado
+import './settings-paneles.js'; // registra window.* de catálogo de paneles
 
 async function getOneDriveStatus() {
   const st = await getOneDriveStatusObj();
@@ -283,6 +286,9 @@ export async function renderSettings(session) {
     </div>
   </div>
 
+  <!-- Tablero comparativo de BOM aplicados por técnico -->
+  ${renderTableroPlaceholder()}
+
   <!-- Backup de emergencia -->
   <div class="card">
     <h3 class="card-title">Backup de emergencia</h3>
@@ -410,276 +416,6 @@ function renderUsersList(allUsers, session) {
   `).join('');
 }
 
-// ── Editar perfil propio ───────────────────────────────────────────────────────
-window.editarMiPerfil = function() {
-  const selfRow  = document.getElementById('urow-self') ||
-                   document.querySelector('.user-row:has(#uedit-self)');
-  const form = document.getElementById('uedit-self');
-  if (!form) return;
-  // Ocultar la fila y mostrar el form
-  const row = form.previousElementSibling;
-  if (row) row.style.display = 'none';
-  form.style.display = 'block';
-  document.getElementById('ue-self-nombre')?.focus();
-};
-
-window.cancelarMiPerfil = function() {
-  const form = document.getElementById('uedit-self');
-  if (!form) return;
-  form.style.display = 'none';
-  const row = form.previousElementSibling;
-  if (row) row.style.display = '';
-};
-
-window.guardarMiPerfil = async function(id) {
-  // Soporta tanto el form admin (ue-self-*) como el form no-admin (ue-np-*)
-  const nombre   = (document.getElementById('ue-self-nombre')   || document.getElementById('ue-np-nombre'))?.value.trim();
-  const username = (document.getElementById('ue-self-username') || document.getElementById('ue-np-username'))?.value.trim().toLowerCase();
-  const pass     = (document.getElementById('ue-self-pass')     || document.getElementById('ue-np-pass'))?.value;
-
-  if (!nombre || !username) { toast('Nombre y usuario son obligatorios', 'error'); return; }
-  if (pass && pass.length < 6) { toast('Contraseña mínimo 6 caracteres', 'error'); return; }
-
-  const btn = document.querySelector('#uedit-self .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
-
-  try {
-    await users.update(id, { nombre, username });
-
-    // Cambiar contraseña en Firebase Auth (solo disponible para el usuario actual)
-    if (pass) {
-      const { getAuth, updatePassword } = await import(
-        'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js'
-      );
-      const currentUser = getAuth().currentUser;
-      if (currentUser) {
-        await updatePassword(currentUser, pass);
-      }
-    }
-
-    toast('✅ Perfil actualizado');
-    navigate('#settings');
-  } catch (err) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
-    // Firebase requiere re-autenticación reciente para cambiar contraseña
-    if (err.code === 'auth/requires-recent-login') {
-      toast('Por seguridad, cierra sesión y vuelve a entrar antes de cambiar tu contraseña.', 'error');
-    } else {
-      toast('Error al guardar: ' + err.message, 'error');
-    }
-  }
-};
-
-window.editarUser = function(id) {
-  document.getElementById('urow-' + id).style.display = 'none';
-  document.getElementById('uedit-' + id).style.display = 'block';
-  document.getElementById('ue-nombre-' + id).focus();
-};
-
-window.guardarEditUser = async function(id) {
-  const rol   = document.getElementById('ue-rol-' + id).value;
-  const email = document.getElementById('ue-email-' + id)?.value.trim() || null;
-
-  try {
-    const update = { rol, email: email || null, authEmail: email || null };
-    await users.update(id, update);
-    toast('✅ Usuario actualizado');
-    navigate('#settings');
-  } catch(err) {
-    toast('Error al guardar: ' + err.message, 'error');
-  }
-};
-
-window.showNewUser = function() {
-  document.getElementById('form-nuevo-usuario').style.display = 'block';
-  document.getElementById('nu-nombre').focus();
-};
-
-window.crearUsuario = async function() {
-  const nombre   = document.getElementById('nu-nombre').value.trim();
-  const username = document.getElementById('nu-username').value.trim().toLowerCase();
-  const pass     = document.getElementById('nu-pass').value;
-  const rol      = document.getElementById('nu-rol').value;
-  const email    = document.getElementById('nu-email')?.value.trim() || null;
-
-  if (!nombre || !username || !pass) { toast('Completa todos los campos','error'); return; }
-  if (pass.length < 6) { toast('Contraseña mínimo 6 caracteres','error'); return; }
-
-  const btn = document.querySelector('#form-nuevo-usuario .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
-
-  try {
-    // 1. Crear en Firebase Auth (sin cerrar sesión actual)
-    // Si se proporcionó email real, se usa como email de Firebase Auth (permite reset real)
-    const { uid, authEmail } = await createFbUser(username, pass, email);
-    // 2. Crear perfil en Firestore
-    await fbUsers.add({ id: uid, nombre, username, rol, activo: true,
-      authEmail, ...(email ? { email } : {}), createdAt: isoNow() });
-    toast(`✅ Usuario @${username} creado`);
-    navigate('#settings');
-  } catch(err) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Crear'; }
-    toast('Error: ' + (err.message || 'usuario ya existe'), 'error');
-  }
-};
-
-window.toggleUser = async function(id, activo) {
-  await users.update(id, { activo: !activo });
-  navigate('#settings');
-};
-
-window.eliminarUser = async function(id) {
-  if (!await confirmDialog('¿Eliminar este usuario? Esta acción es irreversible.')) return;
-  await users.delete(id);
-  toast('Usuario eliminado');
-  navigate('#settings');
-};
-
-window.guardarContacto = async function() {
-  const val = document.getElementById('contacto-ecofit').value.trim();
-  await config.set('contactoEcofit', val);
-  toast('✅ Contacto guardado');
-};
-
-// ── OneDrive ───────────────────────────────────────────────────────────────────
-window.seleccionarCarpetaOneDrive = async function() {
-  try {
-    const handle = await pickFolder();
-    toast(`✅ Carpeta seleccionada: ${handle.name}`);
-    document.getElementById('onedrive-status').innerHTML =
-      `<span class="onedrive-ok">✅ Carpeta: ${handle.name}</span>`;
-  } catch (err) {
-    if (err.name !== 'AbortError') {
-      toast('Error al seleccionar carpeta: ' + err.message, 'error');
-    }
-  }
-};
-
-window.probarOneDrive = async function() {
-  try {
-    const path = await testAccess();
-    toast(`✅ Acceso confirmado — archivo guardado en: ${path}`);
-  } catch (err) {
-    if (err.message.includes('permiso') || err.message.includes('Permiso')) {
-      try {
-        await requestPermission();
-        const path = await testAccess();
-        toast(`✅ Acceso confirmado — archivo guardado en: ${path}`);
-      } catch (e) {
-        toast('Error: ' + e.message, 'error');
-      }
-    } else {
-      toast('Error: ' + err.message, 'error');
-    }
-  }
-};
-
-window.exportarDatos = async function() {
-  const data = await exportBackup();
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `ecofit-bitacora-v6-${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-};
-
-window.importarDatos = async function(e) {
-  const file = e.target.files[0]; if (!file) return;
-  if (!await confirmDialog('¿Importar backup? Se reemplazarán todos los proyectos actuales.')) return;
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    await importBackup(data);
-    toast('✅ Datos importados');
-    navigate('#dashboard');
-  } catch(err) { toast('Error al importar: ' + err.message, 'error'); }
-};
-
-window.showPanelForm = function() {
-  document.getElementById('form-nuevo-panel').style.display = 'block';
-  document.getElementById('np-label').focus();
-};
-
-window.crearPanel = async function() {
-  const label = document.getElementById('np-label').value.trim();
-  const wp    = parseFloat(document.getElementById('np-wp').value);
-  const pW    = parseFloat(document.getElementById('np-pw').value);
-  const pH    = parseFloat(document.getElementById('np-ph').value);
-  const voc   = parseFloat(document.getElementById('np-voc').value) || null;
-  const imp   = parseFloat(document.getElementById('np-imp').value) || null;
-
-  if (!label)             { toast('Ingresa la marca/modelo','error'); return; }
-  if (!wp || wp < 1)      { toast('Potencia inválida','error'); return; }
-  if (!pW || pW < 0.1)    { toast('Ancho inválido','error'); return; }
-  if (!pH || pH < 0.1)    { toast('Alto inválido','error'); return; }
-
-  const existing = (await kv.get('panel_presets_custom')) || [];
-  const nuevo = {
-    id: 'cp-' + Date.now(),
-    label,
-    sub: `${wp}W · ${pW}×${pH}m`,
-    pW, pH, wp,
-    ...(voc ? { voc } : {}),
-    ...(imp ? { imp } : {}),
-    isCustom: true,
-  };
-  await kv.set('panel_presets_custom', [...existing, nuevo]);
-  toast(`✅ Panel "${label}" agregado`);
-  navigate('#settings');
-};
-
-window.editarPanel = function(id) {
-  document.getElementById('panel-row-' + id).style.display = 'none';
-  document.getElementById('panel-edit-' + id).style.display = 'block';
-  document.getElementById('ep-label-' + id).focus();
-};
-
-window.guardarEditPanel = async function(id) {
-  const label = document.getElementById('ep-label-' + id).value.trim();
-  const wp    = parseFloat(document.getElementById('ep-wp-' + id).value);
-  const pW    = parseFloat(document.getElementById('ep-pw-' + id).value);
-  const pH    = parseFloat(document.getElementById('ep-ph-' + id).value);
-  const voc   = parseFloat(document.getElementById('ep-voc-' + id).value) || null;
-  const imp   = parseFloat(document.getElementById('ep-imp-' + id).value) || null;
-
-  if (!label)          { toast('Ingresa la marca/modelo','error'); return; }
-  if (!wp || wp < 1)   { toast('Potencia inválida','error'); return; }
-  if (!pW || pW < 0.1) { toast('Ancho inválido','error'); return; }
-  if (!pH || pH < 0.1) { toast('Alto inválido','error'); return; }
-
-  const existing = (await kv.get('panel_presets_custom')) || [];
-  const updated = existing.map(p => p.id === id
-    ? { ...p, label, sub: `${wp}W · ${pW}×${pH}m`, wp, pW, pH,
-        ...(voc ? { voc } : { voc: null }), ...(imp ? { imp } : { imp: null }) }
-    : p
-  );
-  await kv.set('panel_presets_custom', updated);
-  toast('✅ Panel actualizado');
-  navigate('#settings');
-};
-
-window.eliminarPanel = async function(id) {
-  if (!await confirmDialog('¿Eliminar este modelo de panel?')) return;
-  const existing = (await kv.get('panel_presets_custom')) || [];
-  await kv.set('panel_presets_custom', existing.filter(p => p.id !== id));
-  toast('Panel eliminado');
-  navigate('#settings');
-};
-
-window.resetPassUser = async function(id, authEmail) {
-  const ok = await (await import('./utils.js')).confirmDialog(
-    `¿Enviar link de restablecimiento de contraseña a:\n${authEmail}?`
-  );
-  if (!ok) return;
-  try {
-    await resetPassword(authEmail);
-    toast('📧 Link de restablecimiento enviado');
-  } catch(err) {
-    toast('Error al enviar reset: ' + err.message, 'error');
-  }
-};
-
 // ── Modo oscuro programado ─────────────────────────────────────────────────────
 window.toggleSchedMode = function(enabled) {
   const cfg = document.getElementById('sched-config');
@@ -705,15 +441,6 @@ window.saveSched = function() {
   localStorage.setItem('ecofit-theme-sched', `${from}-${to}`);
   window._applyScheduledTheme?.();
   toast(`🌙 Horario actualizado: ${from} – ${to}`);
-};
-
-window.limpiarDatos = async function() {
-  if (!await confirmDialog('¿ELIMINAR TODOS los datos locales? Esta acción es IRREVERSIBLE.')) return;
-  if (!await confirmDialog('Segunda confirmación: ¿Seguro? Perderás todos los proyectos.')) return;
-  indexedDB.deleteDatabase('ecofitV6');
-  sessionStorage.clear();
-  toast('Datos eliminados. Recargando…');
-  setTimeout(() => location.reload(), 1500);
 };
 
 // ── Forzar actualización del Service Worker ───────────────────────────────────

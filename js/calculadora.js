@@ -3,7 +3,8 @@
 import { inventario as invStore, projects, kv } from './db.js';
 import { PANEL_PRESETS } from '../modules/calculadora/index.js';
 import { cs, SX, loadFromConfig } from './calc-state.js';
-import { renderCalc, _resetDiagZoom } from './calc-render.js';
+import { renderCalc } from './calc-render.js';
+import { _resetDiagZoom } from './calc-render-diagrama.js';
 import './calc-actions.js'; // registra window.calcSelectE, calcGuardar, etc.
 
 function calcRender() {

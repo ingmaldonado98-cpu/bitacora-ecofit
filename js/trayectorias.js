@@ -19,6 +19,30 @@ function conduitLabel(v) {
   return (CONDUIT_OPTS.find(([k]) => k === v) || [, v || '—'])[1];
 }
 
+// ── Resumen embebible (usado en Progreso de obra y en la tarjeta de referencia
+// de ingeniería de doc-exec.js) — lista los tramos ya capturados en vez de
+// solo contarlos, para que el técnico vea conduit/calibre/metros sin tener
+// que entrar a la vista completa de Trayectorias.
+export function renderTrayectoriasResumen(project) {
+  const items  = Array.isArray(project.trayectorias) ? project.trayectorias : [];
+  const totalM = items.reduce((s, t) => s + (parseFloat(t.m) || 0), 0);
+  return `
+  <div class="card exec-section">
+    <div class="card-title-row">
+      <h3 class="card-title">${icon('path', 16)} Trayectorias de canalización</h3>
+      <button class="btn-sm btn-outline" onclick="navigate('#proyecto/${project.id}/trayectorias')">
+        ${items.length ? 'Ver / agregar' : '+ Agregar tramo'}
+      </button>
+    </div>
+    ${items.length ? `
+      <p class="form-hint" style="margin:0 0 6px">${items.length} tramo${items.length !== 1 ? 's' : ''} · ${totalM.toFixed(1)} m en total</p>
+      <ul style="margin:0;padding-left:16px;font-size:.8rem;color:var(--text-muted)">
+        ${items.map(t => `<li>${esc(t.nombre || 'Tramo sin nombre')} — ${conduitLabel(t.conduit)}${t.awg ? `, AWG ${esc(t.awg)}` : ''}${t.m ? `, ${t.m} m` : ''}</li>`).join('')}
+      </ul>`
+      : `<p class="form-hint" style="margin:0">Pendiente de definir en módulo de Trayectorias/Cables.</p>`}
+  </div>`;
+}
+
 // ── Render principal ──────────────────────────────────────────────────────────
 export async function renderTrayectorias(projectId, session) {
   const project = await projects.getById(projectId);

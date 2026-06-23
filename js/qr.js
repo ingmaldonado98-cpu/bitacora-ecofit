@@ -3,6 +3,7 @@
 import { projects, config } from './db.js';
 import { esc, fmtFecha, TIPOS_SISTEMA } from './utils.js';
 import { icon } from './icons.js';
+import { getSerialesFlat } from './gar-paneles.js';
 
 export async function renderQR(projectId, session) {
   const [project, contacto] = await Promise.all([
@@ -12,8 +13,7 @@ export async function renderQR(projectId, session) {
   if (!project) return '<p class="empty-msg">Proyecto no encontrado.</p>';
 
   const tipo = TIPOS_SISTEMA[project.tipoSistema];
-  const totalPaneles = (project.garantia?.paneles?.strings || [])
-    .reduce((s, str) => s + (str.paneles?.length || 0), 0);
+  const totalPaneles = getSerialesFlat(project.garantia).length;
   const totalKwp = totalPaneles * ((project.garantia?.paneles?.wp || 0) / 1000);
 
   const equiposPublicos = (project.garantia?.equipos || []).map(eq =>

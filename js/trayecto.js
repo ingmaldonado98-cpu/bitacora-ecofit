@@ -5,6 +5,7 @@ import { projects } from './db.js';
 import { esc, calcFaseEstado } from './utils.js';
 import { canEdit } from './auth.js';
 import { icon } from './icons.js';
+import { getSerialesFlat } from './gar-paneles.js';
 
 // ── Definición de pasos ──────────────────────────────────────────────────────
 function buildPasos(project, id) {
@@ -33,7 +34,7 @@ function buildPasos(project, id) {
     return s + (f.antes?.length||0) + (f.durante?.length||0) + (f.cierre?.length||0);
   }, 0);
 
-  const totalPaneles = (gar.paneles?.strings||[]).reduce((s,st)=>s+(st.paneles?.length||0),0);
+  const totalPaneles = getSerialesFlat(gar).length;
   // Checklist de instalación (checklistData), NO el checklist de auditoría
   const cl        = project.checklistData || {};
   const clExec    = Object.values(cl.exec || {}).filter(Boolean).length;

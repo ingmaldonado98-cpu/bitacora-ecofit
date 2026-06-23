@@ -1,10 +1,11 @@
 // calc-actions.js — Handlers del wizard y acciones de la Calculadora BOM
 
 import { toast, confirmDialog, isoNow } from './utils.js';
-import { projects, inventario as invStore } from './db.js';
+import { projects, inventario as invStore, logChange } from './db.js';
 import { cs, SX, resetCS, getRowData, loadFromConfig, BOM_INV_MAP } from './calc-state.js';
 import { calcBOM, calcConsumibles, buildProjectConfig } from '../modules/calculadora/index.js';
-import { calcConsumiblesMadera } from './calc-render.js';
+import { calcConsumiblesMadera } from './calc-render-bom.js';
+import { isAdmin } from './auth.js';
 
 // ── Globales del wizard ────────────────────────────────────────────────────
 window._calcReset = () => { resetCS(); window._calcRender(); };
@@ -33,7 +34,10 @@ window.calcIrrChange = (i, delta) => {
   window._calcRender();
 };
 window.calcIrrAdd    = ()  => { cs.irrRows.push(1); window._calcRender(); };
-window.calcIrrRemove = i   => { cs.irrRows.splice(i,1); window._calcRender(); };
+window.calcIrrRemove = i   => {
+  if (cs.irrRows.length <= 1) { toast('Debe quedar al menos una fila', 'error'); return; }
+  cs.irrRows.splice(i,1); window._calcRender();
+};
 
 window.calcSelectPreset = id => {
   cs.presetId = id;
@@ -79,13 +83,21 @@ window.calcGuardar = async () => {
       cfg.computed.consumibles = calcConsumiblesMadera(getRowData(), cs.pW, cs.distVigas);
       cfg.madera = { subtipoMadera: cs.subtipoMadera, distVigas: cs.distVigas };
     }
+    cfg.aplicadoPor = { id: SX.session?.id, nombre: SX.session?.nombre || SX.session?.username || '—' };
     const prevDeduction    = SX.project?.projectConfig?.inventoryDeducted;
     const bom              = cfg.computed?.bom || [];
     const bomWithMapping   = bom.filter(i => BOM_INV_MAP[i.partNum]);
 
     await projects.update(SX.projectId, { projectConfig: cfg });
 
-    if (bomWithMapping.length > 0) {
+    logChange(SX.projectId, {
+      modulo: 'Garantía',
+      accion: 'BOM recalculado',
+      detalle: `${cfg.layout?.totalPanels || 0} paneles · ${cfg.estructura}`,
+      quien: SX.session,
+    });
+
+    if (bomWithMapping.length > 0 && isAdmin(SX.session)) {
       const msg = prevDeduction
         ? `Este BOM ya fue descontado del inventario el ${new Date(prevDeduction).toLocaleDateString('es-MX')}.\n\n¿Volver a descontar los materiales actuales?`
         : `¿Descontar estos ${bomWithMapping.length} materiales del inventario de bodega?\n\n(Confirma solo si los materiales ya salieron físicamente)`;

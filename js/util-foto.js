@@ -4,6 +4,38 @@
 import { esc, uuid } from './util-fmt.js';
 import { toast } from './util-dialogs.js';
 
+// ── Incrustado de fotos en documentos (Word/PDF) ──────────────────────────────
+// Resuelve cualquier representación de foto (string url/data-uri/base64, objeto
+// {url}, o {pending:true, pendingId} todavía no subida) a un data-URI listo
+// para incrustar — así el documento queda autocontenido y no depende de que la
+// URL remota siga viva cuando alguien lo abra después.
+async function _fetchAsDataURI(url) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+export async function fotoToDataURI(foto) {
+  if (!foto) return null;
+  if (typeof foto === 'string') {
+    if (foto.startsWith('data:')) return foto;
+    if (foto.startsWith('http'))  return _fetchAsDataURI(foto);
+    return `data:image/jpeg;base64,${foto}`;
+  }
+  if (foto.pending && foto.pendingId && window._pendingPhotoMap?.[foto.pendingId]) {
+    return window._pendingPhotoMap[foto.pendingId]; // ya es base64 local, no subida aún
+  }
+  if (foto.url)  return _fetchAsDataURI(foto.url);
+  if (foto.data) return foto.data.startsWith('data:') ? foto.data : `data:image/jpeg;base64,${foto.data}`;
+  return null;
+}
+
 // ── Compresión de imagen ───────────────────────────────────────────────────────
 export function compressImage(file, maxDim = 1000, quality = 0.68) {
   return new Promise((resolve, reject) => {
@@ -177,7 +209,7 @@ export function fotoMini(src, alt = '', onClick, isPending = false) {
   const pendingAttr = (isPending || (src && typeof src === 'object' && src.pending))
     ? `data-pending="true"` : '';
   const pendingBadge = pendingAttr
-    ? `<span class="foto-pending-badge" title="Pendiente de subir">⬆</span>` : '';
+    ? `<span class="foto-pending-badge" title="Guardado local — pendiente de subir">Local</span>` : '';
 
   const thumbSrc = _thumbUrl(resolvedSrc) || resolvedSrc;
 

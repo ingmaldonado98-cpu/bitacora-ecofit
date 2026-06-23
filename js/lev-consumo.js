@@ -46,7 +46,10 @@ export function renderRecibos(recibos, edit, pid) {
         <strong>${low.kwh} kWh</strong>
         ${lowLbl ? `<span class="res-mes">${lowLbl}</span>` : ''}
       </div>
-    </div>`;
+    </div>
+    <button type="button" class="btn-outline btn-sm" style="margin-top:6px" onclick="navigate('#proyecto/${window._lev.pid}/dimensionamiento')">
+      ${icon('calculator', 14)} Ver dimensionamiento sugerido con este consumo
+    </button>`;
   })() : '';
 
   return `
@@ -188,7 +191,7 @@ export function renderAparatos(aparatos, edit) {
 
 const _triggerLevSave = () => { if (window._lev.pid) window._levAutoSave(window._lev.pid); };
 window.addAparatoRapido = function(a) { window._lev.aparatos.push({...a,cantidad:1,area:'General'}); refreshAparatos(); _triggerLevSave(); };
-window.addAparato = function() { window._lev.aparatos.push({nombre:'',potencia:0,horas:0,cantidad:1,area:'General'}); refreshAparatos(); };
+window.addAparato = function() { window._lev.aparatos.push({nombre:'',potencia:0,horas:0,cantidad:1,area:'General'}); refreshAparatos(); _triggerLevSave(); };
 window.delAparato = function(i) { window._lev.aparatos.splice(i,1); refreshAparatos(); _triggerLevSave(); };
 window.refreshAparatos = function() {
   const el = document.getElementById('lista-aparatos');

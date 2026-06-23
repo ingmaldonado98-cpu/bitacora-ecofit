@@ -1,1 +1,1 @@
-{"version":"0.0.1","configurations":[{"name":"bitacora-v6","runtimeExecutable":"npx","runtimeArgs":["serve","-p","5174","."],"port":5174}]}
+{"version":"0.0.1","configurations":[{"name":"bitacora-v6","runtimeExecutable":"npx","runtimeArgs":["serve","-l","5174","."],"port":5174}]}

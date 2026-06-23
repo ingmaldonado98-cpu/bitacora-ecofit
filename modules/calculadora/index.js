@@ -151,6 +151,16 @@ export function calcConsumibles(rd, estructura, techo) {
   ];
 }
 
+// ── Getters de lectura — única fuente de verdad para leer projectConfig ────
+// Soportan tanto el schema estructurado actual (layout.*, panel.*, computed.*)
+// como proyectos viejos guardados solo con los campos compat planos, sin
+// duplicar el fallback en cada uno de los consumidores.
+export function getRowsData(cfg)        { return cfg?.layout?.rowsData    ?? cfg?.rowsData    ?? []; }
+export function getTotalPanels(cfg)     { return cfg?.layout?.totalPanels ?? cfg?.paneles      ?? getRowsData(cfg).reduce((s,c)=>s+(parseInt(c,10)||0),0); }
+export function getPanelWidth(cfg)      { return cfg?.panel?.width        ?? cfg?.pW           ?? 0; }
+export function getPanelHeight(cfg)     { return cfg?.panel?.height       ?? cfg?.pH           ?? 0; }
+export function getConsumiblesList(cfg) { return cfg?.computed?.consumibles ?? cfg?.consumibles ?? []; }
+
 /** Construye el objeto projectConfig universal */
 export function buildProjectConfig(cs) {
   const rd = cs.distMode === 'grid'
@@ -200,13 +210,6 @@ export function buildProjectConfig(cs) {
       bom,
       consumibles,
     },
-    // compat fields
-    paneles:     totalPanelsVal,
-    anchors,
-    pW:          cs.pW,
-    pH:          cs.pH,
-    rowsData:    rd,
-    consumibles,
   };
 }
 

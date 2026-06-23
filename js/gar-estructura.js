@@ -1,10 +1,13 @@
 // gar-estructura.js — Estructura de montaje: render, form y guardar
 // Extraído de garantia.js. Exporta renderEstructura, renderEstructuraForm.
 
-import { projects } from './db.js';
+import { projects, logChange } from './db.js';
 import { esc, fotoMini, toast, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_FIJACION } from './utils.js';
+import { getSession } from './auth.js';
 import { icon } from './icons.js';
+import { updateQueueItem } from './photo-queue.js';
 import { _eqFotos, _clearEqFotos } from './gar-equipos.js';
+import { railCutForRow, getRowsData, getTotalPanels, getPanelWidth, getPanelHeight, buildTorqueTable } from '../modules/calculadora/index.js';
 
 function renderCalcInfo(cfg, projectId) {
   if (!cfg) return `
@@ -20,9 +23,9 @@ function renderCalcInfo(cfg, projectId) {
   </div>`;
   const estructuraLabel = cfg.estructura === 'k2' ? 'K2 Systems' : cfg.estructura === 'aluminex' ? 'Aluminex' : cfg.estructura || '—';
   const techoLabel      = cfg.techo === 'cemento' ? 'Concreto/losa' : cfg.techo === 'metal' ? 'Metálico/lámina' : cfg.techo || '—';
-  const paneles         = cfg.layout?.totalPanels || '—';
-  const modelo          = cfg.panel?.model || (cfg.panel?.width ? `${cfg.panel.width}×${cfg.panel.height} m` : '—');
-  const rows            = cfg.layout?.rowsData || [];
+  const paneles         = getTotalPanels(cfg) || '—';
+  const modelo          = cfg.panel?.model || (getPanelWidth(cfg) ? `${getPanelWidth(cfg)}×${getPanelHeight(cfg)} m` : '—');
+  const rows            = getRowsData(cfg);
   const layout          = rows.length ? rows.map((c,i)=>`F${i+1}: ${c}`).join(' · ') : '—';
   const ts              = cfg.timestamp ? new Date(cfg.timestamp).toLocaleDateString('es-MX', {day:'2-digit',month:'short',year:'numeric'}) : '';
   return `
@@ -95,6 +98,9 @@ export async function renderEstructuraForm(projectId, session) {
     <h1 class="hdr-title">Estructura de montaje</h1>
   </div>
   <form class="form-card" onsubmit="guardarEstructura(event,'${projectId}')">
+    ${project?.projectConfig ? `<button type="button" class="btn-outline btn-sm" onclick="importarHerrajes('${projectId}')" style="margin-bottom:14px">
+      ${icon('calculator', 14)} Importar herrajes de ingeniería</button>
+      <div id="torque-ref-box" style="display:none;margin-bottom:14px"></div>` : ''}
     <div class="form-group"><label>Marca *</label>
       <select name="marca">${MARCAS_ESTRUCTURA.map(m=>`<option ${est.marca===m?'selected':''}>${m}</option>`).join('')}</select>
     </div>
@@ -137,6 +143,55 @@ export async function renderEstructuraForm(projectId, session) {
   </form>`;
 }
 
+// Precarga marca/metros de riel/clamps a partir de la Calculadora — los campos
+// importados se marcan como "sugeridos" (azul) hasta que el usuario los edite.
+window.importarHerrajes = async function(projectId) {
+  const p = await projects.getById(projectId);
+  const cfg = p?.projectConfig;
+  if (!cfg) { toast('Sin datos de calculadora para importar', 'error'); return; }
+
+  const marca     = cfg.estructura === 'k2' ? 'K2 Systems' : cfg.estructura === 'aluminex' ? 'Aluminex' : '';
+  const pW        = getPanelWidth(cfg) || 1.134;
+  const rowsData  = getRowsData(cfg);
+  const metrosRiel = rowsData.reduce((s, c) => s + 2 * railCutForRow(c, pW, cfg.estructura), 0);
+  const bom       = cfg.computed?.bom || [];
+  const sumBom    = re => bom.filter(it => re.test(it.name || '')).reduce((s, it) => s + (it.qty || 0), 0);
+  const midClamps = sumBom(/mid.?clamp/i);
+  const endClamps = sumBom(/end.?clamp/i);
+
+  const marcarSugerido = (selector, value) => {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    el.value = value;
+    el.classList.add('field-sugerido');
+    el.addEventListener('input', () => el.classList.remove('field-sugerido'), { once: true });
+  };
+
+  if (marca) marcarSugerido('[name="marca"]', marca);
+  marcarSugerido('[name="metrosRiel"]', metrosRiel.toFixed(1));
+  if (midClamps) marcarSugerido('[name="midClamps"]', midClamps);
+  if (endClamps) marcarSugerido('[name="endClamps"]', endClamps);
+
+  const torques = buildTorqueTable(cfg.estructura, cfg.techo);
+  const box = document.getElementById('torque-ref-box');
+  if (box && torques.length) {
+    box.style.display = '';
+    box.innerHTML = `
+      <div class="calc-info-banner">
+        <div class="cib-header">${icon('calculator', 14)}<span>Torques de referencia</span></div>
+        ${torques.map(t => `
+          <div class="card-row">
+            <div class="meta-item meta-item-full">
+              <span class="meta-lbl">${esc(t.comp)}</span>
+              <span class="meta-val">${esc(t.torque)} — ${esc(t.nota)}</span>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  toast('✅ Herrajes importados de la calculadora — revisa y confirma');
+};
+
 window.guardarEstructura = async function(e, projectId) {
   e.preventDefault();
   const fd = new FormData(e.target);
@@ -154,6 +209,31 @@ window.guardarEstructura = async function(e, projectId) {
     notas:             fd.get('notas').trim(),
   };
   await projects.update(projectId, { garantia: p.garantia });
+
+  // Reparchar items de cola con el projectId real y el campo correcto —
+  // mismo fix que ya tiene gar-equipos.js::guardarEquipo (capEqFoto sube con
+  // projectId:'equipo_temp' porque la estructura aún no tiene fotos guardadas
+  // al momento de tomarlas; sin esto, una foto que cae a la cola offline
+  // quedaba huérfana para siempre).
+  const _fotoCampos = [['frontal','fotoFrontal'], ['angulo','fotoAngulo']];
+  for (const [tipo, campo] of _fotoCampos) {
+    const fotoMem = _eqFotos[tipo];
+    if (fotoMem && typeof fotoMem === 'object' && fotoMem.pending && fotoMem.pendingId) {
+      await updateQueueItem(fotoMem.pendingId, {
+        projectId,
+        storagePath: `projects/${projectId}/estructura_${tipo}_${fotoMem.pendingId}.jpg`,
+        op: 'estructuraFoto',
+        opArgs: { campo },
+      });
+    }
+  }
+
+  logChange(projectId, {
+    modulo: 'Garantía', accion: 'estructura guardada',
+    detalle: `${p.garantia.estructura.marca} — ${p.garantia.estructura.sistemaEstructural}`,
+    quien: await getSession(),
+  });
+
   _clearEqFotos();
   toast('✅ Estructura guardada');
   navigate(`#proyecto/${projectId}/garantia`);

@@ -6,10 +6,11 @@ import { esc, fmtFechaHora, toast, calcFaseEstado, uuid, isoNow, confirmDialog }
 import { canEdit, isAdmin, getSession } from './auth.js';
 import { icon } from './icons.js';
 import { renderFirmaBlock } from './project.js';
-import { renderVocTab } from './gar-voc.js';
+import { renderVocTab, vocEstaDesactualizado } from './gar-voc.js';
 import { renderEquipos, formEquipo, _clearEqFotos } from './gar-equipos.js';
 import { renderEstructura } from './gar-estructura.js';
 import { renderPaneles } from './gar-paneles.js';
+import './pdf-garantia.js'; // registra window.exportarCertificadoGarantia
 
 // Re-exportar calcVocPuro para que lev-guardar.js no necesite cambiar su import
 export { calcVocPuro } from './gar-voc.js';
@@ -44,6 +45,9 @@ export async function renderGarantia(projectId, session) {
     </button>
     <h1 class="hdr-title">Garantía</h1>
     <span class="hdr-sub">${esc(project.displayId)}</span>
+    <button class="btn-outline btn-sm" onclick="exportarCertificadoGarantia('${projectId}')" title="Descargar certificado de garantía (Word)">
+      ${icon('file-arrow-down', 15)} Certificado
+    </button>
   </div>
 
   <!-- Puesta en marcha + vencimientos -->
@@ -70,6 +74,7 @@ export async function renderGarantia(projectId, session) {
     <div id="lista-equipos">
       ${renderEquipos(g.equipos || [], projectId, edit, isAdmin(session))}
     </div>
+    ${renderKitPendientes(project.checklistData?.kitEquipo || {}, projectId, edit)}
     <div id="form-equipo" style="display:none" class="card">
       ${formEquipo(projectId)}
     </div>
@@ -90,7 +95,7 @@ export async function renderGarantia(projectId, session) {
 
   <!-- 1E: Paneles -->
   <div id="g-paneles" class="tab-panel">
-    ${renderPaneles(g.paneles || { marca:'', modelo:'', wp:0, strings:[] }, projectId, edit, customPanels || [], fuenteCalcPanel)}
+    ${renderPaneles(g.paneles || { marca:'', modelo:'', wp:0, strings:[] }, projectId, edit, customPanels || [], fuenteCalcPanel, isAdmin(session))}
   </div>
 
   <!-- Notas de garantía -->
@@ -114,9 +119,11 @@ export async function renderGarantia(projectId, session) {
   </div>
   ${(() => {
     const fe = calcFaseEstado(project);
+    const vocStale = vocEstaDesactualizado(project);
+    const faltantes = [...fe.garFaltantes, ...(vocStale ? ['Voc recalculado (los datos cambiaron)'] : [])];
     return renderFirmaBlock(project, projectId, 'gar', session, {
-      ready: fe.garPct === 100,
-      hint:  `Faltan: ${fe.garFaltantes.join(', ')}`,
+      ready: fe.garPct === 100 && !vocStale,
+      hint:  `Faltan: ${faltantes.join(', ')}`,
     });
   })()}
 
@@ -147,8 +154,25 @@ export async function renderGarantia(projectId, session) {
   `;
 }
 
+// ── Tarjetas de Kit pendientes (sin serial registrado en Garantía) ───────────
+function renderKitPendientes(kitEquipo, projectId, edit) {
+  if (!edit) return '';
+  const pendientes = Object.entries(kitEquipo).filter(([, it]) => !it?.garantiaEquipoId);
+  if (!pendientes.length) return '';
+  return `
+  <div class="kit-pendientes">
+    <p class="form-hint">Equipos del Kit de obra sin serial registrado:</p>
+    ${pendientes.map(([kid, it]) => `
+      <div class="kit-pend-card" data-kit-id="${esc(kid)}" data-kit-nombre="${esc(it.nombre || '')}"
+           onclick="showFormEquipoFromKit('${projectId}',this.dataset.kitId,this.dataset.kitNombre)">
+        <span>⚠️ Pendiente de serial</span>
+        <span class="kit-pend-nombre">${esc(it.nombre || 'Sin nombre')}</span>
+      </div>`).join('')}
+  </div>`;
+}
+
 // ── Puesta en marcha + vencimientos de garantía ───────────────────────────────
-const GARANTIAS_STD = [
+export const GARANTIAS_STD = [
   { key: 'paneles',    label: 'Paneles — producto',    anios: 10 },
   { key: 'paneles25',  label: 'Paneles — desempeño',   anios: 25 },
   { key: 'inversor',   label: 'Inversor',              anios: 10 },

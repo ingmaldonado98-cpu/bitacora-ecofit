@@ -515,7 +515,6 @@ function showUpdateBanner(newSW) {
     <button onclick="
       document.getElementById('sw-update-banner')?.remove();
       navigator.serviceWorker.controller?.postMessage({type:'SKIP_WAITING'});
-      setTimeout(()=>location.reload(),300);
     ">Actualizar ahora</button>`;
   document.body.appendChild(banner);
 }
@@ -559,6 +558,17 @@ async function _initPushAndroid(session) {
 
 // ── Service Worker (solo web, Capacitor usa WebView propio) ──────────────────
 if ('serviceWorker' in navigator && !isNative()) {
+  // Recargar solo cuando el SW nuevo realmente toma control — un setTimeout fijo
+  // puede ganarle la carrera al activate() en dispositivos lentos y recargar con
+  // JS viejo + SW nuevo a medias. `refreshing` evita un doble reload si el evento
+  // dispara más de una vez.
+  let _swRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (_swRefreshing) return;
+    _swRefreshing = true;
+    location.reload();
+  });
+
   navigator.serviceWorker.register('./sw.js').then(reg => {
     reg.addEventListener('updatefound', () => {
       const newSW = reg.installing;

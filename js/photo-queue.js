@@ -9,6 +9,7 @@
 //   createdAt    — ISO timestamp
 //   op           — Operación Firestore al completar (ver OPERACIONES abajo)
 //   opArgs       — Argumentos específicos de la operación
+//   retryCount   — Reintentos fallidos acumulados (backoff exponencial, ver processQueue)
 
 const DB_NAME  = 'ecofit-photo-queue';
 const DB_VER   = 1;
@@ -112,11 +113,22 @@ function _updatePendingBadge() {
     badge.id = 'pending-photos-badge';
     badge.className = 'pending-photos-badge';
     badge.title = 'Fotos pendientes de subir';
-    badge.onclick = () => { /* toast informativo */ };
+    badge.onclick = async () => {
+      const { toast } = await import('./utils.js');
+      if (!navigator.onLine) {
+        toast('Sin conexión — se reintentará automáticamente al reconectar', 'error', 4000);
+        return;
+      }
+      const before = Object.keys(window._pendingPhotoMap).length;
+      await processQueue();
+      if (Object.keys(window._pendingPhotoMap).length === before) {
+        toast('No se pudo sincronizar todavía — revisa tu conexión e intenta de nuevo', 'error', 4000);
+      }
+    };
     document.body.appendChild(badge);
   }
   if (count > 0) {
-    badge.textContent = `⬆ ${count}`;
+    badge.textContent = `⬆ ${count} pendiente${count > 1 ? 's' : ''} — toca para reintentar`;
     badge.style.display = '';
   } else {
     badge.style.display = 'none';
@@ -124,6 +136,13 @@ function _updatePendingBadge() {
 }
 
 // ── Procesar la cola completa (llamar al reconectar) ─────────────────────────
+// Cada item lleva su propio retryCount persistido en IndexedDB — en campo con
+// red inestable (4G débil) evita martillar Storage sin pausa y deja de
+// reintentar items permanentemente rotos en vez de bloquear el resto de la cola.
+const MAX_RETRIES      = 6;
+const BASE_BACKOFF_MS  = 3000;
+const MAX_BACKOFF_MS   = 30000;
+
 export async function processQueue() {
   if (!navigator.onLine) return;
   const items = await getAllQueued();
@@ -133,7 +152,14 @@ export async function processQueue() {
   const { projects }    = await import('./db.js');
 
   let synced = 0;
+  let stuck  = 0;
   for (const item of items) {
+    const retryCount = item.retryCount || 0;
+    if (retryCount >= MAX_RETRIES) { stuck++; continue; }
+    if (retryCount > 0) {
+      const backoff = Math.min(BASE_BACKOFF_MS * 2 ** (retryCount - 1), MAX_BACKOFF_MS);
+      await new Promise(r => setTimeout(r, backoff));
+    }
     try {
       // Subir a Firebase Storage
       const url = await uploadPhoto(item.base64, item.storagePath);
@@ -148,6 +174,31 @@ export async function processQueue() {
           p.garantia.fotoSistema = url;
           await projects.update(item.projectId, { garantia: p.garantia });
           break;
+
+        case 'auditoriaDocFirmado':
+          p.auditoria = p.auditoria || {};
+          p.auditoria.docFirmado = url;
+          await projects.update(item.projectId, { auditoria: p.auditoria });
+          break;
+
+        case 'estructuraFoto': {
+          const { campo } = item.opArgs || {};
+          p.garantia = p.garantia || {};
+          p.garantia.estructura = p.garantia.estructura || {};
+          p.garantia.estructura[campo] = url;
+          await projects.update(item.projectId, { garantia: p.garantia });
+          break;
+        }
+
+        case 'fotoArregloPaneles': {
+          const { tipo } = item.opArgs || {};
+          p.garantia = p.garantia || {};
+          p.garantia.paneles = p.garantia.paneles || {};
+          const campo = tipo === 'frontal' ? 'fotoArregloFrontal' : 'fotoArregloPerfil';
+          p.garantia.paneles[campo] = url;
+          await projects.update(item.projectId, { garantia: p.garantia });
+          break;
+        }
 
         case 'fotoTecnica': {
           const { key, itemId } = item.opArgs;
@@ -217,6 +268,28 @@ export async function processQueue() {
           break;
         }
 
+        case 'fotoCierrePaso': {
+          const { blockId, slotId } = item.opArgs || {};
+          p.checklistData = p.checklistData || {};
+          p.checklistData.fotosCierre = p.checklistData.fotosCierre || {};
+          const slot = p.checklistData.fotosCierre[blockId]?.[slotId];
+          if (slot && slot.pendingId === item.id) { slot.url = url; delete slot.pending; delete slot.pendingId; }
+          await projects.update(item.projectId, { checklistData: p.checklistData });
+          break;
+        }
+
+        case 'fotoArea': {
+          const { areaIdx, itemId } = item.opArgs || {};
+          p.documentacion = p.documentacion || {};
+          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+          const areasQ = p.documentacion.levantamiento.areasTecho || [];
+          const fotoArea = areasQ[areaIdx]?.fotos?.find(f => f.id === itemId);
+          if (fotoArea) { fotoArea.url = url; delete fotoArea.pending; delete fotoArea.pendingId; }
+          p.documentacion.levantamiento.areasTecho = areasQ;
+          await projects.update(item.projectId, { documentacion: p.documentacion });
+          break;
+        }
+
         case 'reciboFoto': {
           p.documentacion = p.documentacion || {};
           p.documentacion.levantamiento = p.documentacion.levantamiento || {};
@@ -241,14 +314,21 @@ export async function processQueue() {
       await dequeuePhoto(item.id);
       synced++;
     } catch (err) {
-      // Si falla por offline, dejar en cola; si es otro error, loggear
+      // Si falla por offline, dejar en cola; si es otro error, contar el reintento
       if (!navigator.onLine) break;
       console.warn('[PhotoQueue] Error sync item:', item.id, err.message);
+      const nextRetry = retryCount + 1;
+      await updateQueueItem(item.id, { retryCount: nextRetry });
+      if (nextRetry >= MAX_RETRIES) stuck++;
     }
   }
 
   if (synced > 0) {
     const { toast } = await import('./utils.js');
     toast(`✅ ${synced} foto${synced > 1 ? 's subidas' : ' subida'} al sincronizar`, 'success', 4000);
+  }
+  if (stuck > 0) {
+    const { toast } = await import('./utils.js');
+    toast(`⚠ ${stuck} foto${stuck > 1 ? 's' : ''} no se ${stuck > 1 ? 'pudieron' : 'pudo'} subir tras varios intentos — revisa tu conexión`, 'error', 6000);
   }
 }

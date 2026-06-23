@@ -5,6 +5,31 @@ import { esc, fotoMini, CAMPOS_SISTEMA_PEQUENO } from './utils.js';
 import { renderRecibos, renderAparatos, renderCargas } from './lev-consumo.js';
 import { icon } from './icons.js';
 
+// Sugerencia de potencia de generador a partir de datos que el técnico ya
+// captura (cargas críticas) — no pide nada nuevo, solo evita que calcule a
+// mano la tasa de recarga del banco. Heurística: recargar el consumo diario
+// de cargas críticas en ~8 horas, +1 kW de margen por cargas simultáneas.
+function _kwhDiaCargas(cargas) {
+  return (cargas || []).reduce((s, c) => s + (c.potencia * c.horas * (c.cantidad || 1) / 1000), 0);
+}
+function _sugerirGeneradorKw(lev) {
+  const kwhDia = _kwhDiaCargas(lev.cargasCriticas);
+  if (!kwhDia) return null;
+  const chargeRateKw = (kwhDia / 8) + 1;
+  if (chargeRateKw <= 6)  return '3-6';
+  if (chargeRateKw <= 12) return '6-12';
+  if (chargeRateKw <= 20) return '12-20';
+  return '+20';
+}
+function _genKwHint(lev, edit, selectId) {
+  const sugerido = _sugerirGeneradorKw(lev);
+  if (!edit || !sugerido || lev.generadorKw === sugerido) return '';
+  return `<button type="button" class="btn-outline btn-sm" style="margin-top:4px"
+            onclick="document.getElementById('${selectId}').value='${sugerido}'">
+            💡 Sugerido: ${sugerido} kW (según cargas críticas y recarga en ~8h)
+          </button>`;
+}
+
 export function renderCamposDinamicos(tipo, lev, edit, pid) {
   const dis = edit ? '' : 'disabled';
   if (tipo === 'interconectado' || tipo === 'hibrido' || tipo === 'hibrido_respaldo') {
@@ -100,6 +125,34 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
         </label>
         <div id="cargas-secundarias">${renderCargas(lev.cargasSecundarias||[],edit,'secundaria')}</div>
       </div>
+      ${(tipo === 'hibrido' || tipo === 'hibrido_respaldo') ? `
+      <div class="lev-sep"></div>
+      <div class="form-group"><label>Generador de respaldo</label>
+        <select name="generador" ${dis} onchange="toggleGenerador(this.value)">
+          <option ${!lev.generador?'selected':''} value="no">No</option>
+          <option ${lev.generador==='gasolina'?'selected':''} value="gasolina">Sí — Gasolina</option>
+          <option ${lev.generador==='diesel'?'selected':''} value="diesel">Sí — Diésel</option>
+          <option ${lev.generador==='gas'?'selected':''} value="gas">Sí — Gas LP</option>
+        </select>
+      </div>
+      <div id="gen-extra" style="${!lev.generador?'display:none':''}">
+        <div class="form-row">
+          <div class="form-group"><label>Arranque
+            <span class="form-hint">Automático = no necesitas estar para encenderlo cuando se va la luz</span>
+          </label>
+            <select name="generadorArranque" ${dis}>
+              <option ${lev.generadorArranque==='automatico'?'selected':''} value="automatico">Automático</option>
+              <option ${lev.generadorArranque==='manual'?'selected':''} value="manual">Manual</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Potencia (kW)</label>
+            <select name="generadorKw" id="gen-kw-hibrido" ${dis}>
+              <option value="">— Seleccionar —</option>
+              ${['3-6','6-12','12-20','+20'].map(t=>`<option ${lev.generadorKw===t?'selected':''}>${t}</option>`).join('')}
+            </select>
+            ${_genKwHint(lev, edit, 'gen-kw-hibrido')}</div>
+        </div>
+      </div>` : ''}
     </div>`;
   }
 
@@ -134,10 +187,11 @@ export function renderCamposDinamicos(tipo, lev, edit, pid) {
             </select>
           </div>
           <div class="form-group"><label>Potencia (kW)</label>
-            <select name="generadorKw" ${dis}>
+            <select name="generadorKw" id="gen-kw-aislado" ${dis}>
               <option value="">— Seleccionar —</option>
               ${['3-6','6-12','12-20','+20'].map(t=>`<option ${lev.generadorKw===t?'selected':''}>${t}</option>`).join('')}
-            </select></div>
+            </select>
+            ${_genKwHint(lev, edit, 'gen-kw-aislado')}</div>
         </div>
       </div>
       <div class="form-group"><label>Crecimiento futuro esperado <span class="req-badge">CRÍTICO</span></label>
