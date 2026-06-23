@@ -125,7 +125,11 @@ export async function renderDashboard(session, all, allUsers) {
   </div>
 
   <div id="projects-list">
-    ${renderProjectList(activos)}
+    ${(!activos.length && !navigator.onLine) ? `
+    <div class="empty-state">
+      <div class="empty-state-icon">📡</div>
+      <p class="empty-state-msg">Sin proyectos en caché local.<br>Conéctate a internet al menos una vez para sincronizarlos a este dispositivo.</p>
+    </div>` : renderProjectList(activos)}
   </div>
 
   ${isLider(session) ? `

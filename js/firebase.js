@@ -253,9 +253,17 @@ export const fbProjects = {
     return snap.docs.map(d => {
       const data = d.data();
       if ((data._v || 0) < SCHEMA_VERSION) {
-        const migrated = _migrateProject(data);
-        setDoc(doc(fbDB, 'projects', data.id), migrated).catch(() => {});
-        return migrated;
+        // Aislado por proyecto: si uno solo tiene una estructura vieja/inesperada
+        // que rompe la migración, no debe tumbar la lista completa — se muestra
+        // sin migrar en vez de desaparecer junto con todos los demás.
+        try {
+          const migrated = _migrateProject(data);
+          setDoc(doc(fbDB, 'projects', data.id), migrated).catch(() => {});
+          return migrated;
+        } catch (err) {
+          console.error('[getAll] Error migrando proyecto', data.id, err);
+          return data;
+        }
       }
       return data;
     });
