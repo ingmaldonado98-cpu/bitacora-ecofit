@@ -21,7 +21,7 @@ const _SITIOS_POR_BLOQUE = Object.entries(SITIO_BLOQUE_PRIMARIA).reduce((acc, [s
   return acc;
 }, {});
 
-const SITIO_LABEL = { techo: '🏠 Techo', centrosCarga: '⚡ Centros de carga', zonaDelSistema: '🔌 Zona del sistema' };
+const SITIO_LABEL = { techo: '📷 Cierre del sistema', centrosCarga: '⚡ Centros de carga', zonaDelSistema: '🔌 Zona del sistema' };
 
 // ── Vista principal — Progreso de obra ────────────────────────────────────────
 export async function renderDocumentacion(projectId, session) {

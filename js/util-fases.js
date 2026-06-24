@@ -136,3 +136,32 @@ export function calcFaseEstado(project) {
     audRequisito: 'Completa Garantía primero (foto del sistema + al menos un equipo o foto técnica).',
   };
 }
+
+// ── calcLevItems / calcLevPct — progreso del Levantamiento ────────────────────
+// Antes solo revisaba tipTecho/areasTecho (casi redundantes entre sí). Ahora
+// suma datos del inmueble y fotos del levantamiento siempre, más un hito
+// adicional según tipo de sistema — mismos campos que ya usa calcFaseEstado
+// para sus extraItems, para no inventar criterios nuevos de "completo".
+export function calcLevItems(doc, tipoSistema) {
+  const lev = doc?.levantamiento || {};
+  const levAreas = lev.areasTecho?.length || 0;
+  const items = [
+    { label: 'Tipo de techo',           ok: !!lev.tipTecho },
+    { label: `Áreas (${levAreas})`,     ok: levAreas > 0 },
+    { label: 'Datos del inmueble',      ok: !!lev.estadoInmueble },
+    { label: 'Fotos del levantamiento', ok: (lev.fotosLevantamiento?.length || 0) > 0 },
+  ];
+  if (!['sistema_pequeno', 'aislado', 'bombeo'].includes(tipoSistema)) {
+    items.push({ label: 'Datos eléctricos (servicio CFE)', ok: !!lev.tipoServicioCFE });
+  } else if (tipoSistema === 'aislado') {
+    items.push({ label: 'Autonomía y cargas', ok: !!(lev.autonomia && (lev.cargasCriticas?.length || 0) > 0) });
+  } else if (tipoSistema === 'bombeo') {
+    items.push({ label: 'Datos de bombeo', ok: !!(lev.tipoBomba && lev.caudal && lev.profundidadPozo) });
+  }
+  return items;
+}
+
+export function calcLevPct(doc, tipoSistema) {
+  const items = calcLevItems(doc, tipoSistema);
+  return Math.round(items.filter(i => i.ok).length / items.length * 100);
+}

@@ -18,7 +18,6 @@ const _lev = {
   aparatos:    [],
   cargas:      { critica: [], secundaria: [] },
   recibos:     [],
-  camposLibres:[],
   areasTecho:  [],
   pid:         '',
 };
@@ -40,7 +39,6 @@ function renderLevantamiento(project, tipo, edit) {
   }));
 
   // Reinicializar estado de módulo con datos del proyecto (evita estado stale entre navegaciones)
-  _lev.camposLibres = [...(lev.camposLibres || [])];
   _lev.cargas = {
     critica:    [...(lev.cargasCriticas    || [])],
     secundaria: [...(lev.cargasSecundarias || [])],
@@ -56,7 +54,6 @@ function renderLevantamiento(project, tipo, edit) {
                            lev.condicionesAmbientales?.length);
   const hasLogistica  = !!(lev.accesoTecho || lev.almacenamientoTemporal || lev.conectividadInversor || lev.logisticaNotas);
   const hasNotas      = !!(lev.observacionesGenerales);
-  const hasCamposLibres = _lev.camposLibres.length > 0;
 
   // Helper para wrapper de acordeón
   const acc = (id, title, emoji, open, content) => `
@@ -447,41 +444,12 @@ function renderLevantamiento(project, tipo, edit) {
       </div>
     `)}
 
-    ${acc('campos_libres', 'Campos libres', '➕', hasCamposLibres, `
-      <div id="campos-libres">
-        ${_lev.camposLibres.map((c,i) => `
-        <div class="campo-libre-row">
-          <input type="text" placeholder="Nombre" value="${esc(c.nombre||'')}" oninput="_lev.camposLibres[${i}].nombre=this.value" ${dis}/>
-          <input type="text" placeholder="Valor" value="${esc(c.valor||'')}" oninput="_lev.camposLibres[${i}].valor=this.value" ${dis}/>
-          ${edit ? `<button type="button" class="btn-del-sm" onclick="delCampoLibre(${i})">✕</button>` : ''}
-        </div>`).join('')}
-      </div>
-      ${edit ? `<button type="button" class="btn-outline btn-sm" onclick="addCampoLibre()">+ Agregar campo</button>` : ''}
-    `)}
-
     ${edit?`<div class="form-actions lev-actions">
       <span id="lev-autosave" class="autosave-indicator"></span>
       <button type="submit" class="btn-primary">Guardar levantamiento</button>
     </div>`:''}
   </form>`;
 }
-
-// ── Campos libres ─────────────────────────────────────────────────────────────
-// state en window._lev.camposLibres
-window.addCampoLibre = function() {
-  _lev.camposLibres.push({nombre:'',valor:''});
-  const el = document.getElementById('campos-libres');
-  const i = _lev.camposLibres.length - 1;
-  const div = document.createElement('div');
-  div.className = 'campo-libre-row';
-  div.innerHTML = `
-    <input type="text" placeholder="Nombre" oninput="_lev.camposLibres[${i}].nombre=this.value"/>
-    <input type="text" placeholder="Valor" oninput="_lev.camposLibres[${i}].valor=this.value"/>
-    <button type="button" class="btn-del-sm" onclick="delCampoLibre(${i})">✕</button>`;
-  el.appendChild(div);
-};
-window.updCampoLibre = function(i,k,v) { if(_lev.camposLibres[i]) _lev.camposLibres[i][k]=v; };
-window.delCampoLibre = function(i) { _lev.camposLibres.splice(i,1); navigate(window.location.hash); };
 
 // ── Levantamiento como vista standalone ────────────────────────────────────────
 export async function renderLevantamientoView(projectId, session) {

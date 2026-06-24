@@ -4,7 +4,7 @@
 import { projects, users } from './db.js';
 import { esc, fmtFecha, fmtFechaHora, fmtRelativa, uuid, isoNow, toast,
          ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog,
-         calcFaseEstado, countFotos } from './utils.js';
+         calcFaseEstado, countFotos, calcLevItems, calcLevPct } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } from './auth.js';
 import { icon } from './icons.js';
 import { renderFirmaBlock } from './proj-firmas.js';
@@ -47,7 +47,7 @@ export async function renderProjectDetail(id, session) {
   const _fT = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'techo',f),0);
   const _fC = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'centrosCarga',f),0);
   const _fZ = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'zonaDelSistema',f),0);
-  const levPct  = (_dDoc.levantamiento?.tipTecho || _dDoc.levantamiento?.areasTecho?.length) ? 100 : 0;
+  const levPct  = calcLevPct(_dDoc, project.tipoSistema);
   const _dItems = _esPeq ? [] : [_fT>0, _fC>0, _fZ>0];
   const docPct  = _dItems.length ? Math.round(_dItems.filter(Boolean).length / _dItems.length * 100) : 0;
   const _gItems = _esPeq
@@ -242,13 +242,8 @@ function renderModulosProgreso(project, id, session, admin) {
 
   const esPequenoTipo = project.tipoSistema === 'sistema_pequeno';
 
-  const levAreas = doc.levantamiento?.areasTecho?.length || 0;
-  const levItems = [
-    { label: 'Tipo de techo',             ok: !!(doc.levantamiento?.tipTecho) },
-    { label: `Áreas (${levAreas})`,       ok: levAreas > 0 },
-  ];
-  const levDone = levItems.filter(i=>i.ok).length;
-  const levPct  = Math.round(levDone / levItems.length * 100);
+  const levItems = calcLevItems(doc, project.tipoSistema);
+  const levPct   = calcLevPct(doc, project.tipoSistema);
 
   const docItems = esPequenoTipo
     ? []

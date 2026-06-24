@@ -93,7 +93,6 @@ window.guardarLevantamiento = async function(e, projectId) {
     almacenamientoTemporal:  fd.get('almacenamientoTemporal')  || null,
     conectividadInversor:    fd.get('conectividadInversor')    || null,
     logisticaNotas:          fd.get('logisticaNotas')           || '',
-    camposLibres:            window._lev.camposLibres || [],
   };
 
   if (tipo==='interconectado'||tipo==='hibrido'||tipo==='hibrido_respaldo') {
@@ -246,16 +245,30 @@ window._levAutoSave = function(projectId) {
   _levAutoSaveTimer = setTimeout(() => {
     const form = document.getElementById('form-levantamiento');
     if (!form) return;
-    const fakeEvent = new Event('submit');
-    fakeEvent._auto = true;
-    fakeEvent.preventDefault = () => {};
-    fakeEvent.target = form;
+    // Objeto plano, NO `new Event(...)` — `target` en un Event real es un
+    // accessor de solo lectura heredado de Event.prototype: asignarlo no
+    // tira error pero tampoco hace nada, así que e.target queda null y
+    // `new FormData(e.target)` truena dentro de guardarLevantamiento. Un
+    // objeto plano sí permite la propiedad `target` normal.
+    const fakeEvent = { target: form, preventDefault: () => {}, _auto: true };
     Promise.resolve(window.guardarLevantamiento(fakeEvent, projectId)).catch(() => {
       const ind = document.getElementById('lev-autosave');
       if (ind) { ind.textContent = '⚠ Error al guardar'; ind.className = 'autosave-indicator error'; }
     });
   }, 3000);
 };
+
+// Guardado forzado e inmediato del formulario abierto — se llama antes de
+// cualquier navigate() disparado por un handler de foto, para no perder lo
+// que el usuario haya escrito mientras la foto subía (el auto-guardado normal
+// tiene 3s de debounce y puede no haber corrido todavía).
+async function _saveLevFormNow(projectId) {
+  const form = document.getElementById('form-levantamiento');
+  if (!form) return;
+  clearTimeout(_levAutoSaveTimer);
+  const fakeEvent = { target: form, preventDefault: () => {}, _auto: true };
+  try { await window.guardarLevantamiento(fakeEvent, projectId); } catch (_) {}
+}
 
 window.capSombraFoto = function(pid) {
   capturePhoto(async b64 => {
@@ -268,6 +281,7 @@ window.capSombraFoto = function(pid) {
     p.documentacion.levantamiento.sombras.foto = result.url
       || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
     await projects.update(pid, { documentacion: p.documentacion });
+    await _saveLevFormNow(pid);
     navigate(`#proyecto/${pid}/documentacion`);
   }, { preview: true });
 };
@@ -275,6 +289,7 @@ window.delSombraFoto = async function(pid) {
   const p = await projects.getById(pid);
   p.documentacion.levantamiento.sombras.foto = null;
   await projects.update(pid, { documentacion: p.documentacion });
+  await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/documentacion`);
 };
 
@@ -288,6 +303,7 @@ window.capFotoMedidor = function(pid) {
     p.documentacion.levantamiento.fotoMedidor = result.url
       || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
     await projects.update(pid, { documentacion: p.documentacion });
+    await _saveLevFormNow(pid);
     navigate(`#proyecto/${pid}/levantamiento`);
   }, { preview: true });
 };
@@ -295,6 +311,7 @@ window.delFotoMedidor = async function(pid) {
   const p = await projects.getById(pid);
   p.documentacion.levantamiento.fotoMedidor = null;
   await projects.update(pid, { documentacion: p.documentacion });
+  await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/levantamiento`);
 };
 
@@ -342,6 +359,7 @@ window.capFotoLev = function(pid) {
     });
     p.documentacion.levantamiento.fotosLevantamiento = fotos;
     await projects.update(pid, { documentacion: p.documentacion });
+    await _saveLevFormNow(pid);
     navigate(`#proyecto/${pid}/levantamiento`);
   }, { preview: true });
 };
@@ -352,6 +370,7 @@ window.delFotoLev = async function(pid, idx) {
   fotos.splice(idx, 1);
   p.documentacion.levantamiento.fotosLevantamiento = fotos;
   await projects.update(pid, { documentacion: p.documentacion });
+  await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/levantamiento`);
 };
 
@@ -390,6 +409,7 @@ window.capFotoArea = function(pid, areaIdx) {
     }
     p.documentacion.levantamiento.areasTecho = areas;
     await projects.update(pid, { documentacion: p.documentacion });
+    await _saveLevFormNow(pid);
     if (fallo) {
       toast(`⚠ Se guardaron ${subidas} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
       navigate(`#proyecto/${pid}/levantamiento`);
@@ -409,5 +429,6 @@ window.delFotoArea = async function(pid, areaIdx, fotoIdx) {
   if (window._lev.areasTecho[areaIdx]?.fotos) window._lev.areasTecho[areaIdx].fotos.splice(fotoIdx, 1);
   p.documentacion.levantamiento.areasTecho = areas;
   await projects.update(pid, { documentacion: p.documentacion });
+  await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/levantamiento`);
 };

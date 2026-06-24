@@ -76,10 +76,16 @@ export function renderReferenciaIngenieria(project, bloque) {
 }
 
 // Sitio físico → bloque donde se documenta con fotos (evita repetir la misma
-// galería en más de una pestaña). El Bloque 2 (Cableado) no tiene galería
-// propia — se documenta con las fotos de techo ya mostradas en el Bloque 1.
+// galería en más de una pestaña). 'techo' aquí no son fotos del techo en sí
+// (no tiene slots propios en SLOTS_CIERRE_SITIO) sino la tarjeta de "Foto
+// general del sistema" + fotos adicionales de cierre — por eso vive en el
+// Bloque 3 (Cierre), igual que zonaDelSistema/centrosCarga. centrosCarga
+// además se repite filtrado en el Bloque 2 (ver documentacion.js, llamada
+// hardcodeada con bloqueFiltro=2 para sus slots de equipos). El Bloque 1 no
+// tiene galería propia — su evidencia sale del checklist por paso
+// (fotosCierre de cada bloque, ver _pasoCompleto más abajo).
 export const SITIO_BLOQUE_PRIMARIA = {
-  techo:          1,
+  techo:          3,
   zonaDelSistema: 3,
   centrosCarga:   3,
 };
