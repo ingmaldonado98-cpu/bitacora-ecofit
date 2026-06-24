@@ -116,6 +116,8 @@ export async function exportarBOMCalculadora() {
 <style>
   body { font-family: Calibri, 'Segoe UI', sans-serif; font-size: 11pt; color: #111827; margin: 24pt 32pt; line-height: 1.4; }
   h1, h2, h3 { font-family: Calibri, 'Segoe UI', sans-serif; }
+  table { table-layout: fixed; }
+  th, td { word-wrap: break-word; overflow-wrap: break-word; }
   img { max-width: 480pt; height: auto; }
   @page { margin: 1.5cm 2cm; }
 </style>

@@ -339,8 +339,8 @@ ${wCampo('Tipo de sistema', tipo?.label || project.tipoSistema)}
 <style>
   body { font-family: Calibri, 'Segoe UI', sans-serif; font-size: 11pt; color: #111827; margin: 24pt 32pt; line-height: 1.4; }
   h1, h2, h3 { font-family: Calibri, 'Segoe UI', sans-serif; }
-  table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
-  th { text-align: left; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0; table-layout: fixed; }
+  th, td { text-align: left; word-wrap: break-word; overflow-wrap: break-word; }
   img { max-width: 260pt; height: auto; }
   @page { margin: 1.5cm 2cm; }
 </style>

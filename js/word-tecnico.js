@@ -373,7 +373,8 @@ ${project.notas ? `<p style="margin:0 0 8pt"><small style="color:#78888c;text-tr
 <style>
   body { font-family: Calibri, 'Segoe UI', sans-serif; font-size: 11pt; color: #2d372d; margin: 24pt 32pt; line-height: 1.4; }
   h1, h2, h3 { font-family: Calibri, 'Segoe UI', sans-serif; }
-  table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0; table-layout: fixed; }
+  th, td { word-wrap: break-word; overflow-wrap: break-word; }
   img { max-width: 300pt; height: auto; }
   @page { margin: 1.5cm 2cm; }
 </style>
