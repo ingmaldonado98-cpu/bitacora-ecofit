@@ -7,13 +7,6 @@ import { esc, fotoMini, capturePhoto, toast, uuid,
          uploadProgressBar, getFotosTecnicas }         from './utils.js';
 import { uploadPhotoQueued }                           from './firebase.js';
 import { icon }                                        from './icons.js';
-import { SITIO_BLOQUE_PRIMARIA }                       from './doc-exec.js';
-
-// ── Mapeo sitio → tab ID — Progreso de obra navega por bloque, no por sitio,
-// así que el tab de cada sitio es el de su bloque primario (SITIO_BLOQUE_PRIMARIA).
-export const SITIO_TAB = Object.fromEntries(
-  Object.entries(SITIO_BLOQUE_PRIMARIA).map(([sitio, bloque]) => [sitio, `d-bloque${bloque}`])
-);
 
 // ── Slots técnicos de cierre por sitio ───────────────────────────────────────
 // `bloque` es solo de presentación: decide en qué pestaña de bloque se PINTA
@@ -151,8 +144,26 @@ function renderCierreSitio(project, sitio, edit, projectId, bloqueFiltro) {
   </div>`;
 }
 
-function _gotoCierre(sitio) {
-  sessionStorage.setItem('doc-tab-target', SITIO_TAB[sitio] || 'd-bloque1');
+// ── Refresco parcial tras una acción de foto — sin navigate() completo ───────
+// renderSitio() ya envuelve su salida en un <div id="sitio-cierre-{sitio}[-b{N}]">
+// (ver más abajo). documentacion.js siempre pasa el número de bloque actual
+// como bloqueFiltro al llamar renderSitio — incluso para 'techo', que solo
+// aparece en su bloque primario pero igual queda con sufijo (ej. "-b1"). Por
+// eso se prueban las 4 variantes posibles (1/2/3/sin sufijo) para cualquier
+// sitio y se omite la que no exista en el DOM. Un mismo sitio físico puede
+// aparecer repartido en más de un bloque (ej. centrosCarga en Bloque 2 Y
+// Bloque 3, cada uno con su propio filtro de slots). Estos handlers escriben
+// en garantia.* — una ruta de datos separada de checklistData.fotosCierre.*
+// (de donde salen los badges de % de los tabs de bloque), así que no hace
+// falta recalcular ningún badge aquí.
+async function _refreshSitioCierre(projectId, sitio) {
+  const p = await projects.getById(projectId);
+  if (!p) return;
+  for (const b of [1, 2, 3, undefined]) {
+    const id = `sitio-cierre-${sitio}${b != null ? '-b' + b : ''}`;
+    const el = document.getElementById(id);
+    if (el) el.outerHTML = renderSitio(p, sitio, true, projectId, b);
+  }
 }
 
 // ── Handlers de fotos de cierre (guardan en garantia.*) ──────────────────────
@@ -166,8 +177,7 @@ window.capFotoSistemaDoc = function(projectId) {
       // setField puntual en vez de getById+update completo — evita pisar cambios
       // de otro técnico editando el mismo proyecto al mismo tiempo.
       await projects.setField(projectId, 'garantia.fotoSistema', fotoSistema);
-      _gotoCierre('techo');
-      navigate(`#proyecto/${projectId}/documentacion`);
+      await _refreshSitioCierre(projectId, 'techo');
       if (!result.pending) toast('✅ Foto guardada');
     } catch (err) {
       console.error('capFotoSistemaDoc error:', err);
@@ -179,8 +189,7 @@ window.capFotoSistemaDoc = function(projectId) {
 window.delFotoSistemaDoc = async function(projectId) {
   if (!await confirmDialog('¿Eliminar foto del sistema?')) return;
   await projects.setField(projectId, 'garantia.fotoSistema', null);
-  _gotoCierre('techo');
-  navigate(`#proyecto/${projectId}/documentacion`);
+  await _refreshSitioCierre(projectId, 'techo');
 };
 
 window.capFotoTecnicaDoc = function(projectId, key) {
@@ -216,12 +225,11 @@ window.capFotoTecnicaDoc = function(projectId, key) {
     // puntual en la clave exacta, no pisa el resto de garantia.fotosTecnicas
     // ni otros campos editados por otro técnico al mismo tiempo.
     await projects.setField(projectId, `garantia.fotosTecnicas.${key}`, existentes);
+    await _refreshSitioCierre(projectId, _sitioForFTKey(key));
     if (fallo) {
       toast(`⚠ Se guardaron ${subidas} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
       return;
     }
-    _gotoCierre(_sitioForFTKey(key));
-    navigate(`#proyecto/${projectId}/documentacion`);
     toast(`✅ ${total} foto${total > 1 ? 's' : ''} guardada${total > 1 ? 's' : ''}`);
   }, { multiple: true });
 };
@@ -233,8 +241,7 @@ window.delFotoTecnicaDoc = async function(projectId, key, idx) {
   const fotos = typeof v === 'string' ? [{ url: v, id: 'legacy' }] : (Array.isArray(v) ? v : []);
   fotos.splice(idx, 1);
   await projects.setField(projectId, `garantia.fotosTecnicas.${key}`, fotos.length ? fotos : null);
-  _gotoCierre(_sitioForFTKey(key));
-  navigate(`#proyecto/${projectId}/documentacion`);
+  await _refreshSitioCierre(projectId, _sitioForFTKey(key));
 };
 
 window.capFotoAdicionalDoc = function(projectId) {
@@ -266,12 +273,11 @@ window.capFotoAdicionalDoc = function(projectId) {
     const p = await projects.getById(projectId);
     const fotosAdicionales = [...(p.garantia?.fotosAdicionales || []), ...nuevas];
     await projects.setField(projectId, 'garantia.fotosAdicionales', fotosAdicionales);
+    await _refreshSitioCierre(projectId, 'techo');
     if (fallo) {
       toast(`⚠ Se guardaron ${nuevas.length} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
       return;
     }
-    _gotoCierre('techo');
-    navigate(`#proyecto/${projectId}/documentacion`);
     toast(`✅ ${total} foto${total > 1 ? 's guardadas' : ' guardada'}`);
   }, { multiple: true });
 };
@@ -282,8 +288,7 @@ window.delFotoAdicionalDoc = async function(projectId, idx) {
   const fotosAdicionales = [...(p.garantia?.fotosAdicionales || [])];
   fotosAdicionales.splice(idx, 1);
   await projects.setField(projectId, 'garantia.fotosAdicionales', fotosAdicionales);
-  _gotoCierre('techo');
-  navigate(`#proyecto/${projectId}/documentacion`);
+  await _refreshSitioCierre(projectId, 'techo');
 };
 
 window.editFotoAdicionalDoc = async function(projectId, idx) {
@@ -294,8 +299,7 @@ window.editFotoAdicionalDoc = async function(projectId, idx) {
   if (nueva === null) return;
   fotosAdicionales[idx] = { ...fotosAdicionales[idx], nota: nueva };
   await projects.setField(projectId, 'garantia.fotosAdicionales', fotosAdicionales);
-  _gotoCierre('techo');
-  navigate(`#proyecto/${projectId}/documentacion`);
+  await _refreshSitioCierre(projectId, 'techo');
 };
 
 // ── Acordeón helper ───────────────────────────────────────────────────────────
@@ -311,6 +315,7 @@ window.toggleAcc = function(btn, bodyId) {
 // técnicos nombrados de renderCierreSitio, y obligaba a un clic extra para
 // llegar a la evidencia real).
 export function renderSitio(project, sitio, edit, projectId, bloqueFiltro) {
-  return renderCierreSitio(project, sitio, edit, projectId, bloqueFiltro);
+  const id = `sitio-cierre-${sitio}${bloqueFiltro != null ? '-b' + bloqueFiltro : ''}`;
+  return `<div id="${id}">${renderCierreSitio(project, sitio, edit, projectId, bloqueFiltro)}</div>`;
 }
 
