@@ -2,7 +2,7 @@
 // ⚠ Cambiar BUILD_DATE y CACHE_NAME en cada deploy para invalidar caché
 const BUILD_DATE  = '2026-06-25';
 const CACHE_NAME  = 'ecofit-v6-v165';
-const SW_VERSION  = '6.77.0';
+const SW_VERSION  = '6.77.1';
 
 const APP_SHELL = [
   './',

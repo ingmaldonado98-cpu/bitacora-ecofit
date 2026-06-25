@@ -891,7 +891,7 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; cursor: not-al
 .chip-sm { padding: 4px 10px; font-size: .75rem; }
 
 .check-chip {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 100%;
   background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
   padding: 7px 12px; font-size: .82rem; color: var(--text-muted);
   cursor: pointer; transition: all .15s;

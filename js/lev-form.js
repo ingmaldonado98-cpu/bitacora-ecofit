@@ -51,7 +51,9 @@ function renderLevantamiento(project, tipo, edit) {
                            lev.autonomia || lev.cargasCriticas?.length ||
                            lev.voltajeSistemaDC || lev.tipoControlador || lev.bateria);
   const hasSombras    = !!(lev.sombras?.checklist?.length || lev.sombras?.foto || lev.sombras?.notas ||
-                           lev.condicionesAmbientales?.length);
+                           lev.condicionesAmbientales?.length || lev.sunSeeker?.length);
+  const _dronCount    = ['antes','cierre'].reduce((s,f)=>s+((lev.dron?.[f]?.fotos?.length||0)+(lev.dron?.[f]?.videos?.length||0)),0);
+  const hasDron       = _dronCount > 0;
   const hasLogistica  = !!(lev.accesoTecho || lev.almacenamientoTemporal || lev.conectividadInversor || lev.logisticaNotas);
   const hasNotas      = !!(lev.observacionesGenerales);
 
@@ -239,6 +241,21 @@ function renderLevantamiento(project, tipo, edit) {
             </label>`).join('')}
         </div>
       </div>
+      <div class="form-group" style="margin-top:8px">
+        <label>☀️ Sun Seeker <span class="form-hint">capturas de la trayectoria solar (invierno / verano)</span></label>
+        <div class="ft-slot" style="flex-wrap:wrap;gap:6px">
+          ${(lev.sunSeeker||[]).map((f,i)=>
+            `<div class="lev-area-foto-wrap">
+              ${fotoMini(f.url||f, f.etiqueta||'Sun Seeker')}
+              ${f.etiqueta?`<span class="foto-nota">${esc(f.etiqueta)}</span>`:''}
+              ${edit?`<button type="button" class="btn-del-foto" onclick="delSunSeeker('${pid}',${i})">✕</button>`:''}
+            </div>`).join('')}
+          ${edit?`
+            <button type="button" class="btn-foto-sm" onclick="capSunSeeker('${pid}','Invierno')">${icon('camera')} Invierno</button>
+            <button type="button" class="btn-foto-sm" onclick="capSunSeeker('${pid}','Verano')">${icon('camera')} Verano</button>
+          `:''}
+        </div>
+      </div>
       <details class="pd-details" ${lev.restricciones ? 'open' : ''}>
         <summary>Restricciones especiales <span class="pd-caret">▾</span></summary>
         <div class="pd-body">
@@ -250,6 +267,31 @@ function renderLevantamiento(project, tipo, edit) {
           </div>
         </div>
       </details>
+    `)}
+
+    ${acc('dron', 'Tomas con dron', '🚁', hasDron, `
+      <p class="form-hint" style="margin:0 0 8px">Foto y video aéreo del sitio — fase inicial (antes) y de cierre. El video se sube solo con conexión (máx. 60 MB); las fotos también funcionan offline.</p>
+      ${['antes','cierre'].map(fase => {
+        const faseLabel = fase==='antes' ? '📍 Antes (levantamiento)' : '✅ Cierre (obra terminada)';
+        const d = (lev.dron && lev.dron[fase]) || { fotos:[], videos:[] };
+        return `
+        <div class="form-group" style="margin-top:4px">
+          <label>${faseLabel}</label>
+          <div class="ft-slot" style="flex-wrap:wrap;gap:6px">
+            ${(d.fotos||[]).map((f,i)=>
+              `<div class="lev-area-foto-wrap">${fotoMini(f.url||f,'Dron')}${edit?`<button type="button" class="btn-del-foto" onclick="delDronMedia('${pid}','${fase}','fotos',${i})">✕</button>`:''}</div>`).join('')}
+            ${(d.videos||[]).map((v,i)=>
+              `<div class="lev-area-foto-wrap dron-video-wrap">
+                <a href="${v.url}" target="_blank" rel="noopener" class="btn-foto-sm" style="text-decoration:none">🎥 Video ${i+1}</a>
+                ${edit?`<button type="button" class="btn-del-foto" onclick="delDronMedia('${pid}','${fase}','videos',${i})">✕</button>`:''}
+              </div>`).join('')}
+            ${edit?`
+              <button type="button" class="btn-foto-sm" onclick="capDronFoto('${pid}','${fase}')">${icon('camera')} Foto</button>
+              <button type="button" class="btn-foto-sm" onclick="capDronVideo('${pid}','${fase}')">🎥 Video</button>
+            `:''}
+          </div>
+        </div>`;
+      }).join('')}
     `)}
 
     ${/* Eléctrico y consumo — no aplica para 'otro'. Sistema pequeño usa solo el bloque DC (dinamico) */

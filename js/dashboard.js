@@ -291,7 +291,7 @@ function projectCard(p) {
                  : prog.pct < 67 ? 'var(--solar)'
                  : prog.pct < 100 ? 'var(--g300)' : 'var(--accent)';
 
-  const faseDoc = prog.docPct === 100 ? 'Doc ✓' : `Doc ${prog.docPct}%`;
+  const faseDoc = prog.docPct === 100 ? 'Obra ✓' : `Obra ${prog.docPct}%`;
   const faseGar = prog.garEstado === 'bloqueada' ? 'Gar —'
                 : prog.garPct === 100 ? 'Gar ✓' : `Gar ${prog.garPct}%`;
   const faseAud = prog.audPct === null ? null

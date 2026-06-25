@@ -2,10 +2,10 @@
 // Extraído de documentacion.js — accede a window._lev (expuesto por documentacion.js)
 
 import { projects, logChange } from './db.js';
-import { toast, isoNow, genDisplayId, capturePhoto, uuid, uploadProgressBar, confirmDialog } from './utils.js';
+import { toast, isoNow, genDisplayId, capturePhoto, captureVideo, uuid, uploadProgressBar, confirmDialog } from './utils.js';
 import { getSession } from './auth.js';
 import { calcVocPuro } from './garantia.js';
-import { uploadPhotoQueued } from './firebase.js';
+import { uploadPhotoQueued, uploadVideo } from './firebase.js';
 import { _sujecionPorTecho } from './lev-areas.js';
 import { getTotalPanels } from '../modules/calculadora/index.js';
 
@@ -86,6 +86,8 @@ window.guardarLevantamiento = async function(e, projectId) {
     sombras:             { checklist:sombrasChecklist, foto:lev.sombras?.foto||null, notas:fd.get('sombraNotas')||'' },
     condicionesAmbientales: condiciones,
     fotosLevantamiento:  lev.fotosLevantamiento || [],
+    sunSeeker:           lev.sunSeeker || [],
+    dron:                lev.dron || null,
     observacionesGenerales: fd.get('observacionesGenerales') || '',
     restricciones:          fd.get('restricciones') || '',
     horarioUso:             fd.get('horarioUso') || null,
@@ -369,6 +371,101 @@ window.delFotoLev = async function(pid, idx) {
   const fotos = p.documentacion?.levantamiento?.fotosLevantamiento || [];
   fotos.splice(idx, 1);
   p.documentacion.levantamiento.fotosLevantamiento = fotos;
+  await projects.update(pid, { documentacion: p.documentacion });
+  await _saveLevFormNow(pid);
+  navigate(`#proyecto/${pid}/levantamiento`);
+};
+
+// ── Sun Seeker — capturas de trayectoria solar (imágenes) ─────────────────────
+window.capSunSeeker = function(pid, etiqueta) {
+  capturePhoto(async b64 => {
+    toast('Subiendo captura Sun Seeker…');
+    const fid = uuid();
+    const result = await uploadPhotoQueued(b64, `projects/${pid}/sunseeker_${fid}.jpg`, pid, 'sunSeeker', { itemId: fid });
+    const p = await projects.getById(pid);
+    p.documentacion = p.documentacion || {};
+    p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+    const arr = p.documentacion.levantamiento.sunSeeker || [];
+    arr.push({
+      url: result.url || null, id: fid, etiqueta: etiqueta || 'General', createdAt: isoNow(),
+      ...(result.pending && { pending: true, pendingId: result.pendingId }),
+    });
+    p.documentacion.levantamiento.sunSeeker = arr;
+    await projects.update(pid, { documentacion: p.documentacion });
+    await _saveLevFormNow(pid);
+    navigate(`#proyecto/${pid}/levantamiento`);
+  }, { preview: true });
+};
+window.delSunSeeker = async function(pid, idx) {
+  const p = await projects.getById(pid);
+  const arr = p.documentacion?.levantamiento?.sunSeeker || [];
+  arr.splice(idx, 1);
+  p.documentacion.levantamiento.sunSeeker = arr;
+  await projects.update(pid, { documentacion: p.documentacion });
+  await _saveLevFormNow(pid);
+  navigate(`#proyecto/${pid}/levantamiento`);
+};
+
+// ── Dron — fotos (cola offline) y videos (directo a Storage, solo online) ─────
+function _ensureDron(lev) {
+  lev.dron = lev.dron || {};
+  for (const fase of ['antes', 'cierre']) {
+    lev.dron[fase] = lev.dron[fase] || { fotos: [], videos: [] };
+    lev.dron[fase].fotos  = lev.dron[fase].fotos  || [];
+    lev.dron[fase].videos = lev.dron[fase].videos || [];
+  }
+  return lev.dron;
+}
+
+window.capDronFoto = function(pid, fase) {
+  capturePhoto(async b64 => {
+    toast('Subiendo foto de dron…');
+    const fid = uuid();
+    const result = await uploadPhotoQueued(b64, `projects/${pid}/dron_${fase}_${fid}.jpg`, pid, 'dronFoto', { fase, itemId: fid });
+    const p = await projects.getById(pid);
+    p.documentacion = p.documentacion || {};
+    p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+    const dron = _ensureDron(p.documentacion.levantamiento);
+    dron[fase].fotos.push({
+      url: result.url || null, id: fid, createdAt: isoNow(),
+      ...(result.pending && { pending: true, pendingId: result.pendingId }),
+    });
+    await projects.update(pid, { documentacion: p.documentacion });
+    await _saveLevFormNow(pid);
+    navigate(`#proyecto/${pid}/levantamiento`);
+  }, { preview: true });
+};
+
+window.capDronVideo = function(pid, fase) {
+  if (!navigator.onLine) { toast('Sin conexión — conéctate para subir el video de dron.', 'error', 6000); return; }
+  captureVideo(async file => {
+    const prog = uploadProgressBar(1);
+    prog.update(1);
+    try {
+      const fid = uuid();
+      const url = await uploadVideo(file, `projects/${pid}/dron_${fase}_${fid}.mp4`);
+      const p = await projects.getById(pid);
+      p.documentacion = p.documentacion || {};
+      p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+      const dron = _ensureDron(p.documentacion.levantamiento);
+      dron[fase].videos.push({ url, id: fid, createdAt: isoNow() });
+      await projects.update(pid, { documentacion: p.documentacion });
+      await _saveLevFormNow(pid);
+      prog.done();
+      toast('✅ Video de dron subido');
+      navigate(`#proyecto/${pid}/levantamiento`);
+    } catch (err) {
+      prog.done();
+      throw err; // captureVideo muestra el toast adecuado (offline / error)
+    }
+  });
+};
+
+window.delDronMedia = async function(pid, fase, tipo, idx) {
+  if (!await confirmDialog('¿Eliminar este archivo de dron?')) return;
+  const p = await projects.getById(pid);
+  const dron = _ensureDron(p.documentacion?.levantamiento || (p.documentacion = p.documentacion || {}, p.documentacion.levantamiento = p.documentacion.levantamiento || {}));
+  (dron[fase]?.[tipo] || []).splice(idx, 1);
   await projects.update(pid, { documentacion: p.documentacion });
   await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/levantamiento`);

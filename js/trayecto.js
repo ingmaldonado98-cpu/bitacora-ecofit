@@ -6,6 +6,15 @@ import { esc, calcFaseEstado } from './utils.js';
 import { canEdit } from './auth.js';
 import { icon } from './icons.js';
 import { getSerialesFlat } from './gar-paneles.js';
+import { getExecBlocks, BLOQUE_LABELS, BLOQUE_DESC } from '../modules/checklist/index.js';
+import { computeBloqueStatus } from './doc-exec.js';
+
+// Navega a un paso; si lleva tab de bloque, lo deja seleccionado en Progreso de
+// obra (documentacion.js lee 'doc-tab-target' tras renderizar).
+window.trIr = function(link, tab) {
+  if (tab) sessionStorage.setItem('doc-tab-target', tab);
+  navigate(link);
+};
 
 // ── Definición de pasos ──────────────────────────────────────────────────────
 function buildPasos(project, id) {
@@ -15,17 +24,6 @@ function buildPasos(project, id) {
   const ft  = gar.fotosTecnicas || {};
   const lev = doc.levantamiento || {};
   const esPequeno = project.tipoSistema === 'sistema_pequeno';
-
-  // Conteo de fotos por sitio
-  const _fc = (sitio, sub) => {
-    const n = doc.fases?.[sitio]?.[sub]?.length || 0;
-    if (n > 0) return n;
-    if (sitio === 'techo') { const m={antes:'antes',durante:'durante',cierre:'despues'}; return doc.fases?.[m[sub]]?.length||0; }
-    return 0;
-  };
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('techo',f),0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('centrosCarga',f),0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+_fc('zonaDelSistema',f),0);
 
   // Fotos por área
   const areas = lev.areasTecho || [];
@@ -40,6 +38,11 @@ function buildPasos(project, id) {
   const clExec    = Object.values(cl.exec || {}).filter(Boolean).length;
   const clHerr    = Object.values(cl.herr || {}).filter(Boolean).length;
   const checkDone = clExec + clHerr;
+
+  // Progreso real por bloque de ejecución (mismo cálculo que Progreso de obra)
+  const techo          = project.projectConfig?.techo || cl.techo || 'cemento';
+  const allExecBlocks  = getExecBlocks(project, techo);
+  const bloqueStatus   = computeBloqueStatus(allExecBlocks, cl);
 
   const pasos = [];
 
@@ -67,41 +70,45 @@ function buildPasos(project, id) {
     });
   }
 
+  // Helper para un paso ligado a un bloque de Progreso de obra
+  const _bloquePaso = (n, emoji) => {
+    const s = bloqueStatus[n] || { done: 0, total: 0 };
+    const ok = s.total > 0 && s.done === s.total;
+    return {
+      id:    `bloque${n}`,
+      emoji,
+      titulo: `${BLOQUE_LABELS[n]} — ${BLOQUE_DESC[n]}`,
+      desc:   `Ejecuta y documenta el ${BLOQUE_LABELS[n].toLowerCase()} (checklist + evidencias de cierre).`,
+      ok,
+      link:  `#proyecto/${id}/documentacion`,
+      tab:   `d-bloque${n}`,
+      hint:  s.total > 0 ? `${s.done}/${s.total} ítems` : 'Sin ítems en este bloque',
+    };
+  };
+
   if (!esPequeno) {
-    // ── Paso 3: Fotos techo ──────────────────────────────────────────────────
+    // ── Paso 3: Bloque 1 — Estructura, Anclaje y Canalización FV ──────────────
+    pasos.push(_bloquePaso(1, '🏗️'));
+
+    // ── Trayectorias de canalización (parte del Bloque 1) ────────────────────
+    const nTray = (project.trayectorias || []).length;
     pasos.push({
-      id:       'fotos-techo',
-      emoji:    '🏗️',
-      titulo:   'Fotos del techo',
-      desc:     'Antes, Durante y Cierre del techo principal.',
-      ok:       fTecho > 0,
-      link:     `#proyecto/${id}/documentacion`,
-      hint:     fTecho > 0 ? `${fTecho} foto${fTecho!==1?'s':''}` : 'Sin fotos del techo',
+      id:       'trayectorias',
+      emoji:    '🔌',
+      titulo:   'Trayectorias de cable',
+      desc:     'Documenta los recorridos físicos de cable: tipo de conduit, calibre y longitud por tramo.',
+      ok:       nTray > 0,
+      link:     `#proyecto/${id}/trayectorias`,
+      hint:     nTray > 0 ? `${nTray} tramo${nTray !== 1 ? 's' : ''} registrado${nTray !== 1 ? 's' : ''}` : 'Sin trayectorias registradas',
     });
 
-    // ── Paso 4: Centros de carga ─────────────────────────────────────────────
-    pasos.push({
-      id:       'fotos-centros',
-      emoji:    '⚡',
-      titulo:   'Fotos centros de carga',
-      desc:     'Antes, Durante y Cierre del tablero y centros de carga.',
-      ok:       fCentros > 0,
-      link:     `#proyecto/${id}/documentacion`,
-      hint:     fCentros > 0 ? `${fCentros} foto${fCentros!==1?'s':''}` : 'Sin fotos de centros de carga',
-    });
+    // ── Paso 4: Bloque 2 — Canalización Central y Montaje de Equipos ──────────
+    pasos.push(_bloquePaso(2, '⚡'));
 
-    // ── Paso 5: Zona del sistema ─────────────────────────────────────────────
-    pasos.push({
-      id:       'fotos-zona',
-      emoji:    '🔆',
-      titulo:   'Fotos zona del sistema',
-      desc:     'Antes, Durante y Cierre del área donde se instala el inversor y sistema.',
-      ok:       fZona > 0,
-      link:     `#proyecto/${id}/documentacion`,
-      hint:     fZona > 0 ? `${fZona} foto${fZona!==1?'s':''}` : 'Sin fotos de la zona',
-    });
+    // ── Paso 5: Bloque 3 — Cableado, Paneles y Cierre ────────────────────────
+    pasos.push(_bloquePaso(3, '🔆'));
 
-    // ── Paso 6: Checklist ────────────────────────────────────────────────────
+    // ── Paso 6: Checklist (herramienta / consumibles / guía) ─────────────────
     pasos.push({
       id:       'checklist',
       emoji:    '✅',
@@ -112,19 +119,19 @@ function buildPasos(project, id) {
       hint:     cl.publishedAt ? 'Aprobado y publicado'
               : checkDone > 0 ? `${checkDone} ítems verificados` : 'Sin verificar aún',
     });
+  } else {
+    // Sistema pequeño: no usa los 3 bloques de ejecución, pero sí trayectorias
+    const nTray = (project.trayectorias || []).length;
+    pasos.push({
+      id:       'trayectorias',
+      emoji:    '🔌',
+      titulo:   'Trayectorias de cable',
+      desc:     'Documenta los recorridos físicos de cable: tipo de conduit, calibre y longitud por tramo.',
+      ok:       nTray > 0,
+      link:     `#proyecto/${id}/trayectorias`,
+      hint:     nTray > 0 ? `${nTray} tramo${nTray !== 1 ? 's' : ''} registrado${nTray !== 1 ? 's' : ''}` : 'Sin trayectorias registradas',
+    });
   }
-
-  // ── Paso 7: Trayectorias de canalización ──────────────────────────────────
-  const nTray = (project.trayectorias || []).length;
-  pasos.push({
-    id:       'trayectorias',
-    emoji:    '🔌',
-    titulo:   'Trayectorias de cable',
-    desc:     'Documenta los recorridos físicos de cable: tipo de conduit, calibre y longitud por tramo.',
-    ok:       nTray > 0,
-    link:     `#proyecto/${id}/trayectorias`,
-    hint:     nTray > 0 ? `${nTray} tramo${nTray !== 1 ? 's' : ''} registrado${nTray !== 1 ? 's' : ''}` : 'Sin trayectorias registradas',
-  });
 
   // ── Paso 8: Foto del sistema ───────────────────────────────────────────────
   pasos.push({
@@ -231,7 +238,7 @@ export async function renderTrayecto(projectId, session) {
     ${pasos.map((paso, i) => {
       const esCurrent = !todoListo && i === primerPend;
       // Pendientes no actuales: tarjeta compacta tappable (saltable sin fricción)
-      const headClick = !esCurrent && !paso.ok ? ` onclick="navigate('${paso.link}')"` : '';
+      const headClick = !esCurrent && !paso.ok ? ` onclick="trIr('${paso.link}', '${paso.tab || ''}')"` : '';
       return `
     <div class="tr-paso ${paso.ok ? 'tr-paso-ok' : ''} ${esCurrent ? 'tr-paso-current' : ''} ${headClick ? 'tr-paso-tap' : ''}"
          id="tr-paso-${paso.id}"${headClick}>
@@ -251,7 +258,7 @@ export async function renderTrayecto(projectId, session) {
       <div class="tr-paso-body">
         <p class="tr-paso-desc">${esc(paso.desc)}</p>
         <div class="tr-paso-actions">
-          <button class="btn-primary tr-ir-btn" onclick="navigate('${paso.link}')">
+          <button class="btn-primary tr-ir-btn" onclick="trIr('${paso.link}', '${paso.tab || ''}')">
             Ir a este paso ${icon('arrow-right', 14)}
           </button>
         </div>

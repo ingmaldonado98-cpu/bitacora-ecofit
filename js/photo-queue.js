@@ -268,6 +268,29 @@ export async function processQueue() {
           break;
         }
 
+        case 'sunSeeker': {
+          const { itemId } = item.opArgs || {};
+          p.documentacion = p.documentacion || {};
+          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+          const arr = p.documentacion.levantamiento.sunSeeker || [];
+          const f = arr.find(x => x.id === itemId);
+          if (f) { f.url = url; delete f.pending; delete f.pendingId; }
+          p.documentacion.levantamiento.sunSeeker = arr;
+          await projects.update(item.projectId, { documentacion: p.documentacion });
+          break;
+        }
+
+        case 'dronFoto': {
+          const { fase, itemId } = item.opArgs || {};
+          p.documentacion = p.documentacion || {};
+          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
+          const dron = p.documentacion.levantamiento.dron;
+          const f = dron?.[fase]?.fotos?.find(x => x.id === itemId);
+          if (f) { f.url = url; delete f.pending; delete f.pendingId; }
+          await projects.update(item.projectId, { documentacion: p.documentacion });
+          break;
+        }
+
         case 'fotoCierrePaso': {
           const { blockId, slotId } = item.opArgs || {};
           p.checklistData = p.checklistData || {};

@@ -164,6 +164,39 @@ function _launchPhotoInput(fuente, callback, { multiple = false, projectId, fase
   input.click();
 }
 
+// ── Captura de video (Dron) ─────────────────────────────────────────────────
+// A diferencia de las fotos, el video NO se comprime en canvas ni se encola en
+// IndexedDB (sería demasiado pesado); se entrega el File crudo al callback, que
+// lo sube directo a Storage solo con conexión. Cap de tamaño para no reventar
+// el almacenamiento con clips largos.
+export const MAX_VIDEO_MB = 60;
+export function captureVideo(callback, { capture = false } = {}) {
+  const input = document.createElement('input');
+  input.type   = 'file';
+  input.accept = 'video/*';
+  if (capture) input.capture = 'environment';
+  input.onchange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const mb = file.size / (1024 * 1024);
+    if (mb > MAX_VIDEO_MB) {
+      toast(`El video pesa ${mb.toFixed(0)} MB — máximo ${MAX_VIDEO_MB} MB. Graba un clip más corto.`, 'error', 6000);
+      return;
+    }
+    try {
+      await callback(file);
+    } catch (err) {
+      if (err.code === 'offline') {
+        toast('Sin conexión — conéctate para subir el video.', 'error', 6000);
+      } else {
+        console.error('captureVideo error:', err);
+        toast('No se pudo subir el video: ' + (err.message || 'intenta de nuevo'), 'error', 6000);
+      }
+    }
+  };
+  input.click();
+}
+
 // Preview de confirmación antes de aceptar la foto (uso interno)
 function _showPhotoPreview(b64, onConfirm, onRetake) {
   const ov = document.createElement('div');

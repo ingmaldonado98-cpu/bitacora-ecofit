@@ -7,7 +7,7 @@ import { canEdit, isAdmin, getSession } from './auth.js';
 import { icon } from './icons.js';
 import { renderFirmaBlock } from './project.js';
 import { renderVocTab, vocEstaDesactualizado } from './gar-voc.js';
-import { renderEquipos, formEquipo, _clearEqFotos } from './gar-equipos.js';
+import { renderEquipos, formEquipo, _clearEqFotos, renderEquiposSugeridos } from './gar-equipos.js';
 import { renderEstructura } from './gar-estructura.js';
 import { renderPaneles } from './gar-paneles.js';
 import './pdf-garantia.js'; // registra window.exportarCertificadoGarantia
@@ -71,6 +71,7 @@ export async function renderGarantia(projectId, session) {
       <h3 class="card-title">Equipos instalados (${(g.equipos||[]).length})</h3>
       ${edit ? `<button class="btn-primary btn-sm" onclick="showFormEquipo('${projectId}')">+ Equipo</button>` : ''}
     </div>
+    ${renderEquiposSugeridos(project, projectId, edit)}
     <div id="lista-equipos">
       ${renderEquipos(g.equipos || [], projectId, edit, isAdmin(session))}
     </div>

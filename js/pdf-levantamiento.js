@@ -104,6 +104,32 @@ window.exportarWordLevantamiento = async function(projectId) {
     }
   }
 
+  // Sun Seeker
+  if (lev.sunSeeker?.length) {
+    addSec('Sun Seeker — trayectoria solar');
+    for (const f of lev.sunSeeker) {
+      const img = await fotoToImageBuffer(f, 350);
+      children.push(...imageBlock(img, f.etiqueta || 'Sun Seeker'));
+    }
+  }
+
+  // Dron — fotos (los videos no se incrustan en Word; se indica el conteo)
+  const dron = lev.dron || {};
+  const dronTieneAlgo = ['antes', 'cierre'].some(fa => (dron[fa]?.fotos?.length || 0) + (dron[fa]?.videos?.length || 0) > 0);
+  if (dronTieneAlgo) {
+    addSec('Tomas con dron');
+    for (const [fase, faseLabel] of [['antes', 'Antes (levantamiento)'], ['cierre', 'Cierre (obra terminada)']]) {
+      const d = dron[fase] || {};
+      if (!((d.fotos?.length || 0) + (d.videos?.length || 0))) continue;
+      children.push(p(faseLabel, { bold: true, color: VERDE }));
+      for (const f of (d.fotos || [])) {
+        const img = await fotoToImageBuffer(f, 350);
+        children.push(...imageBlock(img, 'Dron'));
+      }
+      if (d.videos?.length) children.push(p(`🎥 ${d.videos.length} video${d.videos.length > 1 ? 's' : ''} de dron (ver en la app)`, { size: 18, color: '6b7280' }));
+    }
+  }
+
   // Sombras
   const sombras = lev.sombras || {};
   if (sombras.checklist?.length || sombras.foto || sombras.notas) {

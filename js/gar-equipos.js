@@ -3,7 +3,7 @@
 
 import { projects, logChange } from './db.js';
 import { esc, fotoMini, capturePhoto, toast, confirmDialog, inputDialog, uuid, isoNow,
-         fmtFechaHora, MARCAS_EQUIPOS, openScannerOverlay } from './utils.js';
+         fmtFechaHora, MARCAS_EQUIPOS, TIPOS_SISTEMA, openScannerOverlay } from './utils.js';
 import { getSession } from './auth.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { updateQueueItem } from './photo-queue.js';
@@ -30,6 +30,93 @@ export function _clearEqFotos() {
   Object.keys(_eqFotos).forEach(k => delete _eqFotos[k]);
 }
 export { _eqFotos };
+
+// ── Equipos sugeridos según tipo de sistema ────────────────────────────────────
+// Pre-crea placeholders con el `tipo` correcto para que el técnico solo capture
+// marca/modelo/serial sin elegir tipo. NO se escribe en Firestore al ver la
+// pantalla — se ofrece como banner de un toque (evita sorpresas en proyectos que
+// legítimamente no llevan equipos y writes al solo abrir en modo lectura).
+const _EQUIPOS_POR_SISTEMA = {
+  interconectado:   ['inversor'],
+  hibrido_respaldo: ['inversor', 'bateria'],
+  hibrido:          ['inversor', 'bateria'],
+  respaldo:         ['inversor', 'bateria'],
+  aislado:          ['inversor', 'bateria', 'controladora'],
+  bombeo:           ['inversor'],
+  sistema_pequeno:  ['controladora', 'bateria', 'inversor'],
+};
+const _TIPO_LABEL_EQ = {
+  inversor: 'Inversor', bateria: 'Batería', controladora: 'Controladora / MPPT',
+};
+
+// Separa un texto libre ("Victron Phoenix 800VA") en {marca, modelo} best-effort:
+// marca = primera de MARCAS_EQUIPOS contenida en el texto (o ''), modelo = texto completo.
+function _parseEquipoTexto(texto) {
+  const t = (texto || '').trim();
+  if (!t) return { marca: '', modelo: '' };
+  const marca = MARCAS_EQUIPOS.find(m => m !== 'Otra marca' && t.toLowerCase().includes(m.toLowerCase().split(' ')[0]));
+  return { marca: marca || '', modelo: t };
+}
+
+// Devuelve los tipos esperados que aún NO existen en garantia.equipos, con
+// marca/modelo sembrados desde el levantamiento cuando hay texto libre (sistema pequeño).
+export function equiposSugeridosFaltantes(project) {
+  const tipos = _EQUIPOS_POR_SISTEMA[project.tipoSistema];
+  if (!tipos) return [];
+  const existentes = new Set((project.garantia?.equipos || []).map(e => e.tipo));
+  const lev = project.documentacion?.levantamiento || {};
+  const semilla = {
+    inversor:     _parseEquipoTexto(lev.inversor),
+    bateria:      _parseEquipoTexto(lev.bateria),
+    controladora: _parseEquipoTexto(lev.mppt),
+  };
+  return tipos
+    .filter(tipo => !existentes.has(tipo))
+    // sistema_pequeno: el inversor es opcional — solo sugerirlo si hay texto libre
+    .filter(tipo => !(project.tipoSistema === 'sistema_pequeno' && tipo === 'inversor' && !(lev.inversor || '').trim()))
+    .map(tipo => ({ tipo, marca: semilla[tipo]?.marca || '', modelo: semilla[tipo]?.modelo || '' }));
+}
+
+export function renderEquiposSugeridos(project, projectId, edit) {
+  if (!edit) return '';
+  const faltantes = equiposSugeridosFaltantes(project);
+  if (!faltantes.length) return '';
+  const lista = faltantes.map(f => _TIPO_LABEL_EQ[f.tipo] || f.tipo).join(', ');
+  return `
+  <div class="card calc-info-banner" style="margin-bottom:12px">
+    <p style="margin:0 0 8px;font-size:.85rem">⚡ Equipos sugeridos para <b>${esc(TIPOS_SISTEMA[project.tipoSistema]?.label || project.tipoSistema)}</b>: ${esc(lista)}.<br>
+    <span class="form-hint">Se crean con el tipo listo — solo capturas marca/modelo y escaneas el serial en campo.</span></p>
+    <button class="btn-outline btn-sm" onclick="crearEquiposSugeridos('${projectId}')">+ Crear equipos sugeridos (${faltantes.length})</button>
+  </div>`;
+}
+
+window.crearEquiposSugeridos = async function(projectId) {
+  let p;
+  try { p = await projects.getById(projectId); }
+  catch { toast('No se pudo cargar el proyecto — revisa tu conexión', 'error'); return; }
+  const faltantes = equiposSugeridosFaltantes(p);
+  if (!faltantes.length) { toast('No hay equipos por sugerir', 'info'); return; }
+  const nuevos = faltantes.map(f => ({
+    id: uuid(), tipo: f.tipo, marca: f.marca, modelo: f.modelo, serial: '',
+    fotoPlaca: null, fotoFrontal: null, fotoAngulo: null, notas: '',
+    historialReemplazos: [], createdAt: isoNow(), updatedAt: isoNow(),
+  }));
+  const newEquipos = [...(p.garantia?.equipos || []), ...nuevos];
+  try {
+    await projects.setField(projectId, 'garantia.equipos', newEquipos);
+    logChange(projectId, {
+      modulo: 'Garantía', accion: 'equipos sugeridos creados',
+      detalle: nuevos.map(e => e.tipo).join(', '), quien: await getSession(),
+    });
+  } catch (err) {
+    console.error('crearEquiposSugeridos error:', err);
+    toast('⚠ No se pudieron crear los equipos — revisa tu conexión', 'error', 5000);
+    return;
+  }
+  toast(`✅ ${nuevos.length} equipo${nuevos.length > 1 ? 's' : ''} creado${nuevos.length > 1 ? 's' : ''} — captura marca/modelo y serial`);
+  sessionStorage.setItem('garantia-tab-target', 'g-equipos');
+  navigate(`#proyecto/${projectId}/garantia`);
+};
 
 // ── Render de equipos ──────────────────────────────────────────────────────────
 export function renderEquipos(equipos, projectId, edit, admin) {

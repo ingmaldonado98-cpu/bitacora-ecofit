@@ -158,7 +158,7 @@ export async function renderProjectDetail(id, session) {
     </svg>
     <div class="donut-subs">
       <span class="dsub">Lev <b>${levPct}%</b></span>
-      ${!_esPeq ? `<span class="dsub">Doc <b>${docPct}%</b></span>` : ''}
+      ${!_esPeq ? `<span class="dsub">Obra <b>${docPct}%</b></span>` : ''}
       <span class="dsub">Gar <b>${garPct}%</b></span>
     </div>
   </div>
@@ -395,7 +395,7 @@ function renderQuickCheck(project, id, admin, inline = false) {
 
   const pendientes = [
     ...levItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'lev', link: `#proyecto/${id}/levantamiento`, modLabel: 'Lev' })),
-    ...(!docLocked ? docItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'doc', link: `#proyecto/${id}/documentacion`, modLabel: 'Doc' })) : []),
+    ...(!docLocked ? docItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'doc', link: `#proyecto/${id}/documentacion`, modLabel: 'Obra' })) : []),
     ...(!garLocked ? garItems.filter(i => !i.ok).map(i => ({ ...i, mod: 'gar', link: `#proyecto/${id}/garantia`,      modLabel: 'Garantía' })) : []),
   ];
 

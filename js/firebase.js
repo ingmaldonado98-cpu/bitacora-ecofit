@@ -11,7 +11,7 @@ import { getFirestore, initializeFirestore,
          getDoc, getDocs, setDoc, updateDoc,
          deleteDoc, query, orderBy }              from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getStorage, ref as storageRef,
-         uploadString, getDownloadURL }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+         uploadString, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 // ── Configuración ──────────────────────────────────────────────────────────
 const FB_CONFIG = {
@@ -85,6 +85,21 @@ export async function uploadPhoto(base64DataUrl, path) {
   }).catch(() => {});
 
   return url;
+}
+
+// ── Subir video a Firebase Storage (directo, sin cola offline) ────────────────
+// Los videos son demasiado pesados para la cola Base64-en-IndexedDB; se suben
+// solo con conexión. Timeout más largo que las fotos por el tamaño.
+const VIDEO_TIMEOUT_MS = 120000;
+export async function uploadVideo(file, path) {
+  if (!navigator.onLine) {
+    const err = new Error('Sin conexión — conéctate para subir el video');
+    err.code = 'offline';
+    throw err;
+  }
+  const sRef = storageRef(_storage, path);
+  await _withTimeout(uploadBytes(sRef, file, { contentType: file.type || 'video/mp4' }), VIDEO_TIMEOUT_MS, 'Subida de video');
+  return _withTimeout(getDownloadURL(sRef), UPLOAD_TIMEOUT_MS, 'Obtener URL de video');
 }
 
 // ── Subir foto con cola offline ────────────────────────────────────────────
