@@ -36,6 +36,32 @@ export async function fotoToDataURI(foto) {
   return null;
 }
 
+// Resuelve cualquier representación de foto a { data: Uint8Array, width, height }
+// en píxeles, escalado para que el lado mayor mida maxDimPx — listo para
+// `ImageRun` de la librería docx (que necesita bytes crudos + transformación en
+// px, no un data-URI). Reutiliza fotoToDataURI para no duplicar la lógica de
+// resolución de los 5 formatos de entrada (url, data:, base64, {url}, {pending}).
+export async function fotoToImageBuffer(foto, maxDimPx = 350) {
+  const dataUri = await fotoToDataURI(foto);
+  if (!dataUri) return null;
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload  = () => resolve(i);
+      i.onerror = reject;
+      i.src = dataUri;
+    });
+    let { naturalWidth: width, naturalHeight: height } = img;
+    if (width > maxDimPx || height > maxDimPx) {
+      if (width > height) { height = Math.round(height * maxDimPx / width); width = maxDimPx; }
+      else                { width = Math.round(width * maxDimPx / height); height = maxDimPx; }
+    }
+    const res  = await fetch(dataUri);
+    const data = new Uint8Array(await res.arrayBuffer());
+    return { data, width, height };
+  } catch { return null; }
+}
+
 // ── Compresión de imagen ───────────────────────────────────────────────────────
 export function compressImage(file, maxDim = 1000, quality = 0.68) {
   return new Promise((resolve, reject) => {

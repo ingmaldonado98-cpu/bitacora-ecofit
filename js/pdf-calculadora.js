@@ -1,10 +1,14 @@
-// pdf-calculadora.js — Exportación del BOM/diagrama/guía de la Calculadora (Word vía blob)
+// pdf-calculadora.js — Exportación del BOM/diagrama/guía de la Calculadora (.docx real — OOXML)
 // Lee el estado en pantalla del wizard (cs/SX) — no requiere haber guardado antes,
 // igual que el wizard ya renderiza BOM/diagrama/guía en vivo desde cs.
 
-import { esc, fmtFecha, toast } from './utils.js';
+import { fmtFecha, toast } from './utils.js';
 import { cs, SX, getRowData } from './calc-state.js';
 import { calcBOM, buildDiagramSVG, buildGuiaData, buildTorqueTable } from '../modules/calculadora/index.js';
+import { newDoc, heading1, heading2, p, table, hr, ImageRun, Paragraph,
+         AlignmentType, saveDocx } from './word-helpers.js';
+
+const VERDE = '16a34a';
 
 // El diagrama ya pinta su propio fondo oscuro y usa colores hex fijos (no
 // variables CSS), así que no necesita recoloreo — solo forzar width/height
@@ -21,7 +25,7 @@ function withExplicitSize(svgString) {
   return { svgString: new XMLSerializer().serializeToString(svgEl), width, height };
 }
 
-async function svgToPngDataURI(svgString, width, height) {
+async function svgToPngBuffer(svgString, width, height, maxWidthPx = 640) {
   const blob = new Blob([svgString], { type: 'image/svg+xml' });
   const url  = URL.createObjectURL(blob);
   try {
@@ -30,7 +34,12 @@ async function svgToPngDataURI(svgString, width, height) {
     const canvas = document.createElement('canvas');
     canvas.width = width; canvas.height = height;
     canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-    return canvas.toDataURL('image/png');
+    const dataUri = canvas.toDataURL('image/png');
+    const res2 = await fetch(dataUri);
+    const data = new Uint8Array(await res2.arrayBuffer());
+    let w = width, h = height;
+    if (w > maxWidthPx) { h = Math.round(h * maxWidthPx / w); w = maxWidthPx; }
+    return { data, width: w, height: h };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -49,87 +58,55 @@ export async function exportarBOMCalculadora() {
   const groups = {};
   bom.forEach(item => { (groups[item.grp] = groups[item.grp] || []).push(item); });
 
-  const wSec = (title) =>
-    `<h2 style="color:#16a34a;font-size:13pt;margin:18pt 0 8pt;border-bottom:1px solid #e5e7eb;padding-bottom:4pt">${esc(title)}</h2>`;
-  const TH = 'style="background:#f3f4f6;border:1px solid #e5e7eb;padding:5pt;text-align:left"';
-  const TD = 'style="border:1px solid #e5e7eb;padding:5pt"';
-
   const nombreProyecto = SX.project?.displayId || SX.project?.clientName || 'Consulta sin proyecto guardado';
 
-  let html = `
-<h1 style="color:#111827;font-size:18pt;border-bottom:3px solid #16a34a;padding-bottom:6pt">Lista de Materiales (BOM)</h1>
-<table style="width:100%;border:none;margin-bottom:16pt">
-  <tr>
-    <td style="border:none;font-size:14pt;font-weight:bold;color:#111827">${esc(nombreProyecto)}</td>
-    <td style="border:none;text-align:right;color:#6b7280;font-size:9pt">Generado: ${fmtFecha(new Date().toISOString())}</td>
-  </tr>
-</table>`;
+  const children = [];
+  const addSec = (title) => children.push(heading2(title, VERDE));
+
+  children.push(heading1('Lista de Materiales (BOM)', VERDE));
+  children.push(p(nombreProyecto, { bold: true, size: 28, color: '111827' }));
+  children.push(p(`Generado: ${fmtFecha(new Date().toISOString())}`, { color: '6b7280', size: 18 }));
 
   // ── Tabla de BOM agrupada por categoría ───────────────────────────────────
-  html += wSec('Materiales');
+  addSec('Materiales');
   for (const [grp, items] of Object.entries(groups)) {
-    html += `<p style="font-size:9pt;font-weight:bold;color:#16a34a;margin:8pt 0 2pt">${esc((grp || 'Otros').toUpperCase())}</p>`;
-    html += `<table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:8pt">
-      <tr><th ${TH}>Material</th><th ${TH}>No. parte</th><th ${TH} style="text-align:right">Cant.</th></tr>
-      ${items.map(it => `<tr><td ${TD}>${esc(it.name)}</td><td ${TD}>${esc(it.partNum)}</td><td ${TD} style="text-align:right">${it.qty} ${esc(it.unit)}</td></tr>`).join('')}
-    </table>`;
+    children.push(p((grp || 'Otros').toUpperCase(), { bold: true, color: VERDE, size: 18 }));
+    const rows = items.map(it => [it.name, it.partNum, `${it.qty} ${it.unit}`]);
+    children.push(table(['Material', 'No. parte', 'Cant.'], rows, { headerShading: 'f3f4f6', headerColor: '111827' }));
   }
 
   // ── Diagrama técnico (rasterizado a PNG) ──────────────────────────────────
-  html += wSec('Diagrama técnico');
+  addSec('Diagrama técnico');
   try {
     const rawSvg = buildDiagramSVG(rd, pW, pH, cs.estructura);
     const { svgString, width, height } = withExplicitSize(rawSvg);
-    const png = await svgToPngDataURI(svgString, width, height);
-    html += `<img src="${png}" style="max-width:480pt;height:auto;margin:4pt 0;display:block">`;
+    const img = await svgToPngBuffer(svgString, width, height);
+    children.push(new Paragraph({
+      spacing: { after: 160 },
+      children: [new ImageRun({ type: 'png', data: img.data, transformation: { width: img.width, height: img.height } })],
+    }));
   } catch (e) {
-    html += `<p style="font-size:8pt;color:#dc2626;margin:2pt 0">[Diagrama no disponible — ${esc(e.message)}]</p>`;
+    children.push(p(`[Diagrama no disponible — ${e.message}]`, { size: 16, color: 'dc2626' }));
   }
 
   // ── Guía de instalación ────────────────────────────────────────────────
-  html += wSec('Guía de instalación');
-  html += `<table style="width:100%;border-collapse:collapse;font-size:9pt">
-    <tr><th ${TH}>Filas</th><th ${TH}>Paneles/fila</th><th ${TH}>Corte de riel</th><th ${TH}>Patas</th></tr>
-    ${guia.map(g => `<tr>
-      <td ${TD}>${g.rows.join(', ')}</td>
-      <td ${TD}>${g.n}</td>
-      <td ${TD}>${g.cut.toFixed(3)} m</td>
-      <td ${TD}>${g.feet.length}</td>
-    </tr>`).join('')}
-  </table>`;
+  addSec('Guía de instalación');
+  children.push(table(['Filas', 'Paneles/fila', 'Corte de riel', 'Patas'],
+    guia.map(g => [g.rows.join(', '), String(g.n), `${g.cut.toFixed(3)} m`, String(g.feet.length)]),
+    { headerShading: 'f3f4f6', headerColor: '111827' }));
 
   // ── Torques de apriete ─────────────────────────────────────────────────
-  html += wSec('Torques de apriete');
-  html += `<table style="width:100%;border-collapse:collapse;font-size:9pt">
-    <tr><th ${TH}>Componente</th><th ${TH}>Torque</th><th ${TH}>Nota</th></tr>
-    ${torques.map(t => `<tr><td ${TD}>${esc(t.comp)}</td><td ${TD}>${esc(t.torque)}</td><td ${TD}>${esc(t.nota)}</td></tr>`).join('')}
-  </table>`;
+  addSec('Torques de apriete');
+  children.push(table(['Componente', 'Torque', 'Nota'],
+    torques.map(t => [t.comp, t.torque, t.nota]),
+    { headerShading: 'f3f4f6', headerColor: '111827' }));
 
-  html += `<hr style="margin-top:24pt;border-color:#e5e7eb">
-<p style="font-size:8pt;color:#6b7280;text-align:center">Ecofit Solar Solutions · La Paz, BCS · México · ${fmtFecha(new Date().toISOString())}</p>`;
+  children.push(hr());
+  children.push(p(`Ecofit Solar Solutions · La Paz, BCS · México · ${fmtFecha(new Date().toISOString())}`,
+    { size: 16, color: '6b7280', alignment: AlignmentType.CENTER }));
 
-  const fullDoc = `<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office"
-      xmlns:w="urn:schemas-microsoft-com:office:word"
-      xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><meta name="ProgId" content="Word.Document">
-<style>
-  body { font-family: Calibri, 'Segoe UI', sans-serif; font-size: 11pt; color: #111827; margin: 24pt 32pt; line-height: 1.4; }
-  h1, h2, h3 { font-family: Calibri, 'Segoe UI', sans-serif; }
-  table { table-layout: fixed; }
-  th, td { word-wrap: break-word; overflow-wrap: break-word; }
-  img { max-width: 480pt; height: auto; }
-  @page { margin: 1.5cm 2cm; }
-</style>
-</head>
-<body>${html}</body></html>`;
-
-  const blob = new Blob(['﻿' + fullDoc], { type: 'application/msword' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = `EFS-BOM-${nombreProyecto.replace(/[^\w-]+/g, '_')}.doc`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  const doc = newDoc(children);
+  await saveDocx(doc, `EFS-BOM-${nombreProyecto.replace(/[^\w-]+/g, '_')}`);
   toast('BOM exportado ✓', 'success');
 }
 
