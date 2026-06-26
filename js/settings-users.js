@@ -6,6 +6,12 @@ import { users, config } from './db.js';
 import { isoNow, toast, confirmDialog } from './utils.js';
 import { createFbUser, fbUsers, resetPassword } from './firebase.js';
 
+// El input es type='email' pero el guardado se dispara por onclick (no submit de
+// <form>), así que la validación HTML5 nunca corre. Un email mal formado se
+// persistía en authEmail y rompía el reset de contraseña de Firebase. Validamos
+// en JS antes de guardar.
+const _emailOk = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+
 // ── Editar perfil propio ───────────────────────────────────────────────────────
 window.editarMiPerfil = function() {
   const selfRow  = document.getElementById('urow-self') ||
@@ -76,6 +82,8 @@ window.guardarEditUser = async function(id) {
   const rol   = document.getElementById('ue-rol-' + id).value;
   const email = document.getElementById('ue-email-' + id)?.value.trim() || null;
 
+  if (email && !_emailOk(email)) { toast('Email inválido — revisa el formato', 'error'); return; }
+
   try {
     const update = { rol, email: email || null, authEmail: email || null };
     await users.update(id, update);
@@ -100,6 +108,7 @@ window.crearUsuario = async function() {
 
   if (!nombre || !username || !pass) { toast('Completa todos los campos','error'); return; }
   if (pass.length < 6) { toast('Contraseña mínimo 6 caracteres','error'); return; }
+  if (email && !_emailOk(email)) { toast('Email inválido — revisa el formato','error'); return; }
 
   const btn = document.querySelector('#form-nuevo-usuario .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
@@ -131,10 +140,17 @@ window.eliminarUser = async function(id) {
   navigate('#settings');
 };
 
-window.guardarContacto = async function() {
+window.guardarContacto = async function(btn) {
   const val = document.getElementById('contacto-ecofit').value.trim();
-  await config.set('contactoEcofit', val);
-  toast('✅ Contacto guardado');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    await config.set('contactoEcofit', val);
+    toast('✅ Contacto guardado');
+  } catch (err) {
+    toast('Error al guardar: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar contacto'; }
+  }
 };
 
 window.resetPassUser = async function(id, authEmail) {

@@ -143,7 +143,7 @@ export async function renderSettings(session) {
                 placeholder="WhatsApp: +52 612 000 0000&#10;Email: contacto@ecofitsolar.mx&#10;Web: ecofitsolar.mx"
       >${esc(contacto||'')}</textarea>
     </div>
-    <button class="btn-primary btn-sm" onclick="guardarContacto()">Guardar contacto</button>
+    <button class="btn-primary btn-sm" onclick="guardarContacto(this)">Guardar contacto</button>
   </div>
 
   <!-- Modo oscuro programado -->

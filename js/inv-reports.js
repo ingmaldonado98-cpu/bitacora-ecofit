@@ -87,10 +87,10 @@ export function renderEstado(){
 
 export function renderHistorial(){
   if(!S.history.length)return`
-    <div class="empty-msg" style="padding:40px 0">
-      <ph-icon name="calendar" size="40"></ph-icon>
-      <p style="margin-top:12px">No hay meses guardados aún.</p>
-      <p style="font-size:.8rem">Captura el inventario y presiona Guardar.</p>
+    <div class="empty-state" role="status">
+      <div class="empty-state-icon" aria-hidden="true">📅</div>
+      <p class="empty-state-msg">No hay meses guardados aún.<br>Captura el inventario y presiona Guardar.</p>
+      <button class="empty-state-cta" onclick="window._invTab('captura')">Ir a Captura</button>
     </div>`;
 
   return S.history.map((h,i)=>{
@@ -315,13 +315,16 @@ window._invExportConsumo = async function() {
   const d = window._consumoExportData;
   if (!d) { toast('Genera el reporte primero', 'error'); return; }
 
+  if (!navigator.onLine) { toast('Sin conexión — conéctate para generar el Excel', 'error', 6000); return; }
   toast('Preparando Excel…', 'info', 3000);
   let XLSX;
   try {
     const mod = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
     XLSX = mod;
-  } catch {
-    toast('Sin conexión para cargar exportador', 'error'); return;
+  } catch (e) {
+    // Online pero el CDN no respondió (bloqueado/lento): distinguir del offline real
+    toast('No se pudo cargar el exportador (CDN inaccesible) — reintenta', 'error', 6000);
+    return;
   }
 
   const rows = [['Material','Parte #','Cantidad','Unidad','Categoría']];

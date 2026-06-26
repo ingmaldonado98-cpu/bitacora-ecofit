@@ -291,7 +291,10 @@ function projectCard(p) {
                  : prog.pct < 67 ? 'var(--solar)'
                  : prog.pct < 100 ? 'var(--g300)' : 'var(--accent)';
 
-  const faseDoc = prog.docPct === 100 ? 'Obra ✓' : `Obra ${prog.docPct}%`;
+  // sistema_pequeno no usa Progreso de obra — mostrar "Obra 0%" siempre ahí
+  // daba falsa sensación de incompleto en un proyecto que sí puede estar al 100%.
+  const faseDoc = p.tipoSistema === 'sistema_pequeno' ? null
+                : prog.docPct === 100 ? 'Obra ✓' : `Obra ${prog.docPct}%`;
   const faseGar = prog.garEstado === 'bloqueada' ? 'Gar —'
                 : prog.garPct === 100 ? 'Gar ✓' : `Gar ${prog.garPct}%`;
   const faseAud = prog.audPct === null ? null

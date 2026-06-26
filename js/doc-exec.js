@@ -133,6 +133,23 @@ function _bloqueGate(allExecBlocks, cl, bloque, overrides) {
   return { unlocked: false, overridden: false };
 }
 
+// Lista concreta de lo que falta en bloques anteriores incompletos — antes el
+// mensaje de bloqueo solo nombraba el bloque previo ("Completa primero
+// Bloque 1"), sin decir qué ítem específico falta marcar/evidenciar.
+function _pendientesPrevios(allExecBlocks, cl, bloque) {
+  const out = [];
+  for (const b of allExecBlocks) {
+    if (b.bloque >= bloque || _pasoCompleto(b, cl)) continue;
+    for (const it of b.items) {
+      if (!cl.exec?.[it.id]) out.push(it.n);
+    }
+    for (const slot of (b.fotosCierre || [])) {
+      if (slot.obligatoria && !_slotSatisfecho(cl, b.id, slot.id)) out.push(`${slot.label} (evidencia)`);
+    }
+  }
+  return out;
+}
+
 function _fmtFecha(iso) {
   if (!iso) return '';
   try { return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }); }
@@ -285,7 +302,7 @@ export function renderExecPorBloque(project, bloque, allExecBlocks, edit, admin)
     if (it.isNav) return `
       <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
         <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${dis ? 'disabled' : ''}
-          onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${pid}','${it.id}',this.checked)">
+          onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);_syncCierreReveal(this);clToggleExec('${pid}','${it.id}',this.checked)">
         <div class="cl-item-text" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
           <span class="cl-item-name">${esc(it.n)}</span>
           <button class="btn-outline btn-sm" style="flex-shrink:0"
@@ -295,7 +312,7 @@ export function renderExecPorBloque(project, bloque, allExecBlocks, edit, admin)
     return `
       <label class="cl-item ${cl.exec?.[it.id] ? 'cl-item-done' : ''}">
         <input type="checkbox" ${cl.exec?.[it.id] ? 'checked' : ''} ${dis ? 'disabled' : ''}
-          onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);clToggleExec('${pid}','${it.id}',this.checked)">
+          onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);_syncCierreReveal(this);clToggleExec('${pid}','${it.id}',this.checked)">
         <div class="cl-item-text" style="width:100%">
           <span class="cl-item-name">${esc(it.n)}</span>
           ${it.hasInput ? `<div style="margin-top:6px">
@@ -343,6 +360,13 @@ export function renderExecPorBloque(project, bloque, allExecBlocks, edit, admin)
         ${!gate.unlocked ? `
         <div class="cl-exec-gate-msg cl-exec-gate-locked">
           ${icon('lock', 14)} Completa primero ${esc(BLOQUE_LABELS[block.bloque - 1] || '')} — ${esc(BLOQUE_DESC[block.bloque - 1] || '')}.
+          ${(() => {
+            const pend = _pendientesPrevios(allExecBlocks, cl, block.bloque);
+            if (!pend.length) return '';
+            const shown = pend.slice(0, 4);
+            const resto = pend.length - shown.length;
+            return `<ul class="cl-exec-gate-pendientes">${shown.map(p => `<li>${esc(p)}</li>`).join('')}${resto > 0 ? `<li>y ${resto} más…</li>` : ''}</ul>`;
+          })()}
           ${admin ? `<button class="btn-outline btn-sm" onclick="_clOverrideBloque('${pid}',${block.bloque},true)">Desbloquear (excepción)</button>` : ''}
         </div>` : gate.overridden ? `
         <div class="cl-exec-gate-msg cl-exec-gate-override">
@@ -355,12 +379,34 @@ export function renderExecPorBloque(project, bloque, allExecBlocks, edit, admin)
         ${block.fotosCierre?.length ? `
         <div class="cl-cierre ${chkDone ? 'cl-cierre-activa' : 'cl-cierre-bloqueada'}">
           <p class="cl-cierre-hdr">${chkDone ? '📸 Evidencias de cierre técnico' : `${icon('lock', 13)} Completa las tareas para habilitar la captura`}</p>
-          ${chkDone ? block.fotosCierre.map(slot => _slotFotoHtml(block, slot, pid, cl, edit)).join('') : ''}
+          <div class="cl-cierre-slots ${chkDone ? '' : 'acc-collapsed'}">
+            ${block.fotosCierre.map(slot => _slotFotoHtml(block, slot, pid, cl, edit)).join('')}
+          </div>
         </div>` : ''}
       </details>`;
     }).join('')}
   </div>`;
 }
+
+// ── Reveal suave de evidencias al completar el último ítem del paso ──────────
+// Antes la sección de evidencias pasaba de bloqueada a visible solo en el
+// siguiente re-render completo de la vista (al navegar de pestaña y volver),
+// apareciendo de golpe sin transición — se sentía como un glitch. Esto
+// reacciona en el momento exacto del click, reutilizando la animación
+// max-height/opacity ya definida para .accordion-body/.acc-collapsed.
+window._syncCierreReveal = function(checkboxEl) {
+  const blockEl = checkboxEl.closest('.cl-exec-block');
+  if (!blockEl) return;
+  const checks = blockEl.querySelectorAll('.cl-item-list input[type="checkbox"]');
+  const allChecked = checks.length > 0 && [...checks].every(c => c.checked);
+  const cierre = blockEl.querySelector('.cl-cierre');
+  if (!cierre) return;
+  cierre.classList.toggle('cl-cierre-activa', allChecked);
+  cierre.classList.toggle('cl-cierre-bloqueada', !allChecked);
+  cierre.querySelector('.cl-cierre-slots')?.classList.toggle('acc-collapsed', !allChecked);
+  const hdr = cierre.querySelector('.cl-cierre-hdr');
+  if (hdr) hdr.innerHTML = allChecked ? '📸 Evidencias de cierre técnico' : `${icon('lock', 13)} Completa las tareas para habilitar la captura`;
+};
 
 // ── Handlers de evidencias de cierre ──────────────────────────────────────────
 window.capFotoCierrePaso = function(projectId, blockId, slotId) {

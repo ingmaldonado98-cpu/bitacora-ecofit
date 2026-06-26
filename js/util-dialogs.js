@@ -3,6 +3,31 @@
 
 import { esc } from './util-fmt.js';
 
+// ── Accesibilidad de modales: trap de foco + restauración al cerrar ───────────
+// Los 3 modales ponían foco inicial y escuchaban Escape, pero (1) Tab podía
+// salir del modal hacia el contenido de atrás, y (2) al cerrar el foco caía a
+// <body>, perdiendo el contexto del usuario de teclado. Este helper se engancha
+// al abrir y devuelve una función de limpieza que restaura el foco al trigger.
+function _trapModal(overlay) {
+  const prev = document.activeElement;
+  const focusables = () => [...overlay.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )].filter(el => !el.disabled && el.offsetParent !== null);
+  const onKey = e => {
+    if (e.key !== 'Tab') return;
+    const els = focusables();
+    if (!els.length) return;
+    const first = els[0], last = els[els.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+  overlay.addEventListener('keydown', onKey);
+  return () => {
+    overlay.removeEventListener('keydown', onKey);
+    if (prev && typeof prev.focus === 'function') prev.focus();
+  };
+}
+
 // ── Toast ──────────────────────────────────────────────────────────────────────
 export function toast(msg, type = 'info', duration = 3000) {
   let el = document.getElementById('toast-container');
@@ -31,7 +56,8 @@ export function confirmDialog(msg) {
     document.body.appendChild(overlay);
     const ok  = overlay.querySelector('.modal-btn-ok');
     const can = overlay.querySelector('.modal-btn-cancel');
-    const close = val => { overlay.remove(); resolve(val); };
+    const release = _trapModal(overlay);
+    const close = val => { release(); overlay.remove(); resolve(val); };
     ok.onclick  = () => close(true);
     can.onclick = () => close(false);
     overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
@@ -58,7 +84,8 @@ export function inputDialog(label, defaultValue = '', hint = '') {
     const inp = overlay.querySelector('.modal-input');
     const ok  = overlay.querySelector('.modal-btn-ok');
     const can = overlay.querySelector('.modal-btn-cancel');
-    const close = val => { overlay.remove(); resolve(val); };
+    const release = _trapModal(overlay);
+    const close = val => { release(); overlay.remove(); resolve(val); };
     ok.onclick  = () => close(inp.value);
     can.onclick = () => close(null);
     inp.addEventListener('keydown', e => {
@@ -94,7 +121,8 @@ export function cambioEstadoDialog(estadoLabel, notaRequerida) {
     const ta  = overlay.querySelector('.modal-textarea');
     const ok  = overlay.querySelector('.modal-btn-ok');
     const can = overlay.querySelector('.modal-btn-cancel');
-    const close = val => { overlay.remove(); resolve(val); };
+    const release = _trapModal(overlay);
+    const close = val => { release(); overlay.remove(); resolve(val); };
     ok.onclick = () => {
       const nota = ta.value.trim();
       if (notaRequerida && !nota) {

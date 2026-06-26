@@ -80,10 +80,24 @@ export function _renderAreasTecho(areas, edit, pid, tipTechoGeneral) {
     const totalFotos = fotos.length;
     // Fallback solo para áreas migradas de proyectos viejos sin tipo propio
     const efectivo = a.tipTecho || tipTechoGeneral || 'Losa de concreto';
+    // Resumen colapsado — antes cada área se mostraba con su formulario completo
+    // expandido siempre, sin contador ni forma de ver de un vistazo qué áreas ya
+    // tienen datos; con 3-4 áreas obligaba a scrollear todo para verificar.
+    const completa  = !!(a.nombre && a.ancho && a.largo);
+    const dimTxt     = (a.ancho && a.largo) ? `${a.ancho}×${a.largo} m` : 'sin dimensiones';
+    const resumenTxt = `${esc(a.nombre || `Área ${i + 1}`)} — ${esc(efectivo)} · ${dimTxt}`;
     return `
   <div class="lev-area-item" id="lev-area-${i}">
     ${edit ? `<button type="button" class="lev-area-del-btn"
       onclick="window._removeAreaTecho(${i})" title="Eliminar área">✕</button>` : ''}
+    <button type="button" class="accordion-toggle lev-area-toggle ${completa ? '' : 'acc-open'}"
+            aria-expanded="${completa ? 'false' : 'true'}" aria-controls="lev-area-body-${i}"
+            onclick="toggleAcc(this,'lev-area-body-${i}')">
+      <span class="acc-icon" aria-hidden="true">🏠</span>
+      <span class="acc-title">Área ${i + 1} de ${areas.length} <span class="lev-area-resumen">— ${resumenTxt}</span></span>
+      <span class="acc-arrow" aria-hidden="true">▾</span>
+    </button>
+    <div class="accordion-body ${completa ? 'acc-collapsed' : ''}" id="lev-area-body-${i}">
     <div class="form-row" style="align-items:flex-end">
       <div class="form-group" style="flex:2">
         <label>Nombre del área</label>
@@ -234,6 +248,7 @@ export function _renderAreasTecho(areas, edit, pid, tipTechoGeneral) {
       </div>
       ${edit ? `<button type="button" class="btn-foto-sm lev-area-add-foto"
         onclick="window.capFotoArea('${pid||''}',${i})">${icon('camera')} Foto</button>` : ''}
+    </div>
     </div>
   </div>`;
   }).join('');

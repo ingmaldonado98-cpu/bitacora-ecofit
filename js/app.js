@@ -25,6 +25,7 @@ import { icon } from './icons.js';
 import { isNative, getPlugin } from './platform.js';
 import { renderMapView } from './map.js';
 import { initPendingMap, processQueue } from './photo-queue.js';
+import { skeletonBlock } from './ui-states.js';
 
 const app = document.getElementById('app');
 
@@ -207,12 +208,12 @@ async function route() {
               toast('Completa el Levantamiento primero.', 'warn', 4000);
               navigate(`#proyecto/${id}`); return;
             }
-            await render(renderGarantia(id, session));
+            await render(renderGarantia(id, session), skeletonBlock(3));
           }
         } else if (sub === 'levantamiento') {
           await render(renderLevantamientoView(id, session));
         } else if (sub === 'documentacion') {
-          await render(renderDocumentacion(id, session));
+          await render(renderDocumentacion(id, session), skeletonBlock(4));
         } else if (sub === 'auditoria') {
           const _ap = await projects.getById(id);
           const _ae = calcFaseEstado(_ap || {});

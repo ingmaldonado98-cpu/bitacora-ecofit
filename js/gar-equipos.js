@@ -137,8 +137,8 @@ export function renderEquipos(equipos, projectId, edit, admin) {
           <span class="eq-modelo">${esc(eq.modelo)}</span>
         </div>
         <div class="eq-actions">
-          ${edit ? `<button class="btn-icon-sm" onclick="editarEquipo('${projectId}',${i})" title="Editar equipo">✎</button>` : ''}
-          ${admin ? `<button class="btn-del-sm" onclick="delEquipo('${projectId}',${i})" title="Eliminar equipo">✕</button>` : ''}
+          ${edit ? `<button class="btn-icon-sm" onclick="editarEquipo('${projectId}',${i})" aria-label="Editar equipo" title="Editar equipo">✎</button>` : ''}
+          ${admin ? `<button class="btn-del-sm" onclick="delEquipo('${projectId}',${i})" aria-label="Eliminar equipo" title="Eliminar equipo">✕</button>` : ''}
         </div>
       </div>
       <div class="eq-serial">
@@ -217,7 +217,7 @@ export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null
       <div class="serial-row">
         <input type="text" id="eq-serial" placeholder="Escribe o escanea el serial"
                value="${isEdit ? esc(eq.serial || '') : ''}" />
-        <button type="button" class="btn-icon" onclick="scanSerial('${projectId}')" title="Escanear con cámara">
+        <button type="button" class="btn-icon" onclick="scanSerial('${projectId}')" aria-label="Escanear serial con cámara" title="Escanear con cámara">
           ${icon('barcode')}
         </button>
       </div>

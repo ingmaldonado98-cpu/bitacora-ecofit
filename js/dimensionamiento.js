@@ -135,9 +135,10 @@ export async function renderDimensionamiento(projectId, session) {
             <span class="cl-item-name">${esc(it.n)}</span>
             ${it.hasInput ? `<div style="margin-top:6px">
               <input type="text" class="torq-input" style="max-width:200px"
+                aria-label="${esc(it.n)} — valor medido"
                 placeholder="${esc(it.placeholder||'Valor medido')}" ${!edit ? 'disabled' : ''}
                 value="${esc(val)}"
-                onchange="dimSaveCCText('${projectId}','${it.id}',this.value)"
+                onchange="dimSaveCCText('${projectId}','${it.id}',this.value,this)"
                 onclick="event.stopPropagation()">
             </div>` : ''}
           </div>
@@ -220,11 +221,17 @@ function _renderDimTable(res, lev, trayectorias = []) {
 window.dimToggleCC = (pid, id, v) =>
   projects.setField(pid, `dimensionamiento.campoChecks.${id}`, v);
 
-let _dimCCTimer = null;
-window.dimSaveCCText = (pid, id, val) => {
-  clearTimeout(_dimCCTimer);
-  _dimCCTimer = setTimeout(() =>
-    projects.setField(pid, `dimensionamiento.campoText.${id}`, val), 600);
+// Timer POR campo (no compartido): un timer único descartaba la escritura de un
+// campo si el usuario pasaba a otro antes de 600ms. Además da feedback por-input
+// (clase .field-saved que pulsa el borde) al persistir, igual de claro que el
+// indicador de autoguardado del levantamiento.
+const _dimCCTimers = {};
+window.dimSaveCCText = (pid, id, val, el) => {
+  clearTimeout(_dimCCTimers[id]);
+  _dimCCTimers[id] = setTimeout(async () => {
+    await projects.setField(pid, `dimensionamiento.campoText.${id}`, val);
+    if (el) { el.classList.add('field-saved'); setTimeout(() => el.classList.remove('field-saved'), 1400); }
+  }, 600);
 };
 
 window.dimRecalc = (pid) => navigate(`#dimensionamiento/${pid}`);

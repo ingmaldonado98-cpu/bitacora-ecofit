@@ -70,10 +70,10 @@ export async function renderProjectDetail(id, session) {
       <span class="hdr-estado" style="color:${est.color}">${est.label}</span>
     </div>
     <div class="header-actions">
-      ${edit ? `<button class="btn-icon-hdr" onclick="navigate('#editar-proyecto/${id}')">
+      ${edit ? `<button class="btn-icon-hdr" onclick="navigate('#editar-proyecto/${id}')" aria-label="Editar proyecto" title="Editar proyecto">
         ${icon('pencil')}
       </button>` : ''}
-      ${admin ? `<button class="btn-icon-hdr btn-icon-danger" onclick="window._eliminarProyecto('${id}')" title="Eliminar proyecto">
+      ${admin ? `<button class="btn-icon-hdr btn-icon-danger" onclick="window._eliminarProyecto('${id}')" aria-label="Eliminar proyecto" title="Eliminar proyecto">
         ${icon('trash')}
       </button>` : ''}
     </div>
@@ -301,7 +301,7 @@ function renderModulosProgreso(project, id, session, admin) {
           <span class="mpc-title">${title}${optional ? ' <span class="mpc-opcional">Opcional</span>' : ''}${firmada ? ' <span class="mpc-firmada">✓ Firmada</span>' : ''}</span>
           <div class="mpc-chips">
             ${locked
-              ? `<span class="mpc-chip mpc-locked-msg">🔒 Bloqueada — cumple requisito previo</span>`
+              ? `<span class="mpc-chip mpc-locked-msg">🔒 ${esc(faseKey === 'gar' ? estado.garRequisito : estado.audRequisito)}</span>`
               : items.map(i=>`<span class="mpc-chip ${i.ok?'mpc-ok':''}">${i.ok?'✓ ':''} ${i.label}</span>`).join('')
             }
           </div>

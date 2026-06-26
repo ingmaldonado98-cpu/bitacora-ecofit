@@ -61,10 +61,11 @@ function renderLevantamiento(project, tipo, edit) {
   const acc = (id, title, emoji, open, content) => `
     <div class="accordion-section">
       <button type="button" class="accordion-toggle ${open ? 'acc-open' : ''}"
+              aria-expanded="${open ? 'true' : 'false'}" aria-controls="acc-${id}"
               onclick="toggleAcc(this,'acc-${id}')">
-        <span class="acc-icon">${emoji}</span>
+        <span class="acc-icon" aria-hidden="true">${emoji}</span>
         <span class="acc-title">${title}</span>
-        <span class="acc-arrow">▾</span>
+        <span class="acc-arrow" aria-hidden="true">▾</span>
       </button>
       <div id="acc-${id}" class="accordion-body ${open ? '' : 'acc-collapsed'}">
         ${content}

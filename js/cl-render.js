@@ -159,7 +159,7 @@ function renderGuiaTab(cfg, projectId) {
       </div>`;
     }).join('');
     return `
-    <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+    <div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:var(--surface2)">
         <span style="font-weight:700;font-size:.86rem;color:var(--text)">${rowLbl} — ${n} panel${n>1?'es':''}</span>
         <span style="font-family:monospace;font-size:.9rem;color:var(--solar);font-weight:700">✂ ${(cut*100).toFixed(1)} cm</span>
@@ -210,7 +210,7 @@ function renderGuiaTab(cfg, projectId) {
       <h3 class="card-title" style="margin:0">Medidas de instalación</h3>
       <span style="font-size:.75rem;color:var(--text-muted)">${isAlx?'Aluminex':'K2 Systems'} · ${techo==='cemento'?'Concreto':'Metal'}</span>
     </div>
-    <div style="padding:12px 14px">${guiaBlocks}</div>
+    <div style="padding:12px 14px;display:flex;flex-direction:column;gap:var(--space-md)">${guiaBlocks}</div>
   </div>
 
   <div class="card" style="padding:0;overflow:hidden">

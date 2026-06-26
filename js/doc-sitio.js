@@ -308,6 +308,7 @@ window.toggleAcc = function(btn, bodyId) {
   if (!body) return;
   const isOpen = btn.classList.toggle('acc-open');
   body.classList.toggle('acc-collapsed', !isOpen);
+  btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 };
 
 // ── Render sitio — evidencia de cierre integrada, sin pestañas Antes/Durante/
