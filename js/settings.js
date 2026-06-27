@@ -17,6 +17,25 @@ async function getOneDriveStatus() {
   return `<span class="${cls}">${st.msg}</span>`;
 }
 
+// Tarjeta de fotos pendientes de subir — visible para todos. El reintento
+// manual resetea las atascadas (las que agotaron sus reintentos automáticos).
+async function fotosPendientesCard() {
+  let total = 0;
+  try {
+    const { getQueueCount } = await import('./photo-queue.js');
+    total = await getQueueCount();
+  } catch { /* silencioso */ }
+  if (!total) return '';
+  return `
+  <div class="card">
+    <h3 class="card-title">Fotos pendientes de subir</h3>
+    <p class="hint-text">Hay <b>${total}</b> foto${total > 1 ? 's' : ''} tomada${total > 1 ? 's' : ''} en este dispositivo que aún no se ${total > 1 ? 'suben' : 'sube'} a la nube. Conéctate a internet y reintenta.</p>
+    <div class="form-actions-row" style="margin-top:10px">
+      <button class="btn-primary btn-sm" onclick="window.forceRetryPhotos()">⬆ Reintentar subida (${total})</button>
+    </div>
+  </div>`;
+}
+
 export async function renderSettings(session) {
   if (!isAdmin(session)) {
     return `
@@ -54,6 +73,8 @@ export async function renderSettings(session) {
         </div>
       </div>
     </div>
+
+    ${await fotosPendientesCard()}
 
     <!-- Info de la app -->
     <div class="card">
@@ -326,6 +347,8 @@ export async function renderSettings(session) {
       </button>
     </div>
   </div>
+
+  ${await fotosPendientesCard()}
 
   <div class="card">
     <h3 class="card-title">Actualización de la app</h3>

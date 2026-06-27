@@ -132,6 +132,15 @@ window.setResultadoFormal = function(val, color, btn) {
 // ── Formal: guardar ───────────────────────────────────────────────────────────
 window.guardarFormal = async function(e, projectId) {
   e.preventDefault();
+  // Evitar guardar un dictamen totalmente vacío (sin resultado ni ningún ítem
+  // del checklist marcado) — error de captura accidental. Si hay progreso
+  // parcial sí se permite guardar (es un borrador del dictamen).
+  const _fd0 = new FormData(e.target);
+  const _checklistDone = CHECKLIST_FORMAL.filter(i => AS.formalMap[i.id]).length;
+  if (!_fd0.get('resultado') && _checklistDone === 0) {
+    toast('Marca al menos un ítem del checklist o selecciona un dictamen antes de guardar', 'error', 5000);
+    return;
+  }
   const btn = document.getElementById('btn-fm-save');
   if (btn) { btn.disabled = true; btn.classList.add('btn-saving'); btn.textContent = 'Guardando'; }
 

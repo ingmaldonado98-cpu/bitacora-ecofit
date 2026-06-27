@@ -183,8 +183,11 @@ export function loadXLSX(cb){
   toast('Preparando Excel…','info');
   const s=document.createElement('script');
   s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-  s.onload=()=>{cb();};
-  s.onerror=()=>toast('Error al cargar librería Excel. Verifica tu conexión.','error');
+  // Timeout: online pero el CDN cuelga (señal lenta/CDN bloqueado) — sin esto
+  // el usuario quedaba sin feedback tras "Preparando Excel…".
+  const to=setTimeout(()=>{ s.remove(); toast('El cargador de Excel tardó demasiado — revisa tu conexión e intenta de nuevo','error',6000); },15000);
+  s.onload=()=>{ clearTimeout(to); cb(); };
+  s.onerror=()=>{ clearTimeout(to); s.remove(); toast('No se pudo cargar la librería Excel (CDN inaccesible) — reintenta','error',6000); };
   document.head.appendChild(s);
 }
 

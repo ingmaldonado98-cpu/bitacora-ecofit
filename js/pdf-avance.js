@@ -58,7 +58,7 @@ export async function exportarAvanceObra(projectId) {
     children.push(heading2(`${BLOQUE_LABELS[bloque]} — ${BLOQUE_DESC[bloque]}`, VERDE));
     const fechaTxt = [
       fechas.inicio ? ` · Iniciado ${fmtFecha(fechas.inicio)}` : '',
-      fechas.cierre ? ` · Cerrado ${fmtFecha(fechas.cierre)}${fechas.cerradoPor ? ` por ${fechas.cerradoPor}` : ''}` : '',
+      fechas.cierre ? ` · Cerrado ${fmtFecha(fechas.cierre)}${(fechas.cerradoPor?.nombre || fechas.cerradoPor) ? ` por ${fechas.cerradoPor?.nombre || fechas.cerradoPor}` : ''}` : '',
     ].join('');
     children.push(new Paragraph({
       spacing: { after: 100 },

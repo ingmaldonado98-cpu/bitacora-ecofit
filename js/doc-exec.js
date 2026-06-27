@@ -180,7 +180,9 @@ export async function recalcBloqueMilestone(pid, bloque) {
     const { getSession } = await import('./auth.js');
     const session = await getSession();
     await projects.setField(pid, `checklistData.bloqueFechas.${bloque}.cierre`, isoNow());
-    await projects.setField(pid, `checklistData.bloqueFechas.${bloque}.cerradoPor`, session);
+    // Guardar el NOMBRE (string), no el objeto de sesión — antes se renderizaba
+    // como "[object Object]" en el hito y en el reporte de avance.
+    await projects.setField(pid, `checklistData.bloqueFechas.${bloque}.cerradoPor`, session?.nombre || '—');
   } else if (!completo && fechas.cierre) {
     await projects.setField(pid, `checklistData.bloqueFechas.${bloque}.cierre`, null);
     await projects.setField(pid, `checklistData.bloqueFechas.${bloque}.cerradoPor`, null);
@@ -218,7 +220,7 @@ export async function stampBloqueInicio(pid, bloque) {
 function _hitosBloqueHtml(fechas) {
   if (!fechas?.inicio) return '';
   const partes = [`Iniciado ${_fmtFecha(fechas.inicio)}`];
-  if (fechas.cierre) partes.push(`Cerrado ${_fmtFecha(fechas.cierre)}${fechas.cerradoPor ? ` por ${esc(fechas.cerradoPor)}` : ''}`);
+  if (fechas.cierre) { const cp = fechas.cerradoPor?.nombre || fechas.cerradoPor; partes.push(`Cerrado ${_fmtFecha(fechas.cierre)}${cp ? ` por ${esc(cp)}` : ''}`); }
   return `<p class="cl-bloque-hitos">${partes.join(' · ')}</p>`;
 }
 

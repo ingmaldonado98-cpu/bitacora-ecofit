@@ -143,7 +143,7 @@ export async function renderDocumentacion(projectId, session) {
     if (ft?.inicio) {
       const fmt = iso => new Date(iso).toLocaleDateString('es-MX', { day:'2-digit', month:'short' });
       const partes = [`Iniciado ${fmt(ft.inicio)}`];
-      if (ft.cierre) partes.push(`Cerrado ${fmt(ft.cierre)}${ft.cerradoPor ? ` por ${ft.cerradoPor}` : ''}`);
+      if (ft.cierre) { const cp = ft.cerradoPor?.nombre || ft.cerradoPor; partes.push(`Cerrado ${fmt(ft.cierre)}${cp ? ` por ${cp}` : ''}`); }
       wrap.innerHTML = `<p class="cl-bloque-hitos">${partes.join(' · ')}</p>`;
     }
   };

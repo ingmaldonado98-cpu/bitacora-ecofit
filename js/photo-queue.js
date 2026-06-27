@@ -105,30 +105,29 @@ export async function initPendingMap() {
 }
 
 // ── Actualizar badge de fotos pendientes en la UI ────────────────────────────
-function _updatePendingBadge() {
-  const count = Object.keys(window._pendingPhotoMap).length;
+// Cuenta la cola REAL de IndexedDB (no solo el mapa en memoria) y distingue las
+// "atascadas" (retryCount >= MAX_RETRIES) — el reintento manual sí las recupera.
+async function _updatePendingBadge() {
   let badge = document.getElementById('pending-photos-badge');
   if (!badge) {
     badge = document.createElement('div');
     badge.id = 'pending-photos-badge';
     badge.className = 'pending-photos-badge';
     badge.title = 'Fotos pendientes de subir';
-    badge.onclick = async () => {
-      const { toast } = await import('./utils.js');
-      if (!navigator.onLine) {
-        toast('Sin conexión — se reintentará automáticamente al reconectar', 'error', 4000);
-        return;
-      }
-      const before = Object.keys(window._pendingPhotoMap).length;
-      await processQueue();
-      if (Object.keys(window._pendingPhotoMap).length === before) {
-        toast('No se pudo sincronizar todavía — revisa tu conexión e intenta de nuevo', 'error', 4000);
-      }
-    };
+    // El reintento manual resetea las atascadas (a diferencia del auto-retry).
+    badge.onclick = () => forceRetryPhotos();
     document.body.appendChild(badge);
   }
-  if (count > 0) {
-    badge.textContent = `⬆ ${count} pendiente${count > 1 ? 's' : ''} — toca para reintentar`;
+  let total = 0, stuck = 0;
+  try {
+    const items = await getAllQueued();
+    total = items.length;
+    stuck = items.filter(i => (i.retryCount || 0) >= MAX_RETRIES).length;
+  } catch {
+    total = Object.keys(window._pendingPhotoMap).length;
+  }
+  if (total > 0) {
+    badge.textContent = `⬆ ${total} foto${total > 1 ? 's' : ''} sin subir${stuck > 0 ? ` (${stuck} atascada${stuck > 1 ? 's' : ''})` : ''} — toca para reintentar`;
     badge.style.display = '';
   } else {
     badge.style.display = 'none';
@@ -143,16 +142,18 @@ const MAX_RETRIES      = 6;
 const BASE_BACKOFF_MS  = 3000;
 const MAX_BACKOFF_MS   = 30000;
 
-export async function processQueue() {
-  if (!navigator.onLine) return;
+export async function processQueue(opts = {}) {
+  const { silent = false } = opts;
+  if (!navigator.onLine) return { synced: 0, stuck: 0, remaining: (await getAllQueued()).length, lastError: 'offline' };
   const items = await getAllQueued();
-  if (!items.length) return;
+  if (!items.length) return { synced: 0, stuck: 0, remaining: 0, lastError: null };
 
   const { uploadPhoto } = await import('./firebase.js');
   const { projects }    = await import('./db.js');
 
   let synced = 0;
   let stuck  = 0;
+  let lastError = null;
   for (const item of items) {
     const retryCount = item.retryCount || 0;
     if (retryCount >= MAX_RETRIES) { stuck++; continue; }
@@ -339,19 +340,57 @@ export async function processQueue() {
     } catch (err) {
       // Si falla por offline, dejar en cola; si es otro error, contar el reintento
       if (!navigator.onLine) break;
-      console.warn('[PhotoQueue] Error sync item:', item.id, err.message);
+      lastError = err.message || String(err);
+      console.warn('[PhotoQueue] Error sync item:', item.id, lastError);
       const nextRetry = retryCount + 1;
-      await updateQueueItem(item.id, { retryCount: nextRetry });
+      // Guardar el motivo del fallo para diagnóstico (timeout/conexión/permiso/etc.)
+      await updateQueueItem(item.id, { retryCount: nextRetry, lastError, lastErrorAt: new Date().toISOString() });
       if (nextRetry >= MAX_RETRIES) stuck++;
     }
   }
 
-  if (synced > 0) {
-    const { toast } = await import('./utils.js');
-    toast(`✅ ${synced} foto${synced > 1 ? 's subidas' : ' subida'} al sincronizar`, 'success', 4000);
+  const remaining = (await getAllQueued()).length;
+  if (!silent) {
+    if (synced > 0) {
+      const { toast } = await import('./utils.js');
+      toast(`✅ ${synced} foto${synced > 1 ? 's subidas' : ' subida'} al sincronizar`, 'success', 4000);
+    }
+    if (stuck > 0) {
+      const { toast } = await import('./utils.js');
+      toast(`⚠ ${stuck} foto${stuck > 1 ? 's' : ''} no se ${stuck > 1 ? 'pudieron' : 'pudo'} subir tras varios intentos — revisa tu conexión`, 'error', 6000);
+    }
   }
-  if (stuck > 0) {
-    const { toast } = await import('./utils.js');
-    toast(`⚠ ${stuck} foto${stuck > 1 ? 's' : ''} no se ${stuck > 1 ? 'pudieron' : 'pudo'} subir tras varios intentos — revisa tu conexión`, 'error', 6000);
-  }
+  return { synced, stuck, remaining, lastError };
 }
+
+// ── Reintento manual: resetea el contador de TODOS los items (incluso los
+// "atascados" con retryCount >= MAX_RETRIES, que processQueue normal salta) y
+// reintenta. Esto recupera fotos que agotaron sus 6 intentos por fallos
+// transitorios de señal en campo. Lo llaman el badge y el botón de Ajustes.
+export async function forceRetryPhotos() {
+  const { toast } = await import('./utils.js');
+  if (!navigator.onLine) {
+    toast('Sin conexión — conéctate para subir las fotos pendientes', 'error', 5000);
+    return { synced: 0, stuck: 0, remaining: (await getAllQueued()).length };
+  }
+  const all = await getAllQueued();
+  if (!all.length) { toast('No hay fotos pendientes', 'info', 3000); return { synced: 0, stuck: 0, remaining: 0 }; }
+
+  for (const item of all) {
+    if ((item.retryCount || 0) !== 0) await updateQueueItem(item.id, { retryCount: 0 });
+  }
+  toast(`Subiendo ${all.length} foto${all.length > 1 ? 's' : ''} pendiente${all.length > 1 ? 's' : ''}…`, 'info', 3000);
+  const res = await processQueue({ silent: true });
+  _updatePendingBadge();
+
+  if (res.remaining === 0) {
+    toast(`✅ ${res.synced} foto${res.synced !== 1 ? 's' : ''} subida${res.synced !== 1 ? 's' : ''}`, 'success', 4000);
+  } else {
+    const motivo = res.lastError === 'offline' ? 'sin conexión'
+      : /timeout|excedió/i.test(res.lastError || '') ? 'la red está muy lenta'
+      : (res.lastError || 'error desconocido');
+    toast(`✅ ${res.synced} subida${res.synced !== 1 ? 's' : ''} · ⚠ ${res.remaining} siguen fallando (${motivo}). Súbelas desde el celular donde se tomaron.`, 'error', 8000);
+  }
+  return res;
+}
+window.forceRetryPhotos = forceRetryPhotos;
