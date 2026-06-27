@@ -4,7 +4,7 @@
 import { projects, users } from './db.js';
 import { esc, fmtFecha, fmtFechaHora, fmtRelativa, uuid, isoNow, toast,
          ESTADOS, PRIORIDADES, TIPOS_SISTEMA, confirmDialog, cambioEstadoDialog,
-         calcFaseEstado, countFotos, calcLevItems, calcLevPct } from './utils.js';
+         calcFaseEstado, calcLevItems, calcLevPct, calcObraStatus } from './utils.js';
 import { isAdmin, isLider, canTransition, canEdit, TRANSITIONS, getSession } from './auth.js';
 import { icon } from './icons.js';
 import { renderFirmaBlock } from './proj-firmas.js';
@@ -44,12 +44,9 @@ export async function renderProjectDetail(id, session) {
   const _dDoc  = project.documentacion || {};
   const _dGar  = project.garantia || {};
   const _dFt   = _dGar.fotosTecnicas || {};
-  const _fT = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'techo',f),0);
-  const _fC = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'centrosCarga',f),0);
-  const _fZ = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(_dDoc.fases,'zonaDelSistema',f),0);
   const levPct  = calcLevPct(_dDoc, project.tipoSistema);
-  const _dItems = _esPeq ? [] : [_fT>0, _fC>0, _fZ>0];
-  const docPct  = _dItems.length ? Math.round(_dItems.filter(Boolean).length / _dItems.length * 100) : 0;
+  // "Obra %" = avance real por Bloque 1/2/3 (no el esquema viejo de fotos por sitio).
+  const docPct  = _esPeq ? 0 : calcObraStatus(project).pct;
   const _gItems = _esPeq
     ? [!!_dGar.fotoSistema, totalEquipos>0, totalPaneles>0]
     : [!!_dGar.fotoSistema, !!(_dFt.tableroAC||_dFt.inversorEnergizado), totalEquipos>0, totalPaneles>0];
@@ -236,24 +233,17 @@ function renderModulosProgreso(project, id, session, admin) {
   const aud = project.auditoria || {};
   const ft  = gar.fotosTecnicas || {};
 
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'techo',f),0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'centrosCarga',f),0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'zonaDelSistema',f),0);
-
   const esPequenoTipo = project.tipoSistema === 'sistema_pequeno';
 
   const levItems = calcLevItems(doc, project.tipoSistema);
   const levPct   = calcLevPct(doc, project.tipoSistema);
 
+  // Progreso de obra por Bloque 1/2/3 (checklist + evidencias de cierre).
+  const _obra   = esPequenoTipo ? null : calcObraStatus(project);
   const docItems = esPequenoTipo
     ? []
-    : [
-        { label: `Techo (${fTecho})`,              ok: fTecho > 0 },
-        { label: `Centros de carga (${fCentros})`, ok: fCentros > 0 },
-        { label: `Zona del sistema (${fZona})`,    ok: fZona > 0 },
-      ];
-  const docDone = docItems.length ? docItems.filter(i=>i.ok).length : 0;
-  const docPct  = docItems.length ? Math.round(docDone / docItems.length * 100) : 0;
+    : _obra.bloques.map(b => ({ label: `${b.label} (${b.done}/${b.total})`, ok: b.completo }));
+  const docPct  = esPequenoTipo ? 0 : _obra.pct;
 
   const totalPaneles = getSerialesFlat(gar).length;
   const garItems = esPequenoTipo
@@ -364,19 +354,15 @@ function renderQuickCheck(project, id, admin, inline = false) {
   const esPequeno = project.tipoSistema === 'sistema_pequeno';
   const estado = calcFaseEstado(project);
 
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'techo',f),0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'centrosCarga',f),0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f)=>s+countFotos(doc.fases,'zonaDelSistema',f),0);
   const totalPaneles = getSerialesFlat(gar).length;
 
   const levItems = [ { label: 'Levantamiento (tipo de techo)', ok: !!(doc.levantamiento?.tipTecho || doc.levantamiento?.areasTecho?.length) } ];
+  // Pendientes de obra por Bloque 1/2/3 (no el esquema viejo de fotos por sitio).
   const docItems = esPequeno
     ? []
-    : [
-        { label: `Fotos techo (${fTecho})`,    ok: fTecho > 0 },
-        { label: `Fotos centros de carga`,     ok: fCentros > 0 },
-        { label: `Fotos zona del sistema`,     ok: fZona > 0 },
-      ];
+    : calcObraStatus(project).bloques
+        .filter(b => b.total > 0)
+        .map(b => ({ label: `${b.label} (${b.done}/${b.total})`, ok: b.completo }));
   const garItems = esPequeno
     ? [
         { label: 'Foto del sistema',                ok: !!gar.fotoSistema },
@@ -572,9 +558,11 @@ function _getFaltantes(project) {
   const totalPaneles = getSerialesFlat(project.garantia).length;
   if (totalPaneles === 0) faltantes.push('Al menos un panel registrado con número de serie');
   if (!esPequeno) {
-    const f = project.documentacion?.fases;
-    const hayFotosCierre = (f?.techo?.cierre?.length || f?.despues?.length || 0) > 0;
-    if (!hayFotosCierre) faltantes.push('Al menos una foto de Cierre en Documentación');
+    // Progreso de obra: exigir que los 3 bloques estén completos (checklist +
+    // evidencias de cierre obligatorias) — esquema nuevo, no las fotos por sitio.
+    const obra = calcObraStatus(project);
+    obra.bloques.filter(b => b.total > 0 && !b.completo)
+      .forEach(b => faltantes.push(`${b.label} de obra incompleto`));
     if (!project.garantia?.fotosTecnicas?.tableroAC) faltantes.push('Foto del tablero AC terminado');
     if (!project.garantia?.fotosTecnicas?.inversorEnergizado) faltantes.push('Foto del inversor energizado');
   }

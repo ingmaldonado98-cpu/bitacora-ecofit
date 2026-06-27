@@ -8,6 +8,7 @@ import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
 import { getSerialesFlat } from './gar-paneles.js';
 import { newDoc, heading1, heading2, campo, p, table, hr, imageBlock, pageBreak,
          Paragraph, TextRun, AlignmentType, BorderStyle, saveDocx } from './word-helpers.js';
+import { getExecBlocks, BLOQUE_LABELS } from '../modules/checklist/index.js';
 
 const VERDE_OSC = '1B4332';
 const VERDE_MED = '40916C';
@@ -235,24 +236,30 @@ window.exportarWordTecnico = async function(projectId) {
     }
   }
 
-  // Fotos por fase
-  const _fasesDoc = project.documentacion?.fases || {};
-  const _getFasesFotos = (legacy, sitio, sub) => {
-    if (_fasesDoc[sitio]?.[sub]?.length) return _fasesDoc[sitio][sub];
-    return _fasesDoc[legacy] || [];
-  };
-  for (const [id, legacy, sitio, sub, titulo] of [
-    ['sec-antes',   'antes',   'techo', 'antes',   'Fotos: Antes'],
-    ['sec-durante', 'durante', 'techo', 'durante', 'Fotos: Durante'],
-    ['sec-despues', 'despues', 'techo', 'cierre',  'Fotos: Cierre'],
-  ]) {
-    if (!sec(id)) continue;
-    const fotos = _getFasesFotos(legacy, sitio, sub);
-    if (!fotos.length) continue;
-    addSec(titulo);
-    for (const f of fotos) {
-      if (f.nota) children.push(p(f.nota, { size: 18, color: GRIS }));
-      await addImg(f.data);
+  // Evidencias de cierre por Bloque 1/2/3 (esquema nuevo: checklistData.fotosCierre).
+  // Reemplaza las viejas "Fotos: Antes/Durante/Cierre" (documentacion.fases), cuya
+  // UI de captura ya no existe y salían vacías.
+  if (sec('sec-cierre')) {
+    const cl    = project.checklistData || {};
+    const techo = project.projectConfig?.techo || cl.techo || 'cemento';
+    let blocks = [];
+    try { blocks = getExecBlocks(project, techo) || []; } catch { blocks = []; }
+    for (const bloque of [1, 2, 3]) {
+      const bs = blocks.filter(b => b.bloque === bloque);
+      const items = [];
+      for (const b of bs) {
+        for (const slot of (b.fotosCierre || [])) {
+          const d = cl.fotosCierre?.[b.id]?.[slot.id];
+          if (d && (d.url || d.data || d.justificacion)) items.push({ slot, d });
+        }
+      }
+      if (!items.length) continue;
+      addSec(`Evidencias de cierre — ${BLOQUE_LABELS?.[bloque] || 'Bloque ' + bloque}`);
+      for (const { slot, d } of items) {
+        children.push(p(slot.label, { size: 16, color: GRIS }));
+        if (d.url || d.data) await addImg(d);
+        else if (d.justificacion) children.push(p(`⚠ Justificado: ${d.justificacion}`, { size: 18, color: 'd97706' }));
+      }
     }
   }
 

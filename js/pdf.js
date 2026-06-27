@@ -67,9 +67,7 @@ export async function renderPDFExport(projectId, session) {
           ['sec-paneles',    '☀️ Paneles por string con seriales'],
           ['sec-levant',     '📋 Levantamiento técnico'],
           ['sec-consumo',    '🔌 Consumo del cliente'],
-          ['sec-antes',      '🔍 Fotos: Antes'],
-          ['sec-durante',    '🔧 Fotos: Durante'],
-          ['sec-despues',    '✅ Fotos: Cierre'],
+          ['sec-cierre',     '📸 Evidencias de cierre (Bloques 1-3)'],
           ['sec-observ',     '💬 Observaciones del proyecto'],
           ['sec-historial',  '🕓 Historial de cambios'],
           ['sec-auditoria',  '📋 Auditoría técnica'],
@@ -77,9 +75,9 @@ export async function renderPDFExport(projectId, session) {
           ['sec-torque',     '🔩 Registro de torque'],
           ['sec-qr',         '📱 QR del cliente'],
         ].map(([id, label]) => `
-          <label class="check-chip pdf-check ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-despues','sec-voc','sec-torque'].includes(id)?'check-active':''}">
+          <label class="check-chip pdf-check ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-cierre','sec-voc','sec-torque'].includes(id)?'check-active':''}">
             <input type="checkbox" id="${id}"
-              ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-despues','sec-voc','sec-torque'].includes(id)?'checked':''}>
+              ${['sec-equipos','sec-fotos-tec','sec-paneles','sec-cierre','sec-voc','sec-torque'].includes(id)?'checked':''}>
             ${label}
           </label>`).join('')}
       </div>
@@ -88,7 +86,7 @@ export async function renderPDFExport(projectId, session) {
           ${icon('file-pdf')} PDF Técnico
         </button>
         <button class="btn-secondary btn-full" onclick="exportarWordTecnico('${projectId}')">
-          ${icon('file-text')} Word (.doc)
+          ${icon('file-text')} Word (.docx)
         </button>
       </div>
     </div>

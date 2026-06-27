@@ -1,5 +1,50 @@
 // util-fases.js — Lógica de desbloqueo/estado de fases (Doc/Gar/Aud) y firmas
-// Extraído de utils.js. Autocontenido — sin dependencias de DOM ni de otros util-*.js.
+// Extraído de utils.js. Sin dependencias de DOM ni de otros util-*.js.
+// Importa SOLO de modules/checklist/index.js (módulo hoja, sin imports propios
+// → no hay riesgo de dependencia circular vía utils.js).
+
+import { getExecBlocks, BLOQUE_LABELS, BLOQUE_DESC } from '../modules/checklist/index.js';
+
+// ── calcObraStatus — avance real de "Progreso de obra" por Bloque 1/2/3 ────────
+// Fuente de verdad nueva: checklistData.exec (ítems marcados) + checklistData.
+// fotosCierre (evidencias obligatorias). Reemplaza el esquema viejo de fotos por
+// sitio (documentacion.fases.techo/centrosCarga/zonaDelSistema), cuya UI de
+// captura ya no existe — por eso el viejo docPct quedaba clavado en 0.
+// Réplica local de la lógica de _pasoCompleto/computeBloqueStatus de doc-exec.js
+// (no se importa de ahí para no crear un ciclo doc-exec → utils → util-fases).
+export function calcObraStatus(project) {
+  const cl    = project.checklistData || {};
+  const techo = project.projectConfig?.techo || cl.techo || 'cemento';
+  let blocks = [];
+  try { blocks = getExecBlocks(project, techo) || []; } catch { blocks = []; }
+
+  const slotOk = (bid, sid) => {
+    const d = cl.fotosCierre?.[bid]?.[sid];
+    return !!(d && (d.url || d.pending || d.justificacion));
+  };
+  const pasoCompleto = b => {
+    const done = b.items.filter(it => cl.exec?.[it.id]).length;
+    if (done !== b.items.length || b.items.length === 0) return false;
+    return (b.fotosCierre || []).filter(s => s.obligatoria).every(s => slotOk(b.id, s.id));
+  };
+
+  const bloques = [1, 2, 3].map(n => {
+    const bs    = blocks.filter(x => x.bloque === n);
+    const total = bs.reduce((s, x) => s + x.items.length, 0);
+    const done  = bs.reduce((s, x) => s + x.items.filter(it => cl.exec?.[it.id]).length, 0);
+    return {
+      bloque: n,
+      label: BLOQUE_LABELS?.[n] || `Bloque ${n}`,
+      desc:  BLOQUE_DESC?.[n] || '',
+      done, total,
+      completo: bs.length > 0 && bs.every(pasoCompleto),
+    };
+  });
+  const conItems  = bloques.filter(b => b.total > 0);
+  const completos = conItems.filter(b => b.completo).length;
+  const pct = conItems.length ? Math.round(completos / conItems.length * 100) : 0;
+  return { bloques, completos, total: conItems.length, pct };
+}
 
 // ── firmaModificada — ¿hubo cambios en el módulo después de firmarlo? ─────────
 // Revisa el changeLog: cualquier entrada del módulo posterior a la firma
@@ -49,47 +94,30 @@ export function calcFaseEstado(project) {
   const aud = project.auditoria     || {};
   const esPequeno = project.tipoSistema === 'sistema_pequeno';
 
-  // ── Documentación ────────────────────────────────────────────────────────────
-  const fTecho   = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(doc.fases,'techo',f), 0);
-  const fCentros = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(doc.fases,'centrosCarga',f), 0);
-  const fZona    = ['antes','durante','cierre'].reduce((s,f) => s + countFotos(doc.fases,'zonaDelSistema',f), 0);
-
-  // Sistema pequeño solo necesita levantamiento; no requiere juego completo de fotos
+  // ── Documentación / Progreso de obra ─────────────────────────────────────────
+  // Levantamiento (gate de desbloqueo de Garantía) — sistema pequeño solo necesita esto.
   const lev      = doc.levantamiento || {};
   const levHecho = !!(lev.tipTecho || lev.areasTecho?.length);
 
-  // Puntos adicionales según tipo de sistema — qué tan completo está el
-  // Levantamiento eléctrico/de consumo, no solo el de techo.
-  const tipo     = project.tipoSistema;
-  const tieneCFE = ['interconectado', 'hibrido', 'hibrido_respaldo', 'respaldo'].includes(tipo);
-  const extraItems = [];
-  if (tieneCFE) {
-    const cfeHecho    = !!(lev.tarifaCFE && ((lev.recibos?.length || 0) > 0 || (lev.aparatos?.length || 0) > 0));
-    const cargasHecho = (lev.cargasCriticas?.length || 0) > 0 || (lev.cargasSecundarias?.length || 0) > 0;
-    extraItems.push(['Eléctrico / consumo CFE', cfeHecho]);
-    extraItems.push(['Cargas críticas/secundarias', cargasHecho]);
-  } else if (tipo === 'aislado') {
-    extraItems.push(['Autonomía y cargas críticas', !!(lev.autonomia && (lev.cargasCriticas?.length || 0) > 0)]);
-  } else if (tipo === 'bombeo') {
-    extraItems.push(['Datos de bombeo', !!(lev.tipoBomba && lev.caudal && lev.profundidadPozo)]);
-  }
-
-  const docItemsL = esPequeno
-    ? [ ['Levantamiento', levHecho] ]
-    : [ ['Levantamiento',              levHecho],
-        ['fotos de Techo',             fTecho > 0],
-        ['fotos de Centros de carga',  fCentros > 0],
-        ['fotos de Zona del inversor', fZona > 0],
-        ...extraItems ];
-  const docItems = docItemsL.map(([,ok]) => ok);
-  const docFaltantes = docItemsL.filter(([,ok]) => !ok).map(([l]) => l);
-  const docItemsOk = docItems.filter(Boolean).length;
-  const docCompleta = docItemsOk >= 1;
-  const docPct      = Math.round(docItemsOk / docItems.length * 100);
+  // "Progreso de obra" (fase 'doc') ahora se mide por Bloque 1/2/3 — checklist
+  // de ejecución + evidencias de cierre — NO por las fotos por sitio viejas (UI
+  // eliminada). Para sistema pequeño no hay Progreso de obra (módulo oculto).
+  const obra = esPequeno ? null : calcObraStatus(project);
+  const docPct = esPequeno
+    ? (levHecho ? 100 : 0)
+    : (obra.total ? obra.pct : 0);
+  const docFaltantes = esPequeno
+    ? (levHecho ? [] : ['Levantamiento'])
+    : [
+        ...(levHecho ? [] : ['Levantamiento']),
+        ...obra.bloques.filter(b => b.total > 0 && !b.completo).map(b => `${b.label} incompleto`),
+      ];
   const docFirmada  = !!(project.fases?.firmas?.doc);
 
   // ── Garantía ─────────────────────────────────────────────────────────────────
-  const garDesbloqueada = docCompleta;
+  // Garantía se desbloquea al terminar el Levantamiento (NO al terminar la obra)
+  // — preserva el toast "Completa el Levantamiento primero" del router.
+  const garDesbloqueada = levHecho;
   // Lectura en línea (no se importa gar-paneles.js — este archivo es autocontenido):
   // seriales planos, con fallback a strings viejos para proyectos no migrados.
   const totalPaneles = (gar.paneles?.seriales ?? (gar.paneles?.strings||[]).flatMap(s=>s.paneles||[])).length;

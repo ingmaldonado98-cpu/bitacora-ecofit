@@ -11,6 +11,7 @@ import {
 } from './pdf-helpers.js';
 import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
 import { getSerialesFlat } from './gar-paneles.js';
+import { getExecBlocks, BLOQUE_LABELS } from '../modules/checklist/index.js';
 
 const ESTADOS_LABEL = Object.fromEntries(Object.entries(ESTADOS).map(([k,v]) => [k, v.label]));
 
@@ -283,28 +284,32 @@ window.exportarPDFTecnico = async function(projectId) {
       }
     }
 
-    // Fotos por fase
-    const _fasesDoc = project.documentacion?.fases || {};
-    const _getFasesFotos = (legacy, sitio, sub) => {
-      if (_fasesDoc[sitio]?.[sub]?.length) return _fasesDoc[sitio][sub];
-      return _fasesDoc[legacy] || [];
-    };
-    for (const [id, legacy, sitio, sub, titulo] of [
-      ['sec-antes',   'antes',   'techo', 'antes',   'Fotos: Antes'],
-      ['sec-durante', 'durante', 'techo', 'durante', 'Fotos: Durante'],
-      ['sec-despues', 'despues', 'techo', 'cierre',  'Fotos: Cierre'],
-    ]) {
-      if (!sec(id)) continue;
-      const fotos = _getFasesFotos(legacy, sitio, sub);
-      if (!fotos.length) continue;
-      doc.addPage(); addHeader(doc,titulo,project); y=44;
-      let col=0;
-      for (const f of fotos) {
-        const fx = 14 + col*98;
-        if (f.nota) { doc.setFontSize(8); doc.setTextColor(...GRIS_CLR); doc.text(f.nota,fx,y); y+=4; }
-        const newY = await addImage(doc,f.data,fx,y,88,65);
-        if (col===1) { y=newY; col=0; } else col=1;
-        if (y>230) { doc.addPage(); addHeader(doc,titulo+' (cont.)',project); y=44; col=0; }
+    // Evidencias de cierre por Bloque 1/2/3 (esquema nuevo: checklistData.fotosCierre).
+    if (sec('sec-cierre')) {
+      const cl    = project.checklistData || {};
+      const techo = project.projectConfig?.techo || cl.techo || 'cemento';
+      let blocks = [];
+      try { blocks = getExecBlocks(project, techo) || []; } catch { blocks = []; }
+      for (const bloque of [1, 2, 3]) {
+        const bs = blocks.filter(b => b.bloque === bloque);
+        const items = [];
+        for (const b of bs) {
+          for (const slot of (b.fotosCierre || [])) {
+            const d = cl.fotosCierre?.[b.id]?.[slot.id];
+            if (d && (d.url || d.data)) items.push({ slot, src: d.url || d.data });
+          }
+        }
+        if (!items.length) continue;
+        const titulo = `Evidencias de cierre — ${BLOQUE_LABELS?.[bloque] || 'Bloque ' + bloque}`;
+        doc.addPage(); addHeader(doc, titulo, project); y = 44;
+        let col = 0;
+        for (const { slot, src } of items) {
+          const fx = 14 + col * 98;
+          doc.setFontSize(8); doc.setTextColor(...GRIS_CLR); doc.text(slot.label, fx, y); y += 4;
+          const newY = await addImage(doc, src, fx, y, 88, 65);
+          if (col === 1) { y = newY; col = 0; } else col = 1;
+          if (y > 230) { doc.addPage(); addHeader(doc, titulo + ' (cont.)', project); y = 44; col = 0; }
+        }
       }
     }
 

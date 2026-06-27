@@ -52,6 +52,9 @@
   --shadow:    none;
   --nav-h:     68px;
   --hdr-h:     56px;
+  /* Espacio inferior del contenido para que el bottom-nav fijo (móvil/tablet)
+     no tape el final de las vistas (antes 24px < 68px del nav → contenido mocho). */
+  --app-pb:    calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 16px);
 
   /* Spacing — roles de separación entre secciones/elementos. Mapeado a los
      valores ya dominantes en el archivo (no son números nuevos) — usar en
@@ -405,10 +408,10 @@ body {
 /* ── App container ────────────────────────────────────────────────────────── */
 #app {
   width: 100%; margin: 0 auto;
-  padding: 0 16px 24px;
+  padding: 0 16px var(--app-pb);
   min-height: calc(100dvh - var(--hdr-h) - var(--nav-h));
 }
-@media (min-width: 600px)  { #app { max-width: 720px;  padding: 0 24px 24px; } }
+@media (min-width: 600px)  { #app { max-width: 720px;  padding: 0 24px var(--app-pb); } }
 @media (min-width: 900px)  { #app { max-width: 1000px; padding: 0 32px 24px; } }
 @media (min-width: 1280px) { #app { max-width: 1200px; padding: 0 40px 24px; } }
 
@@ -2181,7 +2184,7 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 
 /* ── Tablet: centrar como columna angosta ─────────────────────────────────── */
 @media (min-width: 641px) and (max-width: 899px) {
-  #app { padding: 0 24px 24px; }
+  #app { padding: 0 24px var(--app-pb); }
   #bottom-nav { max-width: 640px; left: 50%; transform: translateX(-50%); }
   #top-header { max-width: 640px; left: 50%; right: auto; width: 640px; transform: translateX(-50%); border-radius: 0 0 var(--radius) var(--radius); }
   .search-filter-bar { flex-direction: row; }
