@@ -33,6 +33,10 @@ window.calcIrrChange = (i, delta) => {
   cs.irrRows[i] = Math.max(1, cs.irrRows[i]+delta);
   window._calcRender();
 };
+window.calcUsarSugerenciaArea = (cols, rows) => {
+  cs.distMode = 'grid'; cs.cols = Math.max(1, cols); cs.rows = Math.max(1, rows);
+  window._calcRender();
+};
 window.calcIrrAdd    = ()  => { cs.irrRows.push(1); window._calcRender(); };
 window.calcIrrRemove = i   => {
   if (cs.irrRows.length <= 1) { toast('Debe quedar al menos una fila', 'error'); return; }

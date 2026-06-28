@@ -178,6 +178,34 @@ function renderContexto() {
 }
 
 // ── Distribución ───────────────────────────────────────────────────────────
+// Hint informativo (no vinculante) con el área de techo capturada en el
+// levantamiento de campo — evita que el técnico tenga que adivinar cuántos
+// paneles entran sin volver a medir. El usuario decide si usa la sugerencia.
+function _areaLevantamientoHint() {
+  const area = SX.project?.documentacion?.levantamiento?.areasTecho?.[0];
+  if (!area) return '';
+  const dimTxt = (area.ancho && area.largo)
+    ? `${area.ancho} × ${area.largo} m (${(area.ancho*area.largo).toFixed(1)} m²)`
+    : (area.area ? `${area.area} m²` : null);
+  if (!dimTxt) return '';
+  let sugerencia = '';
+  if (area.ancho && area.largo && cs.pW > 0 && cs.pH > 0) {
+    const cols = Math.max(1, Math.floor(area.ancho / (cs.pW + cs.gapH)));
+    const rows = Math.max(1, Math.floor(area.largo / (cs.pH + cs.gapV)));
+    sugerencia = `
+      <button type="button" class="btn-outline btn-sm" style="margin-left:8px"
+        onclick="calcUsarSugerenciaArea(${cols},${rows})">
+        Usar sugerencia: ${cols}×${rows} (${cols*rows} paneles)
+      </button>`;
+  }
+  return `
+  <div style="margin-bottom:10px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);font-size:.8rem;display:flex;flex-wrap:wrap;align-items:center;gap:4px">
+    <span style="color:var(--text-muted)">Área disponible (levantamiento)${area.nombre?` — ${esc(area.nombre)}`:''}:</span>
+    <strong>${dimTxt}</strong>
+    ${sugerencia}
+  </div>`;
+}
+
 function renderDist() {
   const rd = getRowData();
   const total = rd.reduce((s,c)=>s+c,0);
@@ -196,6 +224,7 @@ function renderDist() {
   return `
   <div class="card">
     <div class="calc-step-label"><span class="calc-step-num">4</span> Distribución de paneles</div>
+    ${_areaLevantamientoHint()}
     <div style="display:flex;gap:6px;margin-bottom:14px">
       <button class="calc-chip ${cs.distMode==='grid'?'calc-chip-on':''}" onclick="calcSetDist('grid')">Cuadrícula</button>
       <button class="calc-chip ${cs.distMode==='irregular'?'calc-chip-on':''}" onclick="calcSetDist('irregular')">Filas irregulares</button>

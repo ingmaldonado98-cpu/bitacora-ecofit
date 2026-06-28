@@ -2,7 +2,7 @@
 
 import { inventario as invStore, projects, kv } from './db.js';
 import { PANEL_PRESETS } from '../modules/calculadora/index.js';
-import { cs, SX, loadFromConfig } from './calc-state.js';
+import { cs, SX, loadFromConfig, loadTechoDesdeLevantamiento } from './calc-state.js';
 import { renderCalc } from './calc-render.js';
 import { _resetDiagZoom } from './calc-render-diagrama.js';
 import './calc-actions.js'; // registra window.calcSelectE, calcGuardar, etc.
@@ -39,6 +39,7 @@ export async function renderCalculadora(session, projectId) {
   if (SX.projectId) {
     SX.project = await projects.getById(SX.projectId);
     if (SX.project?.projectConfig) loadFromConfig(SX.project.projectConfig);
+    loadTechoDesdeLevantamiento(SX.project);
   }
 
   return renderCalc() + `<script>window._calcBind&&window._calcBind();<\/script>`;

@@ -74,6 +74,28 @@ export function loadFromConfig(cfg) {
   cs.distVigas      = cfg.madera?.distVigas      ?? 40;
 }
 
+// Mapea el tipo de techo capturado en el levantamiento (lev.areasTecho[].tipTecho,
+// en español) a la clave interna que usa la calculadora BOM (cs.techo).
+const TECHO_LEV_A_CS = {
+  'Losa de concreto': 'cemento',
+  'Lámina':           'metal',
+  'Carport':           'metal',
+  'Madera':            'madera',
+};
+
+// Precarga cs.techo (y datos de madera) desde la primera área del levantamiento
+// — solo si la calculadora todavía no tiene techo configurado (no sobreescribe
+// una config ya guardada). El usuario puede cambiarlo libremente después.
+export function loadTechoDesdeLevantamiento(project) {
+  if (cs.techo) return;
+  const area = project?.documentacion?.levantamiento?.areasTecho?.[0];
+  if (!area) return;
+  const techo = TECHO_LEV_A_CS[area.tipTecho];
+  if (!techo) return;
+  cs.techo = techo;
+  if (techo === 'madera' && area.distVigas) cs.distVigas = area.distVigas;
+}
+
 export function getRowData() {
   return cs.distMode === 'grid'
     ? Array.from({ length: cs.rows }, () => cs.cols)

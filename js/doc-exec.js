@@ -27,6 +27,7 @@ import { BLOQUE_LABELS, BLOQUE_DESC } from '../modules/checklist/index.js';
 import { calcVocEsperadoString } from './gar-voc.js';
 import { getRowsData, getPanelWidth, railCutForRow, buildTorqueTable } from '../modules/calculadora/index.js';
 import { renderTrayectoriasResumen } from './trayectorias.js';
+import './lev-guardar.js'; // registra window.capDronFoto/capDronVideo/delDronMedia para la toma aérea de cierre
 
 // ── Tarjeta de referencia de ingeniería ──────────────────────────────────────
 // Inyecta datos que ya calcula la Calculadora (mismas funciones puras que usa
@@ -269,6 +270,31 @@ function _slotFotoHtml(block, slot, pid, cl, edit) {
   </div>`;
 }
 
+// ── Toma aérea de cierre (dron) — vive en el último paso del Bloque 3, no en
+// el levantamiento inicial, porque solo tiene sentido pedirla una vez que el
+// sistema ya está instalado. Reutiliza lev.dron.cierre y los mismos handlers
+// capDronFoto/capDronVideo/delDronMedia ya registrados en lev-guardar.js.
+function _dronCierreHtml(project, pid, chkDone, edit) {
+  const d = project.documentacion?.levantamiento?.dron?.cierre || { fotos: [], videos: [] };
+  return `
+  <div class="cl-cierre ${chkDone ? 'cl-cierre-activa' : 'cl-cierre-bloqueada'}">
+    <p class="cl-cierre-hdr">${chkDone ? '🚁 Toma aérea de cierre (dron)' : `${icon('lock', 13)} Completa las tareas para habilitar la captura`}</p>
+    <div class="cl-cierre-slots ${chkDone ? '' : 'acc-collapsed'}" style="flex-wrap:wrap;gap:6px;display:flex">
+      ${(d.fotos||[]).map((f,i)=>
+        `<div class="lev-area-foto-wrap">${fotoMini(f.url||f,'Dron')}${edit?`<button type="button" class="btn-del-foto" onclick="delDronMedia('${pid}','cierre','fotos',${i})">✕</button>`:''}</div>`).join('')}
+      ${(d.videos||[]).map((v,i)=>
+        `<div class="lev-area-foto-wrap dron-video-wrap">
+          <a href="${v.url}" target="_blank" rel="noopener" class="btn-foto-sm" style="text-decoration:none">🎥 Video ${i+1}</a>
+          ${edit?`<button type="button" class="btn-del-foto" onclick="delDronMedia('${pid}','cierre','videos',${i})">✕</button>`:''}
+        </div>`).join('')}
+      ${edit && chkDone ? `
+        <button type="button" class="btn-foto-sm" onclick="capDronFoto('${pid}','cierre')">${icon('camera')} Foto</button>
+        <button type="button" class="btn-foto-sm" onclick="capDronVideo('${pid}','cierre')">🎥 Video</button>
+      ` : ''}
+    </div>
+  </div>`;
+}
+
 export function renderExecPorBloque(project, bloque, allExecBlocks, edit, admin) {
   const cl        = project.checklistData || {};
   const overrides = cl.bloqueOverride || {};
@@ -385,6 +411,7 @@ export function renderExecPorBloque(project, bloque, allExecBlocks, edit, admin)
             ${block.fotosCierre.map(slot => _slotFotoHtml(block, slot, pid, cl, edit)).join('')}
           </div>
         </div>` : ''}
+        ${block.id === 'mediciones-marcha' ? _dronCierreHtml(project, pid, chkDone, edit) : ''}
       </details>`;
     }).join('')}
   </div>`;

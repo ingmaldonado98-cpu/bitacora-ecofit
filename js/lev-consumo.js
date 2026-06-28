@@ -6,7 +6,7 @@ import { uploadPhotoQueued } from './firebase.js';
 import { icon } from './icons.js';
 
 // ── Recibos CFE ───────────────────────────────────────────────────────────────
-const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+export const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MESES_FULL  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 window.MESES_FULL = MESES_FULL; // exponer para onchange inline
 

@@ -12,6 +12,7 @@ import {
 import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
 import { getSerialesFlat } from './gar-paneles.js';
 import { getExecBlocks, BLOQUE_LABELS } from '../modules/checklist/index.js';
+import { MESES_CORTO } from './lev-consumo.js';
 
 const ESTADOS_LABEL = Object.fromEntries(Object.entries(ESTADOS).map(([k,v]) => [k, v.label]));
 
@@ -194,12 +195,40 @@ window.exportarPDFTecnico = async function(projectId) {
         if (lev.almacenamientoTemporal) y=campo(doc,'Almacenamiento temporal',lev.almacenamientoTemporal,14,y);
         if (lev.conectividadInversor)   y=campo(doc,'Conectividad en inversor',lev.conectividadInversor,14,y);
       }
+      if (lev.restricciones) {
+        const lineas = doc.splitTextToSize(lev.restricciones, 180);
+        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
+        doc.text('RESTRICCIONES', 14, y); y+=4;
+        doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+        doc.text(lineas, 14, y); y += lineas.length * 5;
+      }
+      if (lev.logisticaNotas) {
+        const lineas = doc.splitTextToSize(lev.logisticaNotas, 180);
+        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
+        doc.text('NOTAS DE LOGÍSTICA', 14, y); y+=4;
+        doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+        doc.text(lineas, 14, y); y += lineas.length * 5;
+      }
       if (lev.observacionesGenerales) {
         const lineas = doc.splitTextToSize(lev.observacionesGenerales, 180);
         doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR);
         doc.text('OBSERVACIONES', 14, y); y+=4;
         doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
         doc.text(lineas, 14, y); y += lineas.length * 5;
+      }
+      const sunSeeker = lev.sunSeeker || [];
+      if (sunSeeker.length) {
+        if (y > 220) { doc.addPage(); addHeader(doc,'Levantamiento — Sun Seeker',project); y=44; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...VERDE);
+        doc.text('Sun Seeker (análisis de sombras)', 14, y); y+=6;
+        let colSS=0;
+        for (const f of sunSeeker.slice(0,4)) {
+          const fx = 14 + colSS*98;
+          const newY = await addImage(doc, f.url||f, fx, y, 88, 62);
+          if (f.etiqueta) { doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRIS_CLR); doc.text(f.etiqueta, fx, newY+4); }
+          if (colSS===1) { y=newY+8; colSS=0; } else colSS=1;
+          if (y>240) { doc.addPage(); addHeader(doc,'Levant. Sun Seeker (cont.)',project); y=44; colSS=0; }
+        }
       }
       const fotosLev = lev.fotosLevantamiento || [];
       if (fotosLev.length) {
@@ -213,6 +242,44 @@ window.exportarPDFTecnico = async function(projectId) {
           if (col===1) { y=newY+2; col=0; } else col=1;
           if (y>240) { doc.addPage(); addHeader(doc,'Levant. Fotos (cont.)',project); y=44; col=0; }
         }
+      }
+    }
+
+    // Consumo del cliente
+    if (sec('sec-consumo')) {
+      const lev = project.documentacion?.levantamiento||{};
+      const recibos  = lev.recibos  || [];
+      const aparatos = lev.aparatos || [];
+      if (recibos.length || aparatos.length) {
+        if (y > 220) { doc.addPage(); addHeader(doc,'Consumo del cliente',project); y=44; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...VERDE);
+        doc.text('Consumo del cliente', 14, y); y += 7;
+
+        if (lev.modoConsumo === 'aparatos' && aparatos.length) {
+          const totalKwh = aparatos.reduce((s,a)=>s+((a.potencia||0)*(a.horas||0)*(a.cantidad||1)*30/1000),0);
+          doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GRIS_CLR);
+          doc.text(`Estimado por aparatos — ${Math.round(totalKwh)} kWh/mes`, 14, y); y += 6;
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GRIS);
+          for (const a of aparatos) {
+            if (y>260) { doc.addPage(); addHeader(doc,'Consumo (cont.)',project); y=44; }
+            const kwhMes = ((a.potencia||0)*(a.horas||0)*(a.cantidad||1)*30/1000).toFixed(1);
+            doc.text(`${a.nombre||'—'} · ${a.potencia||0} W × ${a.horas||0} h/día × ${a.cantidad||1} (${a.area||'General'}) — ${kwhMes} kWh/mes`, 14, y); y += 4.5;
+          }
+        } else if (recibos.length) {
+          const conKwh = recibos.filter(r=>r.kwh>0);
+          if (conKwh.length) {
+            const avgKwh = Math.round(conKwh.reduce((s,r)=>s+r.kwh,0)/conKwh.length);
+            doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GRIS_CLR);
+            doc.text(`Promedio mensual (${conKwh.length} recibos) — ${avgKwh} kWh/mes`, 14, y); y += 6;
+          }
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GRIS);
+          for (const r of recibos) {
+            if (y>260) { doc.addPage(); addHeader(doc,'Consumo (cont.)',project); y=44; }
+            const mesTxt = r.mes ? `${MESES_CORTO[r.mes-1]||r.mes} ${r.anio||''}`.trim() : (r.anio||'—');
+            doc.text(`${mesTxt} — ${r.kwh||0} kWh${r.importe?` · $${r.importe}`:''}`, 14, y); y += 4.5;
+          }
+        }
+        y += 4;
       }
     }
 

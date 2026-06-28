@@ -52,7 +52,7 @@ function renderLevantamiento(project, tipo, edit) {
                            lev.voltajeSistemaDC || lev.tipoControlador || lev.bateria);
   const hasSombras    = !!(lev.sombras?.checklist?.length || lev.sombras?.foto || lev.sombras?.notas ||
                            lev.condicionesAmbientales?.length || lev.sunSeeker?.length);
-  const _dronCount    = ['antes','cierre'].reduce((s,f)=>s+((lev.dron?.[f]?.fotos?.length||0)+(lev.dron?.[f]?.videos?.length||0)),0);
+  const _dronCount    = (lev.dron?.antes?.fotos?.length||0)+(lev.dron?.antes?.videos?.length||0);
   const hasDron       = _dronCount > 0;
   const hasLogistica  = !!(lev.accesoTecho || lev.almacenamientoTemporal || lev.conectividadInversor || lev.logisticaNotas);
   const hasNotas      = !!(lev.observacionesGenerales);
@@ -271,28 +271,26 @@ function renderLevantamiento(project, tipo, edit) {
     `)}
 
     ${acc('dron', 'Tomas con dron', '🚁', hasDron, `
-      <p class="form-hint" style="margin:0 0 8px">Foto y video aéreo del sitio — fase inicial (antes) y de cierre. El video se sube solo con conexión (máx. 60 MB); las fotos también funcionan offline.</p>
-      ${['antes','cierre'].map(fase => {
-        const faseLabel = fase==='antes' ? '📍 Antes (levantamiento)' : '✅ Cierre (obra terminada)';
-        const d = (lev.dron && lev.dron[fase]) || { fotos:[], videos:[] };
+      <p class="form-hint" style="margin:0 0 8px">Foto y video aéreo del sitio antes de instalar. El video se sube solo con conexión (máx. 60 MB); las fotos también funcionan offline. La toma aérea de cierre (obra terminada) se captura más adelante, en Progreso de obra → Bloque 3.</p>
+      ${(() => {
+        const d = lev.dron?.antes || { fotos:[], videos:[] };
         return `
         <div class="form-group" style="margin-top:4px">
-          <label>${faseLabel}</label>
           <div class="ft-slot" style="flex-wrap:wrap;gap:6px">
             ${(d.fotos||[]).map((f,i)=>
-              `<div class="lev-area-foto-wrap">${fotoMini(f.url||f,'Dron')}${edit?`<button type="button" class="btn-del-foto" onclick="delDronMedia('${pid}','${fase}','fotos',${i})">✕</button>`:''}</div>`).join('')}
+              `<div class="lev-area-foto-wrap">${fotoMini(f.url||f,'Dron')}${edit?`<button type="button" class="btn-del-foto" onclick="delDronMedia('${pid}','antes','fotos',${i})">✕</button>`:''}</div>`).join('')}
             ${(d.videos||[]).map((v,i)=>
               `<div class="lev-area-foto-wrap dron-video-wrap">
                 <a href="${v.url}" target="_blank" rel="noopener" class="btn-foto-sm" style="text-decoration:none">🎥 Video ${i+1}</a>
-                ${edit?`<button type="button" class="btn-del-foto" onclick="delDronMedia('${pid}','${fase}','videos',${i})">✕</button>`:''}
+                ${edit?`<button type="button" class="btn-del-foto" onclick="delDronMedia('${pid}','antes','videos',${i})">✕</button>`:''}
               </div>`).join('')}
             ${edit?`
-              <button type="button" class="btn-foto-sm" onclick="capDronFoto('${pid}','${fase}')">${icon('camera')} Foto</button>
-              <button type="button" class="btn-foto-sm" onclick="capDronVideo('${pid}','${fase}')">🎥 Video</button>
+              <button type="button" class="btn-foto-sm" onclick="capDronFoto('${pid}','antes')">${icon('camera')} Foto</button>
+              <button type="button" class="btn-foto-sm" onclick="capDronVideo('${pid}','antes')">🎥 Video</button>
             `:''}
           </div>
         </div>`;
-      }).join('')}
+      })()}
     `)}
 
     ${/* Eléctrico y consumo — no aplica para 'otro'. Sistema pequeño usa solo el bloque DC (dinamico) */

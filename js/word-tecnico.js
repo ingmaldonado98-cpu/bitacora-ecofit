@@ -9,6 +9,7 @@ import { getSerialesFlat } from './gar-paneles.js';
 import { newDoc, heading1, heading2, campo, p, table, hr, imageBlock, pageBreak,
          Paragraph, TextRun, AlignmentType, BorderStyle, saveDocx } from './word-helpers.js';
 import { getExecBlocks, BLOQUE_LABELS } from '../modules/checklist/index.js';
+import { MESES_CORTO } from './lev-consumo.js';
 
 const VERDE_OSC = '1B4332';
 const VERDE_MED = '40916C';
@@ -189,16 +190,68 @@ window.exportarWordTecnico = async function(projectId) {
       if (lev.almacenamientoTemporal) addCampo('Almacenamiento temporal', lev.almacenamientoTemporal);
       if (lev.conectividadInversor)   addCampo('Conectividad en inversor', lev.conectividadInversor);
     }
+    if (lev.restricciones) {
+      children.push(new Paragraph({ children: [
+        new TextRun({ text: 'RESTRICCIONES', size: 16, color: GRIS, break: 0 }),
+        new TextRun({ text: lev.restricciones, size: 20, break: 1 }),
+      ] }));
+    }
+    if (lev.logisticaNotas) {
+      children.push(new Paragraph({ children: [
+        new TextRun({ text: 'NOTAS DE LOGÍSTICA', size: 16, color: GRIS, break: 0 }),
+        new TextRun({ text: lev.logisticaNotas, size: 20, break: 1 }),
+      ] }));
+    }
     if (lev.observacionesGenerales) {
       children.push(new Paragraph({ children: [
         new TextRun({ text: 'OBSERVACIONES', size: 16, color: GRIS, break: 0 }),
         new TextRun({ text: lev.observacionesGenerales, size: 20, break: 1 }),
       ] }));
     }
+    const sunSeekerW = lev.sunSeeker || [];
+    if (sunSeekerW.length) {
+      children.push(p('Sun Seeker (análisis de sombras)', { bold: true, color: VERDE_MED }));
+      for (const f of sunSeekerW.slice(0, 4)) {
+        await addImg(f.url || f);
+        if (f.etiqueta) children.push(p(f.etiqueta, { size: 16, color: '6b7280' }));
+      }
+    }
     const fotosLev = lev.fotosLevantamiento || [];
     if (fotosLev.length) {
       children.push(p('Fotos del levantamiento', { bold: true, color: VERDE_MED }));
       for (const f of fotosLev.slice(0, 6)) await addImg(f.url || f);
+    }
+  }
+
+  // Consumo del cliente
+  if (sec('sec-consumo')) {
+    const lev = project.documentacion?.levantamiento || {};
+    const recibos  = lev.recibos  || [];
+    const aparatos = lev.aparatos || [];
+    if (recibos.length || aparatos.length) {
+      addSec('Consumo del cliente');
+      if (lev.modoConsumo === 'aparatos' && aparatos.length) {
+        const totalKwh = aparatos.reduce((s,a)=>s+((a.potencia||0)*(a.horas||0)*(a.cantidad||1)*30/1000),0);
+        children.push(p(`Estimado por aparatos — ${Math.round(totalKwh)} kWh/mes`, { bold: true, color: VERDE_MED }));
+        const headers = ['Aparato', 'Área', 'Potencia (W)', 'h/día', 'Cant.', 'kWh/mes'];
+        const rows = aparatos.map(a => [
+          a.nombre || '—', a.area || 'General', String(a.potencia||0), String(a.horas||0), String(a.cantidad||1),
+          ((a.potencia||0)*(a.horas||0)*(a.cantidad||1)*30/1000).toFixed(1),
+        ]);
+        children.push(table(headers, rows, { headerShading: VERDE_OSC }));
+      } else if (recibos.length) {
+        const conKwh = recibos.filter(r=>r.kwh>0);
+        if (conKwh.length) {
+          const avgKwh = Math.round(conKwh.reduce((s,r)=>s+r.kwh,0)/conKwh.length);
+          children.push(p(`Promedio mensual (${conKwh.length} recibos) — ${avgKwh} kWh/mes`, { bold: true, color: VERDE_MED }));
+        }
+        const headers = ['Mes', 'kWh', 'Importe'];
+        const rows = recibos.map(r => [
+          r.mes ? `${MESES_CORTO[r.mes-1]||r.mes} ${r.anio||''}`.trim() : (r.anio || '—'),
+          String(r.kwh||0), r.importe ? `$${r.importe}` : '—',
+        ]);
+        children.push(table(headers, rows, { headerShading: VERDE_OSC }));
+      }
     }
   }
 
