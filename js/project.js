@@ -356,24 +356,24 @@ function renderQuickCheck(project, id, admin, inline = false) {
 
   const totalPaneles = getSerialesFlat(gar).length;
 
-  const levItems = [ { label: 'Levantamiento (tipo de techo)', ok: !!(doc.levantamiento?.tipTecho || doc.levantamiento?.areasTecho?.length) } ];
+  const levItems = [ { label: 'Levantamiento (tipo de techo)', desc: 'Registra tipo de techo, temperatura, orientación y áreas del techo.', ok: !!(doc.levantamiento?.tipTecho || doc.levantamiento?.areasTecho?.length) } ];
   // Pendientes de obra por Bloque 1/2/3 (no el esquema viejo de fotos por sitio).
   const docItems = esPequeno
     ? []
     : calcObraStatus(project).bloques
         .filter(b => b.total > 0)
-        .map(b => ({ label: `${b.label} (${b.done}/${b.total})`, ok: b.completo }));
+        .map(b => ({ label: `${b.label} (${b.done}/${b.total})`, desc: b.desc, tab: `d-bloque${b.bloque}`, ok: b.completo }));
   const garItems = esPequeno
     ? [
-        { label: 'Foto del sistema',                ok: !!gar.fotoSistema },
-        { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
-        { label: `Paneles (${totalPaneles})`,       ok: totalPaneles > 0 },
+        { label: 'Foto del sistema',                     desc: 'Foto general del sistema terminado, para la garantía.', ok: !!gar.fotoSistema },
+        { label: `Equipos (${gar.equipos?.length||0})`,  desc: 'Números de serie de inversor, protecciones y otros equipos.', ok: (gar.equipos?.length||0) > 0 },
+        { label: `Paneles (${totalPaneles})`,            desc: 'Números de serie de cada panel registrado.', ok: totalPaneles > 0 },
       ]
     : [
-        { label: 'Foto del sistema',                ok: !!gar.fotoSistema },
-        { label: 'Fotos técnicas',                  ok: !!(ft.tableroAC || ft.inversorEnergizado) },
-        { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
-        { label: `Paneles (${totalPaneles})`,       ok: totalPaneles > 0 },
+        { label: 'Foto del sistema',                     desc: 'Foto general del sistema terminado, para la garantía.', ok: !!gar.fotoSistema },
+        { label: 'Fotos técnicas',                       desc: 'Tablero AC, tablero DC o inversor energizado.', ok: !!(ft.tableroAC || ft.inversorEnergizado) },
+        { label: `Equipos (${gar.equipos?.length||0})`,  desc: 'Números de serie de inversor, protecciones y otros equipos.', ok: (gar.equipos?.length||0) > 0 },
+        { label: `Paneles (${totalPaneles})`,            desc: 'Números de serie de cada panel registrado.', ok: totalPaneles > 0 },
       ];
 
   const docLocked = estado.doc === 'bloqueada';
@@ -394,9 +394,12 @@ function renderQuickCheck(project, id, admin, inline = false) {
     </div>`;
   const body = `<div class="qc-list">
       ${pendientes.map(p => `
-      <div class="qc-item" onclick="navigate('${p.link}')">
+      <div class="qc-item" onclick="${p.tab ? `sessionStorage.setItem('doc-tab-target','${p.tab}');` : ''}navigate('${p.link}')">
         <span class="qc-mod-dot" style="background:${modColor[p.mod]}"></span>
-        <span class="qc-label">${esc(p.label)}</span>
+        <div class="qc-info">
+          <span class="qc-label">${esc(p.label)}</span>
+          ${p.desc ? `<span class="qc-desc">${esc(p.desc)}</span>` : ''}
+        </div>
         <span class="qc-mod-tag" style="color:${modColor[p.mod]}">${esc(p.modLabel)}</span>
         ${icon('caret-right', 14, 'qc-arrow')}
       </div>`).join('')}
