@@ -21,7 +21,8 @@ jobs:
         run: |
           COUNT=$(git diff HEAD~1 HEAD --name-only \
             | grep -v '^sw\.js$' \
-            | grep -cE '\.(js|html|css|json)$' || echo 0)
+            | grep -cE '\.(js|html|css|json)$' || true)
+          COUNT=${COUNT:-0}
           echo "count=$COUNT" >> $GITHUB_OUTPUT
           echo "Archivos de app modificados: $COUNT"
 
