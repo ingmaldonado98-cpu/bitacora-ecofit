@@ -1,7 +1,7 @@
 // dimensionamiento.js — Vista de Memoria Técnica Preliminar
 
 import { projects } from './db.js';
-import { esc, toast, fmtFechaHora } from './utils.js';
+import { esc, toast, fmtFechaHora, isoNow } from './utils.js';
 import { isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
 import { calcDimensionamiento, detectarRiesgos, getChecklistCampo, calcSeccionCable, awgToMm2 } from '../modules/dimensionamiento/index.js';
@@ -34,7 +34,7 @@ export async function renderDimensionamiento(projectId, session) {
   </div>
 
   <div class="dim-actions-row">
-    <button class="btn-outline btn-sm" onclick="navigate('#documentacion/${projectId}')">
+    <button class="btn-outline btn-sm" onclick="navigate('#proyecto/${projectId}/levantamiento')">
       ${icon('pencil-simple', 14)} Editar levantamiento
     </button>
     <button class="btn-outline btn-sm" onclick="dimExportPDF('${projectId}')">
@@ -51,7 +51,7 @@ export async function renderDimensionamiento(projectId, session) {
     <div>
       <strong>Datos insuficientes para calcular</strong>
       <p>${esc(res.error)}</p>
-      <button class="btn-primary btn-sm" onclick="navigate('#documentacion/${projectId}')">
+      <button class="btn-primary btn-sm" onclick="navigate('#proyecto/${projectId}/levantamiento')">
         Completar levantamiento
       </button>
     </div>
@@ -310,5 +310,6 @@ window.dimExportPDF = async function(projectId) {
   a.href = url; a.download = `memoria-tecnica-${projectId}.html`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+  await projects.setField(projectId, 'dimensionamiento.exportadoAt', isoNow());
   toast('PDF generado');
 };

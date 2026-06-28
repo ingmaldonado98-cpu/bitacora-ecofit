@@ -53,7 +53,7 @@ function buildPasos(project, id) {
     titulo:   'Levantamiento del sitio',
     desc:     'Registra tipo de techo, temperatura, orientación y áreas del techo.',
     ok:       !!(lev.tipTecho),
-    link:     `#proyecto/${id}/documentacion`,
+    link:     `#proyecto/${id}/levantamiento`,
     hint:     lev.tipTecho ? `Techo: ${esc(lev.tipTecho)}` : 'Sin datos del sitio aún',
   });
 
@@ -65,10 +65,32 @@ function buildPasos(project, id) {
       titulo:   `Fotos por área (${areas.length} área${areas.length!==1?'s':''})`,
       desc:     'Toma fotos Antes / Durante / Cierre de cada área del techo registrada.',
       ok:       fotosAreaTotal > 0,
-      link:     `#proyecto/${id}/documentacion`,
+      link:     `#proyecto/${id}/levantamiento`,
       hint:     fotosAreaTotal > 0 ? `${fotosAreaTotal} foto${fotosAreaTotal!==1?'s':''} capturada${fotosAreaTotal!==1?'s':''}` : 'Sin fotos de áreas aún',
     });
   }
+
+  // ── Paso: Calculadora BOM — debe correrse antes de iniciar obra ─────────────
+  pasos.push({
+    id:       'calculadora',
+    emoji:    '🧮',
+    titulo:   'Calculadora BOM',
+    desc:     'Calcula la estructura de montaje (rieles, clamps, anclajes) antes de iniciar la obra.',
+    ok:       !!project.projectConfig,
+    link:     `#calculadora/${id}`,
+    hint:     project.projectConfig ? `${project.projectConfig.layout?.totalPanels || 0} paneles · ${project.projectConfig.estructura || '—'}` : 'Sin BOM calculado aún',
+  });
+
+  // ── Paso: Dimensionamiento eléctrico — memoria técnica preliminar ───────────
+  pasos.push({
+    id:       'dimensionamiento',
+    emoji:    '📐',
+    titulo:   'Dimensionamiento eléctrico',
+    desc:     'Revisa y exporta la memoria técnica preliminar (diagnóstico energético, cableado, riesgos).',
+    ok:       !!project.dimensionamiento?.exportadoAt,
+    link:     `#dimensionamiento/${id}`,
+    hint:     project.dimensionamiento?.exportadoAt ? 'Memoria técnica exportada' : 'Sin exportar aún',
+  });
 
   // Helper para un paso ligado a un bloque de Progreso de obra
   const _bloquePaso = (n, emoji) => {
