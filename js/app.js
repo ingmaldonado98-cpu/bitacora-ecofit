@@ -8,6 +8,7 @@ import { renderEstructuraForm } from './gar-estructura.js';
 import { renderDocumentacion, renderLevantamientoView } from './documentacion.js';
 import { renderAuditoria } from './auditoria.js';
 import { renderQR } from './qr.js';
+import { renderClientePublico } from './cliente-publico.js';
 import { renderPDFExport } from './pdf.js';
 import { renderSettings } from './settings.js';
 import { renderRecordatorios, updateRecordatoriosBadge, calcRecordatoriosCount } from './recordatorios.js';
@@ -156,6 +157,14 @@ async function route() {
     window.__hideNav?.();
     document.getElementById('top-header').style.display = 'none';
     await render(renderLogin());
+    return;
+  }
+
+  // Tarjeta pública del cliente (QR) — sin sesión, solo lee publicCards/{id}
+  if (view === 'cliente') {
+    window.__hideNav?.();
+    document.getElementById('top-header').style.display = 'none';
+    await render(renderClientePublico(id));
     return;
   }
 

@@ -398,6 +398,19 @@ export const fbConfig = {
   },
 };
 
+// ── Tarjetas públicas (QR del cliente) ────────────────────────────────────
+// Subconjunto de datos del proyecto, sin seriales/notas/fotos internas —
+// la única colección con lectura pública (sin sesión) en firestore.rules.
+export const fbPublicCards = {
+  get: async (id) => {
+    const snap = await getDoc(doc(fbDB, 'publicCards', id));
+    return snap.exists() ? snap.data() : null;
+  },
+  set: async (id, data) => {
+    await setDoc(doc(fbDB, 'publicCards', id), data);
+  },
+};
+
 // ── KV store ───────────────────────────────────────────────────────────────
 export const fbKV = {
   get: async (key) => {

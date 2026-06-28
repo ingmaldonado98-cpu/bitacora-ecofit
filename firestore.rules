@@ -112,6 +112,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Tarjetas públicas (QR del cliente) ───────────────────────────────────
+    // Única colección legible SIN sesión — solo guarda el subconjunto de datos
+    // ya pensado para mostrarse al cliente final (sin seriales/notas/fotos
+    // internas). Se escribe desde la app (qr.js) cada vez que un técnico abre
+    // la vista de QR del proyecto.
+    match /publicCards/{id} {
+      allow read: if true;
+      allow write: if isActive();
+    }
+
     // ── Recordatorios globales ────────────────────────────────────────────────
     match /reminders/{id} {
       allow read, write: if isActive();

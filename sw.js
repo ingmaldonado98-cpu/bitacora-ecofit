@@ -63,6 +63,7 @@ const APP_SHELL = [
   './js/proj-form.js',
   './js/proj-obs.js',
   './js/qr.js',
+  './js/cliente-publico.js',
   './js/scanner.js',
   './js/settings.js',
   './js/settings-users.js',

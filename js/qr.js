@@ -1,6 +1,6 @@
 // qr.js — QR del cliente (sin nombre del técnico, sin seriales)
 
-import { projects, config } from './db.js';
+import { projects, config, publicCards } from './db.js';
 import { esc, fmtFecha, TIPOS_SISTEMA } from './utils.js';
 import { icon } from './icons.js';
 import { getSerialesFlat } from './gar-paneles.js';
@@ -23,22 +23,28 @@ export async function renderQR(projectId, session) {
   const baterias = (project.garantia?.equipos || []).filter(eq => eq.tipo === 'bateria');
   const totalBatKwh = baterias.reduce((s, b) => s + (b.capacidadKwh || 0), 0);
 
-  // Datos que verá el cliente (sin seriales, sin fotos internas)
-  const qrData = JSON.stringify({
+  // Datos que verá el cliente (sin seriales, sin fotos internas) — se escriben
+  // a publicCards/{id} (lectura pública vía firestore.rules) y el QR codifica
+  // la URL a #cliente/{id}, no el JSON directo, para que cualquier cámara lo
+  // abra como página en vez de mostrar texto crudo.
+  const cardData = {
     empresa: 'Ecofit Solar Solutions',
     proyecto: project.displayId,
-    cliente: project.clientName,
-    tipo: tipo?.label || project.tipoSistema,
+    cliente: project.clientName || '',
+    tipo: tipo?.label || project.tipoSistema || '',
     capacidad: `${totalKwp.toFixed(2)} kWp`,
     paneles: totalPaneles,
-    fecha: project.fechaInicio || project.createdAt,
+    fecha: fmtFecha(project.fechaInicio) || '',
     equipos: equiposPublicos,
     ...(baterias.length ? {
       baterias: baterias.length,
-      capacidadBaterias: totalBatKwh ? `${totalBatKwh.toFixed(2)} kWh` : undefined,
+      ...(totalBatKwh ? { capacidadBaterias: `${totalBatKwh.toFixed(2)} kWh` } : {}),
     } : {}),
     contacto: contacto || '',
-  });
+  };
+  await publicCards.set(projectId, cardData).catch(() => {});
+
+  const qrUrl = `${location.origin}${location.pathname}#cliente/${projectId}`;
 
   return `
   <div class="view-header">
@@ -89,7 +95,7 @@ export async function renderQR(projectId, session) {
       if (!wrap) return;
       if (window.QRCode) {
         new QRCode(wrap, {
-          text: ${JSON.stringify(qrData)},
+          text: ${JSON.stringify(qrUrl)},
           width: 220, height: 220,
           colorDark: '#1B4332',
           colorLight: '#f0faf4',
