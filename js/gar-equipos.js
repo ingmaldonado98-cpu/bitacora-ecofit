@@ -212,6 +212,14 @@ export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null
                value="${isEdit ? esc(eq.potenciaNominalAC || '') : ''}" />
       </div>
     </div>
+    <!-- capacidadKwh: solo para baterías -->
+    <div class="form-row" id="eq-bateria-wrap" style="${(isEdit ? eq.tipo : '') === 'bateria' ? '' : 'display:none'}">
+      <div class="form-group">
+        <label>Capacidad (kWh) <span class="form-hint">Del datasheet de la batería</span></label>
+        <input type="number" id="eq-bateria-kwh" placeholder="Ej: 5.12" step="0.01" min="0"
+               value="${isEdit ? esc(eq.capacidadKwh || '') : ''}" />
+      </div>
+    </div>
     <div class="form-group">
       <label>Número de serie</label>
       <div class="serial-row">
@@ -271,6 +279,8 @@ window.toggleVocMaxField = function() {
   const tipo = document.getElementById('eq-tipo')?.value;
   const wrap = document.getElementById('eq-vocmax-wrap');
   if (wrap) wrap.style.display = tipo === 'inversor' ? '' : 'none';
+  const batWrap = document.getElementById('eq-bateria-wrap');
+  if (batWrap) batWrap.style.display = tipo === 'bateria' ? '' : 'none';
 };
 
 // ¿Dónde existe ya este serial en el proyecto? → nombre de la ubicación o null
@@ -360,11 +370,13 @@ window.guardarEquipo = async function(projectId) {
 
   const vocMaxRaw      = document.getElementById('eq-vocmax')?.value?.trim();
   const potenciaAcRaw  = document.getElementById('eq-potencia-ac')?.value?.trim();
+  const bateriaKwhRaw  = document.getElementById('eq-bateria-kwh')?.value?.trim();
   const equipo = {
     id:          isEdit ? (p.garantia.equipos[editIdx]?.id || uuid()) : uuid(),
     tipo, marca, modelo,
     ...(tipo === 'inversor' && vocMaxRaw     ? { vocMax: parseFloat(vocMaxRaw) } : {}),
     ...(tipo === 'inversor' && potenciaAcRaw ? { potenciaNominalAC: parseFloat(potenciaAcRaw) } : {}),
+    ...(tipo === 'bateria'  && bateriaKwhRaw ? { capacidadKwh: parseFloat(bateriaKwhRaw) } : {}),
     serial:      document.getElementById('eq-serial').value.trim(),
     fotoPlaca:   _eqFotos.placa   || (isEdit ? p.garantia.equipos[editIdx]?.fotoPlaca   : null),
     fotoFrontal: _eqFotos.frontal || (isEdit ? p.garantia.equipos[editIdx]?.fotoFrontal : null),

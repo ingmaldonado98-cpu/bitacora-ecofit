@@ -20,6 +20,9 @@ export async function renderQR(projectId, session) {
     `${eq.marca} ${eq.modelo}`
   ).join('\n');
 
+  const baterias = (project.garantia?.equipos || []).filter(eq => eq.tipo === 'bateria');
+  const totalBatKwh = baterias.reduce((s, b) => s + (b.capacidadKwh || 0), 0);
+
   // Datos que verá el cliente (sin seriales, sin fotos internas)
   const qrData = JSON.stringify({
     empresa: 'Ecofit Solar Solutions',
@@ -30,6 +33,10 @@ export async function renderQR(projectId, session) {
     paneles: totalPaneles,
     fecha: project.fechaInicio || project.createdAt,
     equipos: equiposPublicos,
+    ...(baterias.length ? {
+      baterias: baterias.length,
+      capacidadBaterias: totalBatKwh ? `${totalBatKwh.toFixed(2)} kWh` : undefined,
+    } : {}),
     contacto: contacto || '',
   });
 
@@ -59,6 +66,7 @@ export async function renderQR(projectId, session) {
       <div class="qr-row"><span>Tipo de sistema</span><strong>${esc(tipo?.label || '—')}</strong></div>
       <div class="qr-row"><span>Capacidad</span><strong>${totalKwp.toFixed(2)} kWp</strong></div>
       <div class="qr-row"><span>Paneles</span><strong>${totalPaneles}</strong></div>
+      ${baterias.length ? `<div class="qr-row"><span>Baterías</span><strong>${baterias.length}${totalBatKwh ? ` · ${totalBatKwh.toFixed(2)} kWh` : ''}</strong></div>` : ''}
       <div class="qr-row"><span>Fecha de instalación</span><strong>${fmtFecha(project.fechaInicio)}</strong></div>
       ${equiposPublicos ? `<div class="qr-row"><span>Equipos</span><strong style="white-space:pre-line">${esc(equiposPublicos)}</strong></div>` : ''}
       ${contacto ? `<div class="qr-row"><span>Contacto</span><strong style="white-space:pre-line">${esc(contacto)}</strong></div>` : ''}
