@@ -25,12 +25,9 @@ function buildPasos(project, id) {
   const lev = doc.levantamiento || {};
   const esPequeno = project.tipoSistema === 'sistema_pequeno';
 
-  // Fotos por área
+  // Fotos por área — a.fotos es un arreglo plano (no hay sub-fases antes/durante/cierre)
   const areas = lev.areasTecho || [];
-  const fotosAreaTotal = areas.reduce((s, a) => {
-    const f = a.fotos || {};
-    return s + (f.antes?.length||0) + (f.durante?.length||0) + (f.cierre?.length||0);
-  }, 0);
+  const fotosAreaTotal = areas.reduce((s, a) => s + (Array.isArray(a.fotos) ? a.fotos.length : 0), 0);
 
   const totalPaneles = getSerialesFlat(gar).length;
   // Checklist de instalación (checklistData), NO el checklist de auditoría
@@ -63,7 +60,7 @@ function buildPasos(project, id) {
       id:       'fotos-area',
       emoji:    '📐',
       titulo:   `Fotos por área (${areas.length} área${areas.length!==1?'s':''})`,
-      desc:     'Toma fotos Antes / Durante / Cierre de cada área del techo registrada.',
+      desc:     'Toma fotos de cada área del techo registrada.',
       ok:       fotosAreaTotal > 0,
       link:     `#proyecto/${id}/levantamiento`,
       hint:     fotosAreaTotal > 0 ? `${fotosAreaTotal} foto${fotosAreaTotal!==1?'s':''} capturada${fotosAreaTotal!==1?'s':''}` : 'Sin fotos de áreas aún',
