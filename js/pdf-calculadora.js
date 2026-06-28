@@ -14,7 +14,7 @@ const VERDE = '16a34a';
 // variables CSS), así que no necesita recoloreo — solo forzar width/height
 // explícitos en el SVG clonado, porque sin esos atributos un <img>/Image()
 // renderiza el SVG a 300×150 por defecto en vez de usar el viewBox.
-function withExplicitSize(svgString) {
+export function withExplicitSize(svgString) {
   const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
   const svgEl = doc.documentElement;
   const viewBox = svgEl.getAttribute('viewBox') || '0 0 800 600';
@@ -25,7 +25,19 @@ function withExplicitSize(svgString) {
   return { svgString: new XMLSerializer().serializeToString(svgEl), width, height };
 }
 
-async function svgToPngBuffer(svgString, width, height, maxWidthPx = 640) {
+export async function svgToPngBuffer(svgString, width, height, maxWidthPx = 640) {
+  const { dataUri, width: w0, height: h0 } = await svgToPngDataUri(svgString, width, height);
+  const res2 = await fetch(dataUri);
+  const data = new Uint8Array(await res2.arrayBuffer());
+  let w = w0, h = h0;
+  if (w > maxWidthPx) { h = Math.round(h * maxWidthPx / w); w = maxWidthPx; }
+  return { data, width: w, height: h };
+}
+
+// Variante que retorna el data URI directamente — la usa jsPDF (pdf-tecnico.js
+// vía addImage), que acepta base64/dataURI en vez del Uint8Array que necesita
+// docx ImageRun (word-tecnico.js, vía svgToPngBuffer arriba).
+export async function svgToPngDataUri(svgString, width, height) {
   const blob = new Blob([svgString], { type: 'image/svg+xml' });
   const url  = URL.createObjectURL(blob);
   try {
@@ -34,12 +46,7 @@ async function svgToPngBuffer(svgString, width, height, maxWidthPx = 640) {
     const canvas = document.createElement('canvas');
     canvas.width = width; canvas.height = height;
     canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-    const dataUri = canvas.toDataURL('image/png');
-    const res2 = await fetch(dataUri);
-    const data = new Uint8Array(await res2.arrayBuffer());
-    let w = width, h = height;
-    if (w > maxWidthPx) { h = Math.round(h * maxWidthPx / w); w = maxWidthPx; }
-    return { data, width: w, height: h };
+    return { dataUri: canvas.toDataURL('image/png'), width, height };
   } finally {
     URL.revokeObjectURL(url);
   }

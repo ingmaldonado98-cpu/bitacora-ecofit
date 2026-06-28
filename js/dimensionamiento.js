@@ -160,16 +160,20 @@ function _kpiCard(label, value, ico, sub) {
   </div>`;
 }
 
-const _MOD_LABELS = {
+export const MOD_LABELS = {
   paneles:'Módulos FV', inversor:'Inversor', baterias:'Banco de baterías',
   controlador:'BMS / Controlador', protDC:'Protecciones DC',
   protAC:'Protecciones AC', ats:'Transferencia (ATS)',
   smart:'Medición / Smart meter', monitoreo:'Monitoreo',
   vfd:'Variador (VFD)', bomba:'Motor / Bomba', proteccion:'Protecciones bomba',
 };
-function _labelModelo(k) { return _MOD_LABELS[k] || k; }
+const _labelModelo = (k) => MOD_LABELS[k] || k;
+export const labelModelo = _labelModelo;
 
-function _renderDimTable(res, lev, trayectorias = []) {
+// Filas [label, valor] de la sección C (Dimensionamiento Técnico) — pura, sin
+// DOM, para que pdf-tecnico.js / word-tecnico.js puedan reusar el mismo
+// cálculo que la vista en vivo sin duplicar la lógica.
+export function buildDimRows(res, lev, trayectorias = []) {
   const rows = [];
 
   if (res.pvKwpReal != null)
@@ -207,6 +211,11 @@ function _renderDimTable(res, lev, trayectorias = []) {
     }
   }
 
+  return rows;
+}
+
+function _renderDimTable(res, lev, trayectorias = []) {
+  const rows = buildDimRows(res, lev, trayectorias);
   return `
   <div class="dim-modelo-table">
     ${rows.map(([k,v]) => `

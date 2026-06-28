@@ -13,6 +13,10 @@ import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
 import { getSerialesFlat } from './gar-paneles.js';
 import { getExecBlocks, BLOQUE_LABELS } from '../modules/checklist/index.js';
 import { MESES_CORTO } from './lev-consumo.js';
+import { calcDimensionamiento, detectarRiesgos } from '../modules/dimensionamiento/index.js';
+import { buildDimRows, MOD_LABELS } from './dimensionamiento.js';
+import { getRowsData, getPanelWidth, getPanelHeight, buildDiagramSVG } from '../modules/calculadora/index.js';
+import { withExplicitSize, svgToPngDataUri } from './pdf-calculadora.js';
 
 const ESTADOS_LABEL = Object.fromEntries(Object.entries(ESTADOS).map(([k,v]) => [k, v.label]));
 
@@ -92,6 +96,51 @@ window.exportarPDFTecnico = async function(projectId) {
         y=campo(doc,'Clamps',`Mid: ${est.midClamps} pzas · End: ${est.endClamps} pzas`,14,y);
         if (est.fotoFrontal) { y=await addImage(doc,est.fotoFrontal,14,y,90,65); }
       }
+    }
+
+    // Materiales (BOM) — calculado en la Calculadora, no el formulario manual de Garantía
+    const cfg = project.projectConfig;
+    if (sec('sec-bom') && cfg?.computed?.bom?.length) {
+      doc.addPage(); addHeader(doc,'Materiales (BOM)',project); y=44;
+      const grupos = {};
+      for (const it of cfg.computed.bom) (grupos[it.grp || 'Otros'] = grupos[it.grp || 'Otros'] || []).push(it);
+      for (const [grp, items] of Object.entries(grupos)) {
+        if (y>250) { doc.addPage(); addHeader(doc,'Materiales (cont.)',project); y=44; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+        doc.text(grp.toUpperCase(), 14, y); y += 5;
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GRIS);
+        for (const it of items) {
+          if (y>260) { doc.addPage(); addHeader(doc,'Materiales (cont.)',project); y=44; }
+          doc.text(`${it.name} (${it.partNum}) — ${it.qty} ${it.unit}`, 14, y); y += 4.5;
+        }
+        y += 3;
+      }
+      const consumibles = cfg.computed.consumibles || [];
+      if (consumibles.length) {
+        if (y>250) { doc.addPage(); addHeader(doc,'Materiales (cont.)',project); y=44; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+        doc.text('CONSUMIBLES', 14, y); y += 5;
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GRIS);
+        for (const c of consumibles) {
+          doc.text(`${c.nombre} — ${c.qty} ${c.unit}`, 14, y); y += 4.5;
+        }
+      }
+    }
+
+    // Diagrama de diseño — rasterizado desde el mismo SVG que ve el técnico en la Calculadora
+    if (sec('sec-diagrama') && cfg?.estructura) {
+      try {
+        const rd = getRowsData(cfg);
+        const pW = getPanelWidth(cfg), pH = getPanelHeight(cfg);
+        if (rd.length && pW && pH) {
+          const rawSvg = buildDiagramSVG(rd, pW, pH, cfg.estructura);
+          const { svgString, width, height } = withExplicitSize(rawSvg);
+          const { dataUri } = await svgToPngDataUri(svgString, width, height);
+          doc.addPage(); addHeader(doc,'Diagrama de diseño',project); y=44;
+          const maxW = 180, maxH = maxW * height / width;
+          doc.addImage(dataUri, 'PNG', 14, y, maxW, maxH);
+        }
+      } catch { /* sin diagrama si falla la rasterización */ }
     }
 
     // Paneles — números de serie
@@ -241,6 +290,65 @@ window.exportarPDFTecnico = async function(projectId) {
           const newY = await addImage(doc, f.url||f, fx, y, 88, 62);
           if (col===1) { y=newY+2; col=0; } else col=1;
           if (y>240) { doc.addPage(); addHeader(doc,'Levant. Fotos (cont.)',project); y=44; col=0; }
+        }
+      }
+    }
+
+    // Dimensionamiento eléctrico — memoria técnica preliminar (mismo motor que la vista Dimensionamiento)
+    if (sec('sec-dimensionamiento')) {
+      const res = calcDimensionamiento(project);
+      if (!res.error) {
+        doc.addPage(); addHeader(doc,'Dimensionamiento eléctrico',project); y=44;
+        const lev2 = project.documentacion?.levantamiento || {};
+        const riesgos = detectarRiesgos(project);
+
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+        doc.text('Diagnóstico energético', 14, y); y += 6;
+        const kpiTxt = [
+          res.hsp       ? `HSP del sitio: ${res.hsp} h/día (${lev2.tMinCiudad || 'promedio nacional'})` : null,
+          res.kwhDia    ? `Demanda diaria: ${res.kwhDia} kWh/día` : null,
+          res.consMes   ? `Consumo mensual estimado: ${res.consMes} kWh/mes` : null,
+          res.genMes    ? `Generación FV estimada: ${res.genMes} kWh/mes` : null,
+          res.cobertura ? `Cobertura solar: ${res.cobertura}%` : null,
+          res.batKwh    ? `Almacenamiento: ${res.batKwh} kWh LFP` : null,
+          res.vfdKw     ? `VFD: ${res.vfdKw} kW · Volumen diario: ${res.volDia} m³/día` : null,
+        ].filter(Boolean);
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GRIS);
+        for (const t of kpiTxt) {
+          if (y>260) { doc.addPage(); addHeader(doc,'Dimensionamiento (cont.)',project); y=44; }
+          doc.text(`• ${t}`, 14, y); y += 5;
+        }
+
+        if (y>250) { doc.addPage(); addHeader(doc,'Dimensionamiento (cont.)',project); y=44; }
+        y += 2;
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+        doc.text('Arquitectura propuesta', 14, y); y += 6;
+        for (const [k, v] of Object.entries(res.modelo || {})) {
+          if (y>260) { doc.addPage(); addHeader(doc,'Dimensionamiento (cont.)',project); y=44; }
+          y = campo(doc, MOD_LABELS[k] || k, v, 14, y);
+        }
+
+        if (y>240) { doc.addPage(); addHeader(doc,'Dimensionamiento (cont.)',project); y=44; }
+        y += 2;
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+        doc.text('Dimensionamiento técnico', 14, y); y += 6;
+        for (const [k, v] of buildDimRows(res, lev2, project.trayectorias)) {
+          if (y>260) { doc.addPage(); addHeader(doc,'Dimensionamiento (cont.)',project); y=44; }
+          y = campo(doc, k, v, 14, y);
+        }
+
+        if (riesgos.length) {
+          if (y>240) { doc.addPage(); addHeader(doc,'Dimensionamiento (cont.)',project); y=44; }
+          y += 2;
+          doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...VERDE_MED);
+          doc.text('Riesgos detectados', 14, y); y += 6;
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+          for (const r of riesgos) {
+            if (y>260) { doc.addPage(); addHeader(doc,'Dimensionamiento (cont.)',project); y=44; }
+            doc.setTextColor(...(r.nivel === 'error' ? [220,38,38] : [217,119,6]));
+            const lineas = doc.splitTextToSize(`• ${r.msg}`, 180);
+            doc.text(lineas, 14, y); y += lineas.length * 4.5;
+          }
         }
       }
     }

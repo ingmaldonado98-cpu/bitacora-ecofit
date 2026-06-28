@@ -7,9 +7,13 @@ import { fmtFecha, TIPOS_SISTEMA, ESTADOS, fotoToImageBuffer } from './utils.js'
 import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
 import { getSerialesFlat } from './gar-paneles.js';
 import { newDoc, heading1, heading2, campo, p, table, hr, imageBlock, pageBreak,
-         Paragraph, TextRun, AlignmentType, BorderStyle, saveDocx } from './word-helpers.js';
+         Paragraph, TextRun, ImageRun, AlignmentType, BorderStyle, saveDocx } from './word-helpers.js';
 import { getExecBlocks, BLOQUE_LABELS } from '../modules/checklist/index.js';
 import { MESES_CORTO } from './lev-consumo.js';
+import { calcDimensionamiento, detectarRiesgos } from '../modules/dimensionamiento/index.js';
+import { buildDimRows, MOD_LABELS } from './dimensionamiento.js';
+import { getRowsData, getPanelWidth, getPanelHeight, buildDiagramSVG } from '../modules/calculadora/index.js';
+import { withExplicitSize, svgToPngBuffer } from './pdf-calculadora.js';
 
 const VERDE_OSC = '1B4332';
 const VERDE_MED = '40916C';
@@ -87,6 +91,43 @@ window.exportarWordTecnico = async function(projectId) {
       addCampo('Clamps', `Mid: ${est.midClamps} pzas · End: ${est.endClamps} pzas`);
       if (est.fotoFrontal) await addImg(est.fotoFrontal);
     }
+  }
+
+  // Materiales (BOM) — calculado en la Calculadora, no el formulario manual de Garantía
+  const cfg = project.projectConfig;
+  if (sec('sec-bom') && cfg?.computed?.bom?.length) {
+    addSec('Materiales (BOM)');
+    const grupos = {};
+    for (const it of cfg.computed.bom) (grupos[it.grp || 'Otros'] = grupos[it.grp || 'Otros'] || []).push(it);
+    for (const [grp, items] of Object.entries(grupos)) {
+      children.push(p(grp.toUpperCase(), { bold: true, color: VERDE_MED, size: 18 }));
+      children.push(table(['Material', 'No. parte', 'Cant.'],
+        items.map(it => [it.name, it.partNum, `${it.qty} ${it.unit}`]), { headerShading: VERDE_OSC }));
+    }
+    const consumibles = cfg.computed.consumibles || [];
+    if (consumibles.length) {
+      children.push(p('CONSUMIBLES', { bold: true, color: VERDE_MED, size: 18 }));
+      children.push(table(['Consumible', 'Cant.'],
+        consumibles.map(c => [c.nombre, `${c.qty} ${c.unit}`]), { headerShading: VERDE_OSC }));
+    }
+  }
+
+  // Diagrama de diseño — rasterizado desde el mismo SVG que ve el técnico en la Calculadora
+  if (sec('sec-diagrama') && cfg?.estructura) {
+    try {
+      const rd = getRowsData(cfg);
+      const pW = getPanelWidth(cfg), pH = getPanelHeight(cfg);
+      if (rd.length && pW && pH) {
+        const rawSvg = buildDiagramSVG(rd, pW, pH, cfg.estructura);
+        const { svgString, width, height } = withExplicitSize(rawSvg);
+        const img = await svgToPngBuffer(svgString, width, height);
+        addSec('Diagrama de diseño');
+        children.push(new Paragraph({
+          spacing: { after: 160 },
+          children: [new ImageRun({ type: 'png', data: img.data, transformation: { width: img.width, height: img.height } })],
+        }));
+      }
+    } catch { /* sin diagrama si falla la rasterización */ }
   }
 
   // Paneles — números de serie
@@ -220,6 +261,39 @@ window.exportarWordTecnico = async function(projectId) {
     if (fotosLev.length) {
       children.push(p('Fotos del levantamiento', { bold: true, color: VERDE_MED }));
       for (const f of fotosLev.slice(0, 6)) await addImg(f.url || f);
+    }
+  }
+
+  // Dimensionamiento eléctrico — memoria técnica preliminar (mismo motor que la vista Dimensionamiento)
+  if (sec('sec-dimensionamiento')) {
+    const res = calcDimensionamiento(project);
+    if (!res.error) {
+      addSec('Dimensionamiento eléctrico');
+      const lev2 = project.documentacion?.levantamiento || {};
+      const riesgos = detectarRiesgos(project);
+
+      children.push(p('Diagnóstico energético', { bold: true, color: VERDE_MED }));
+      const kpiTxt = [
+        res.hsp       ? `HSP del sitio: ${res.hsp} h/día (${lev2.tMinCiudad || 'promedio nacional'})` : null,
+        res.kwhDia    ? `Demanda diaria: ${res.kwhDia} kWh/día` : null,
+        res.consMes   ? `Consumo mensual estimado: ${res.consMes} kWh/mes` : null,
+        res.genMes    ? `Generación FV estimada: ${res.genMes} kWh/mes` : null,
+        res.cobertura ? `Cobertura solar: ${res.cobertura}%` : null,
+        res.batKwh    ? `Almacenamiento: ${res.batKwh} kWh LFP` : null,
+        res.vfdKw     ? `VFD: ${res.vfdKw} kW · Volumen diario: ${res.volDia} m³/día` : null,
+      ].filter(Boolean);
+      for (const t of kpiTxt) children.push(p(`• ${t}`, { size: 18 }));
+
+      children.push(p('Arquitectura propuesta', { bold: true, color: VERDE_MED }));
+      for (const [k, v] of Object.entries(res.modelo || {})) addCampo(MOD_LABELS[k] || k, v);
+
+      children.push(p('Dimensionamiento técnico', { bold: true, color: VERDE_MED }));
+      for (const [k, v] of buildDimRows(res, lev2, project.trayectorias)) addCampo(k, v);
+
+      if (riesgos.length) {
+        children.push(p('Riesgos detectados', { bold: true, color: VERDE_MED }));
+        for (const r of riesgos) children.push(p(`• ${r.msg}`, { size: 18, color: r.nivel === 'error' ? 'dc2626' : 'd97706' }));
+      }
     }
   }
 
