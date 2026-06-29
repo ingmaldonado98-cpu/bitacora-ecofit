@@ -14,11 +14,79 @@ async function _saveField(projectId, field, key, value) {
   await projects.setField(projectId, `checklistData.${field}.${key}`, value);
 }
 
-window.clToggleHerr  = (pid, id, v)  => _saveField(pid, 'herr',  id,         v);
-window.clToggleCons  = (pid, idx, v) => _saveField(pid, 'cons',  String(idx), v);
-window.clToggleBOM   = (pid, key, v) => _saveField(pid, 'bom',   String(key), v);
+window.clToggleHerr  = (pid, id, v)  => { _refreshClProgress(); return _saveField(pid, 'herr',  id,         v); };
+window.clToggleCons  = (pid, idx, v) => { _refreshClProgress(); return _saveField(pid, 'cons',  String(idx), v); };
+window.clToggleBOM   = (pid, key, v) => { _refreshClProgress(); return _saveField(pid, 'bom',   String(key), v); };
 window.clToggleAdmin = (pid, id, v)  => _saveField(pid, 'admin', id,         v);
 window.clToggleExec  = (pid, id, v)  => toggleExecItem(pid, id, v);
+
+// ── Actualización en vivo de contadores del checklist ───────────────────────
+// Los toggles arriba solo persisten en Firestore — sin esto, la barra de
+// progreso y los badges de pestaña ("Materiales 0/13") quedaban congelados
+// hasta el próximo render completo de la vista (recargar o navegar). Se
+// recalcula leyendo el estado YA actualizado de los checkboxes en el DOM
+// (el navegador marca/desmarca el checkbox antes de disparar 'onchange'),
+// sin esperar a la escritura en Firestore ni volver a pedir el proyecto.
+function _progressHtml(done, total) {
+  if (!total) return '';
+  const pct = Math.round(done / total * 100);
+  return `
+    <div class="cl-progress-row">
+      <span class="cl-progress-label">${done} de ${total} completados</span>
+      <span class="cl-progress-pct">${pct}%</span>
+    </div>
+    <div class="cl-progress-bar"><div class="cl-progress-fill" style="width:${pct}%"></div></div>`;
+}
+
+function _refreshClProgress() {
+  const herrList = document.querySelector('#cl-herr .cl-item-list');
+  if (herrList) {
+    const total = herrList.querySelectorAll('input[type="checkbox"]').length;
+    const done  = herrList.querySelectorAll('input[type="checkbox"]:checked').length;
+    const block = document.getElementById('cl-prog-herr');
+    if (block) block.innerHTML = _progressHtml(done, total);
+    const badge = document.getElementById('cl-badge-herr');
+    if (badge) badge.innerHTML = (total && done === total) ? '<span class="tab-badge tab-ok">✓</span>' : '';
+  }
+
+  let doneBOM = 0, totalBOM = 0;
+  const bomCard = document.getElementById('cl-bom-card');
+  if (bomCard) {
+    totalBOM = bomCard.querySelectorAll('.cl-item-list input[type="checkbox"]').length;
+    doneBOM  = bomCard.querySelectorAll('.cl-item-list input[type="checkbox"]:checked').length;
+    const block = document.getElementById('cl-prog-bom');
+    if (block) block.innerHTML = _progressHtml(doneBOM, totalBOM);
+    const lbl = document.getElementById('cl-lbl-bom');
+    if (lbl) lbl.textContent = `${doneBOM}/${totalBOM}`;
+  }
+
+  let doneCons = 0, totalCons = 0;
+  const consCard = document.getElementById('cl-cons-card');
+  if (consCard) {
+    totalCons = consCard.querySelectorAll('.cl-item-list input[type="checkbox"]').length;
+    doneCons  = consCard.querySelectorAll('.cl-item-list input[type="checkbox"]:checked').length;
+    const block = document.getElementById('cl-prog-cons');
+    if (block) block.innerHTML = _progressHtml(doneCons, totalCons);
+    const lbl = document.getElementById('cl-lbl-cons');
+    if (lbl) lbl.textContent = `${doneCons}/${totalCons}`;
+  }
+
+  let doneKit = 0, totalKit = 0;
+  const kitCard = document.getElementById('cl-kit-card');
+  if (kitCard) {
+    totalKit = kitCard.querySelectorAll('.cl-kit-check input[type="checkbox"]').length;
+    doneKit  = kitCard.querySelectorAll('.cl-kit-check input[type="checkbox"]:checked').length;
+  }
+
+  const totalMat = totalBOM + totalCons + totalKit;
+  const doneMat  = doneBOM + doneCons + doneKit;
+  const matBadge = document.getElementById('cl-badge-materiales');
+  if (matBadge) {
+    matBadge.innerHTML = totalMat > 0 && doneMat === totalMat
+      ? '<span class="tab-badge tab-ok">✓</span>'
+      : (totalMat > 0 ? `<span class="tab-badge">${doneMat}/${totalMat}</span>` : '');
+  }
+}
 
 // ── Kit de obra — equipo principal a llevar a la instalación ────────────────
 // Independiente del inventario de bodega (ese se hace una vez al mes; con 2-3
@@ -36,7 +104,7 @@ window.delKitEquipo = async (pid, id) => {
   await projects.setField(pid, 'checklistData.kitEquipo', map);
   navigate(window.location.hash);
 };
-window.toggleKitEquipo = (pid, id, v) => _saveField(pid, 'kitEquipo', `${id}.empacado`, v);
+window.toggleKitEquipo = (pid, id, v) => { _refreshClProgress(); return _saveField(pid, 'kitEquipo', `${id}.empacado`, v); };
 
 let _kitTextTimer = null;
 window.updKitEquipo = (pid, id, field, val) => {

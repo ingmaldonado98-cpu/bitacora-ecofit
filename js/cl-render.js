@@ -12,15 +12,19 @@ export function _tkey(comp) {
   return comp.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_').toLowerCase();
 }
 
-function renderProgress(done, total) {
+// blockId opcional — permite a cl-actions.js reescribir solo este bloque tras
+// marcar un checkbox, sin re-renderizar toda la vista (ver _refreshClProgress).
+function renderProgress(done, total, blockId) {
   if (!total) return '';
   const pct = Math.round(done / total * 100);
   return `
-  <div class="cl-progress-row">
-    <span class="cl-progress-label">${done} de ${total} completados</span>
-    <span class="cl-progress-pct">${pct}%</span>
-  </div>
-  <div class="cl-progress-bar"><div class="cl-progress-fill" style="width:${pct}%"></div></div>`;
+  <div${blockId ? ` id="${blockId}"` : ''}>
+    <div class="cl-progress-row">
+      <span class="cl-progress-label">${done} de ${total} completados</span>
+      <span class="cl-progress-pct">${pct}%</span>
+    </div>
+    <div class="cl-progress-bar"><div class="cl-progress-fill" style="width:${pct}%"></div></div>
+  </div>`;
 }
 
 function renderTorqueTab(rows, torqData, done, total, projectId, edit) {
@@ -299,10 +303,10 @@ export async function renderChecklistModule(projectId, session) {
 
   <div class="tab-bar" id="cl-tabs" role="tablist" aria-label="Secciones del checklist">
     <button class="tab-btn tab-active" role="tab" aria-selected="true"  aria-controls="cl-herr" tabindex="0"  data-tab="cl-herr" onclick="switchTab('cl-tabs','cl-herr',this)">
-      Herramienta${doneHerr === herramienta.length && herramienta.length ? '<span class="tab-badge tab-ok">✓</span>' : ''}
+      Herramienta<span id="cl-badge-herr">${doneHerr === herramienta.length && herramienta.length ? '<span class="tab-badge tab-ok">✓</span>' : ''}</span>
     </button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-cons" tabindex="-1" data-tab="cl-cons" onclick="switchTab('cl-tabs','cl-cons',this)">
-      Materiales${totalMat > 0 && doneMat === totalMat ? '<span class="tab-badge tab-ok">✓</span>' : (totalMat > 0 ? `<span class="tab-badge">${doneMat}/${totalMat}</span>` : '')}
+      Materiales<span id="cl-badge-materiales">${totalMat > 0 && doneMat === totalMat ? '<span class="tab-badge tab-ok">✓</span>' : (totalMat > 0 ? `<span class="tab-badge">${doneMat}/${totalMat}</span>` : '')}</span>
     </button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="cl-consulta" tabindex="-1" data-tab="cl-consulta" onclick="switchTab('cl-tabs','cl-consulta',this)">
       Consulta
@@ -316,7 +320,7 @@ export async function renderChecklistModule(projectId, session) {
         <span class="cl-techo-badge">Techo: <strong>${techo === 'cemento' ? 'Concreto / losa' : 'Metálico / lámina'}</strong></span>
         ${cfg ? '' : `<span class="cl-hint">Tipo tomado de configuración manual. <button class="btn-link" onclick="navigate('#calculadora/${projectId}')">Calcular BOM</button> para ajustar.</span>`}
       </div>
-      ${renderProgress(doneHerr, herramienta.length)}
+      ${renderProgress(doneHerr, herramienta.length, 'cl-prog-herr')}
       <div class="cl-item-list">
         ${herramienta.map(h => `
         <label class="cl-item ${cl.herr?.[h.id] ? 'cl-item-done' : ''}">
@@ -371,12 +375,12 @@ export async function renderChecklistModule(projectId, session) {
         bomByGrp[g].push({ ...item, _key: item.partNum || item.name });
       });
       const bomSection = bomItems.length ? `
-      <div class="card">
+      <div class="card" id="cl-bom-card">
         <div class="card-title-row">
           <h3 class="card-title">Lista de materiales <span style="color:var(--text-muted);font-weight:400;font-size:.8rem">${bomItems.length} ítems · ${getTotalPanels(cfg)||0} paneles</span></h3>
-          <span class="cl-prog-lbl">${doneBOM}/${bomItems.length}</span>
+          <span class="cl-prog-lbl" id="cl-lbl-bom">${doneBOM}/${bomItems.length}</span>
         </div>
-        ${renderProgress(doneBOM, bomItems.length)}
+        ${renderProgress(doneBOM, bomItems.length, 'cl-prog-bom')}
         ${grpOrder.filter(g => bomByGrp[g]).map(g => `
           <div class="cl-bom-group">
             <span class="cl-bom-grp-lbl">${grpLabel[g] || g}</span>
@@ -398,12 +402,12 @@ export async function renderChecklistModule(projectId, session) {
       </div>` : '';
 
       const consSection = consumibles.length ? `
-      <div class="card">
+      <div class="card" id="cl-cons-card">
         <div class="card-title-row">
           <h3 class="card-title">Consumibles de anclaje</h3>
-          <span class="cl-prog-lbl">${doneCons}/${consumibles.length}</span>
+          <span class="cl-prog-lbl" id="cl-lbl-cons">${doneCons}/${consumibles.length}</span>
         </div>
-        ${renderProgress(doneCons, consumibles.length)}
+        ${renderProgress(doneCons, consumibles.length, 'cl-prog-cons')}
         <div class="cl-item-list">
           ${consumibles.map((c, i) => `
             <label class="cl-item ${cl.cons?.[String(i)] ? 'cl-item-done' : ''}">

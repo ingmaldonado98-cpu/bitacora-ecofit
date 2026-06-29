@@ -186,7 +186,7 @@ export function buildDimRows(res, lev, trayectorias = []) {
   if (res.batKwh != null)
     rows.push(['Almacenamiento LFP', `${res.batKwh} kWh útiles${res.batVbus ? ` / ${res.batVbus}V DC` : ''}${res.batAh ? ` / ${res.batAh} Ah` : ''}`]);
   if (res.autonomia != null)
-    rows.push(['Autonomía diseñada', `${res.autonomia} ${res.tipo === 'aislado' ? 'días' : 'horas'} (cargas críticas)`]);
+    rows.push(['Autonomía diseñada', `${res.autonomia} horas (cargas críticas)`]);
   if (res.vfdKw != null)
     rows.push(['Variador de frecuencia', `${res.vfdKw} kW — acoplamiento DC directo`]);
   if (res.phidro != null)

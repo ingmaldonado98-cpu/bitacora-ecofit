@@ -532,7 +532,8 @@ function showUpdateBanner(newSW) {
     <button onclick="
       document.getElementById('sw-update-banner')?.remove();
       navigator.serviceWorker.controller?.postMessage({type:'SKIP_WAITING'});
-    ">Actualizar ahora</button>`;
+    ">Actualizar ahora</button>
+    <button class="sw-update-dismiss" title="Descartar por ahora" onclick="document.getElementById('sw-update-banner')?.remove();">✕</button>`;
   document.body.appendChild(banner);
 }
 

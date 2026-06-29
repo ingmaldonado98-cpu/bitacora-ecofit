@@ -9,9 +9,13 @@ export function esc(str) {
 }
 
 // ── Fechas ─────────────────────────────────────────────────────────────────────
+// timeZone:'UTC' — fechas-calendario puras (fechaInicio, fechaEstimada) se
+// guardan como medianoche UTC; sin esto, zonas horarias detrás de UTC (México)
+// muestran el día anterior. No aplica a fmtFechaHora/fmtRelativa (timestamps
+// reales, donde sí se quiere la hora local del usuario).
 export function fmtFecha(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
 export function fmtFechaHora(iso) {

@@ -102,9 +102,11 @@ export function calcAislado(lev) {
 
   const kwhCrit  = cargas.reduce((s,c) => s + c.potencia * c.horas * (c.cantidad||1) / 1000, 0);
   const kwhTotal = todos.reduce((s,c)  => s + c.potencia * c.horas * (c.cantidad||1) / 1000, 0);
+  const potCritW = cargas.reduce((s,c) => s + c.potencia * (c.cantidad||1), 0);
 
-  // Banco baterías LFP
-  const batKwh  = +(kwhCrit * autonomia / DoD).toFixed(1);
+  // Banco baterías LFP — autonomia en HORAS de respaldo a potencia crítica
+  // instantánea (no energía diaria — por eso se usa potCritW, no kwhCrit).
+  const batKwh  = +(potCritW/1000 * autonomia / DoD).toFixed(1);
   const batVbus = kwhTotal > 5 ? 48 : 24;
   const batAh   = Math.ceil(batKwh * 1000 / batVbus);
 
@@ -123,7 +125,7 @@ export function calcAislado(lev) {
     modelo: {
       paneles:      `${nPaneles} × Módulo Mono PERC 580 Wp = ${pvKwpReal} kWp`,
       inversor:     `Inversor/cargador off-grid ${invKw} kW — bus ${batVbus}V DC`,
-      baterias:     `Banco LFP ${batVbus}V — ${batAh} Ah (${batKwh} kWh útiles, ${autonomia}d autonomía)`,
+      baterias:     `Banco LFP ${batVbus}V — ${batAh} Ah (${batKwh} kWh útiles, ${autonomia}h autonomía)`,
       controlador:  'BMS compatible LFP (integrado o externo al inversor/cargador)',
       protDC:       `Fusible de banco ${Math.ceil(batKwh*1000/batVbus/10)*10} A entre batería e inversor`,
     },

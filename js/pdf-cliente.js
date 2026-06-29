@@ -65,17 +65,20 @@ window.exportarPDFCliente = async function(projectId) {
       y = await addImage(doc, fotoSistema, 14, y, 120, 80);
     }
 
-    // Fotos de Cierre (nueva estructura techo.cierre con fallback legacy despues)
-    const _fases = project.documentacion?.fases || {};
-    const fotos = _fases.techo?.cierre?.length ? _fases.techo.cierre : (_fases.despues || []);
-    if (fotos.length) {
+    // Fotos de cierre — evidencias por bloque (checklistData.fotosCierre).
+    // El esquema viejo (documentacion.fases.techo.cierre) ya no tiene pantalla
+    // de captura en la app actual; esta sección siempre salía vacía.
+    const fotosCierre = Object.values(project.checklistData?.fotosCierre || {})
+      .flatMap(bloque => Object.values(bloque || {}))
+      .filter(f => f?.url);
+    if (fotosCierre.length) {
       doc.addPage(); addHeader(doc,'Resultado final', project); y = 44;
       let col = 0;
-      for (const f of fotos.slice(0,6)) {
+      for (const f of fotosCierre.slice(0,6)) {
         const fx = 14 + col * 98;
-        y = await addImage(doc, f.data, fx, y, 88, 65);
+        y = await addImage(doc, f.url, fx, y, 88, 65);
         col = (col+1)%2;
-        if (col===0 && fotos.indexOf(f)<fotos.length-1) y += 4;
+        if (col===0 && fotosCierre.indexOf(f)<fotosCierre.length-1) y += 4;
       }
     }
 

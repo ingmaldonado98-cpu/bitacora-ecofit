@@ -189,6 +189,7 @@ export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null
       <div class="form-group">
         <label>Marca *</label>
         <select id="eq-marca">
+          <option value="" ${(isEdit ? eq.marca : '') ? '' : 'selected'}>— Seleccionar marca —</option>
           ${MARCAS_EQUIPOS.map(m => `<option ${(isEdit ? eq.marca : '') === m ? 'selected' : ''}>${m}</option>`).join('')}
         </select>
       </div>
@@ -352,6 +353,7 @@ window.guardarEquipo = async function(projectId) {
   const marca  = document.getElementById('eq-marca').value;
   const modelo = document.getElementById('eq-modelo').value.trim();
   if (!tipo)   { toast('Selecciona el tipo de equipo', 'error'); return; }
+  if (!marca)  { toast('Selecciona la marca del equipo', 'error'); return; }
   if (!modelo) { toast('El modelo es requerido', 'error'); return; }
 
   const editIdx = parseInt(document.getElementById('eq-editing-idx')?.value ?? '-1');

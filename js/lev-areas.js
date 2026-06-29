@@ -94,7 +94,7 @@ export function _renderAreasTecho(areas, edit, pid, tipTechoGeneral) {
             aria-expanded="${completa ? 'false' : 'true'}" aria-controls="lev-area-body-${i}"
             onclick="toggleAcc(this,'lev-area-body-${i}')">
       <span class="acc-icon" aria-hidden="true">🏠</span>
-      <span class="acc-title">Área ${i + 1} de ${areas.length} <span class="lev-area-resumen">— ${resumenTxt}</span></span>
+      <span class="acc-title">Área ${i + 1} de ${areas.length} <span class="lev-area-resumen" id="lev-area-resumen-${i}">— ${resumenTxt}</span></span>
       <span class="acc-arrow" aria-hidden="true">▾</span>
     </button>
     <div class="accordion-body ${completa ? 'acc-collapsed' : ''}" id="lev-area-body-${i}">
@@ -280,4 +280,13 @@ window._updateAreaTecho = function(idx, campo, val) {
   const res = document.getElementById(`lev-area-res-${idx}`);
   if (res) res.innerHTML = (a.ancho && a.largo)
     ? `<strong>${(a.ancho * a.largo).toFixed(1)} m²</strong>` : '—';
+
+  // Mantener el resumen del acordeón colapsado en sincronía — antes solo se
+  // actualizaba al cerrar/reabrir (re-render completo de _renderAreasTecho).
+  const resumenEl = document.getElementById(`lev-area-resumen-${idx}`);
+  if (resumenEl) {
+    const efectivo = a.tipTecho || window._lev.tipTecho || 'Losa de concreto';
+    const dimTxt   = (a.ancho && a.largo) ? `${a.ancho}×${a.largo} m` : 'sin dimensiones';
+    resumenEl.textContent = `— ${a.nombre || `Área ${idx + 1}`} — ${efectivo} · ${dimTxt}`;
+  }
 };
