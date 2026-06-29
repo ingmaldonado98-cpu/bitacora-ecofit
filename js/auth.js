@@ -1,6 +1,6 @@
 // auth.js — Autenticación Firebase · Bitácora Ecofit V6
 
-import { fbAuth, fbUsers, seedAdminIfEmpty, toEmail } from './firebase.js';
+import { fbAuth, fbUsers, fbUsernameIndex, seedAdminIfEmpty, toEmail } from './firebase.js';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { icon }                                        from './icons.js';
 
@@ -111,18 +111,30 @@ export async function login(username, password) {
   await seedAdminIfEmpty();
 
   try {
-    // Buscar perfil primero para obtener el authEmail correcto (real o sintético)
-    const profilePre = await fbUsers.getByUsername(username);
-    const authEmail  = profilePre?.authEmail || toEmail(username);
+    const raw = username.toLowerCase().trim();
+    // Resolver el authEmail SIN leer el perfil completo (eso requiere estar ya
+    // autenticado — imposible en este punto). Tres niveles, del más al menos
+    // común: índice público usuario→correo (se autocompleta abajo tras el
+    // primer login exitoso) → si escribiste tu correo real directo, úsalo tal
+    // cual (escape hatch que no depende de ningún dato precargado) → correo
+    // sintético por defecto (usuario@ecofit.app).
+    let authEmail = await fbUsernameIndex.get(raw).catch(() => null);
+    if (!authEmail) authEmail = raw.includes('@') ? raw : toEmail(raw);
 
     const cred = await signInWithEmailAndPassword(fbAuth, authEmail, password);
     const uid  = cred.user.uid;
 
-    // Cargar perfil desde Firestore
+    // Ya autenticados — ahora sí se puede leer el perfil completo.
     let profile = await fbUsers.getById(uid);
-    if (!profile) profile = profilePre;
+    if (!profile) profile = await fbUsers.getByUsername(raw);
     if (!profile) throw new Error('Perfil de usuario no encontrado en Firestore.');
     if (!profile.activo) throw new Error('Usuario desactivado. Contacta al administrador.');
+
+    // Autocompletar el índice público para que el próximo login por username
+    // corto ya no necesite el escape hatch del correo completo.
+    if (profile.username) {
+      fbUsernameIndex.set(profile.username, authEmail).catch(() => {});
+    }
 
     setSession({ ...profile, id: uid });
     return profile;

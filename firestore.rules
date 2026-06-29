@@ -85,6 +85,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ── Índice público usuario→correo (solo para resolver el login) ──────────
+    // login() necesita el authEmail real ANTES de autenticarse — leer el
+    // perfil completo de /users requiere isActive(), imposible pre-auth. Esta
+    // colección espejo solo guarda el correo, nunca nombre/rol/datos sensibles.
+    match /usernameIndex/{username} {
+      allow read: if true;
+      // Solo puedes escribir tu propio mapeo, apuntando a tu propio correo real
+      // — evita que otro usuario autenticado sabotee el login de alguien más.
+      allow write: if isAuth() && request.resource.data.authEmail == request.auth.token.email;
+    }
+
     // ── Usuarios ──────────────────────────────────────────────────────────────
     match /users/{userId} {
       // Cualquier usuario activo puede leer perfiles (para selects de técnicos)

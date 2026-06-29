@@ -411,6 +411,21 @@ export const fbPublicCards = {
   },
 };
 
+// ── Índice público usuario→correo (solo para resolver el login) ──────────
+// login() necesita el authEmail real ANTES de autenticarse para poder llamar
+// signInWithEmailAndPassword — pero leer el perfil completo (fbUsers) requiere
+// estar autenticado (firestore.rules: isActive()). Esta colección espejo NO
+// guarda nada más que el correo, así que es segura para lectura pública.
+export const fbUsernameIndex = {
+  get: async (username) => {
+    const snap = await getDoc(doc(fbDB, 'usernameIndex', username));
+    return snap.exists() ? snap.data().authEmail : null;
+  },
+  set: async (username, authEmail) => {
+    await setDoc(doc(fbDB, 'usernameIndex', username), { authEmail });
+  },
+};
+
 // ── KV store ───────────────────────────────────────────────────────────────
 export const fbKV = {
   get: async (key) => {
