@@ -505,8 +505,13 @@ function updateOnline() {
 }
 window.addEventListener('online', () => {
   updateOnline();
-  // Procesar cola de fotos offline al reconectar
-  processQueue().catch(() => {});
+  // Procesar cola de fotos offline al reconectar — silent:true porque en
+  // campo con señal intermitente el evento 'online' puede dispararse muchas
+  // veces en minutos; mostrar un toast por cada disparo apila banners de
+  // 6-8s más rápido de lo que desaparecen. El feedback queda en el badge
+  // persistente (pending-photos-badge); el toast se reserva para el
+  // reintento manual (forceRetryPhotos), que sí lo dispara explícitamente.
+  processQueue({ silent: true }).catch(() => {});
 });
 window.addEventListener('offline', updateOnline);
 updateOnline();
@@ -519,7 +524,8 @@ initPendingMap().catch(() => {})
 // la app, y se reabre días después ya conectado), sincroniza cualquier foto
 // que quedó pendiente de una sesión anterior. processQueue() ya se
 // autoprotege si no hay conexión, así que es seguro llamarla siempre.
-processQueue().catch(() => {})
+// silent:true — ver comentario en el listener de 'online' arriba.
+processQueue({ silent: true }).catch(() => {})
 
 // ── SW update banner ──────────────────────────────────────────────────────────
 function showUpdateBanner(newSW) {

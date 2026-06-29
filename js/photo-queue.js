@@ -142,8 +142,25 @@ const MAX_RETRIES      = 6;
 const BASE_BACKOFF_MS  = 3000;
 const MAX_BACKOFF_MS   = 30000;
 
+// Evita que dos pasadas se solapen — en campo con señal intermitente el
+// evento 'online' puede dispararse varias veces seguidas antes de que la
+// primera pasada termine, reprocesando (y reintentando) la misma cola.
+let _processing = false;
+
 export async function processQueue(opts = {}) {
-  const { silent = false } = opts;
+  const { silent = false, force = false } = opts;
+  if (_processing && !force) {
+    return { synced: 0, stuck: 0, remaining: (await getAllQueued()).length, lastError: null };
+  }
+  _processing = true;
+  try {
+    return await _processQueueImpl(silent);
+  } finally {
+    _processing = false;
+  }
+}
+
+async function _processQueueImpl(silent) {
   if (!navigator.onLine) return { synced: 0, stuck: 0, remaining: (await getAllQueued()).length, lastError: 'offline' };
   const items = await getAllQueued();
   if (!items.length) return { synced: 0, stuck: 0, remaining: 0, lastError: null };
@@ -380,7 +397,10 @@ export async function forceRetryPhotos() {
     if ((item.retryCount || 0) !== 0) await updateQueueItem(item.id, { retryCount: 0 });
   }
   toast(`Subiendo ${all.length} foto${all.length > 1 ? 's' : ''} pendiente${all.length > 1 ? 's' : ''}…`, 'info', 3000);
-  const res = await processQueue({ silent: true });
+  // force:true — el reintento manual debe correr aunque ya haya una pasada
+  // automática en curso (el usuario tocó el badge explícitamente, no debe
+  // quedar en silencio por la guardia anti-solape de processQueue).
+  const res = await processQueue({ silent: true, force: true });
   _updatePendingBadge();
 
   if (res.remaining === 0) {
