@@ -1,7 +1,7 @@
 // auth.js — Autenticación Firebase · Bitácora Ecofit V6
 
 import { fbAuth, fbUsers, seedAdminIfEmpty, toEmail } from './firebase.js';
-import { signInWithEmailAndPassword, signOut }         from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { icon }                                        from './icons.js';
 
 // ── Roles ──────────────────────────────────────────────────────────────────
@@ -33,29 +33,61 @@ const _LS_TTL = 7 * 24 * 3600 * 1000; // 7 días
 
 let _session = null;
 
+// El check de sesión propio (sessionStorage/localStorage, TTL 7 días) vivía
+// totalmente desacoplado del estado real de Firebase Auth: si el token de
+// Firebase se perdía/expiraba (ej. el navegador limpió el storage de Firebase
+// pero no localStorage) la app seguía creyendo que había sesión — Firestore
+// rechazaba todo con "Missing or insufficient permissions" en vez de regresar
+// al login con un mensaje claro. Se espera UNA vez (memoizado) al primer
+// onAuthStateChanged para confirmar contra el SDK real antes de confiar en el
+// cache local. onAuthStateChanged resuelve desde la persistencia local de
+// Firebase incluso sin red, así que el modo offline sigue funcionando igual.
+let _fbUserReady = null;
+function _waitForFirebaseUser() {
+  if (!_fbUserReady) {
+    _fbUserReady = new Promise(resolve => {
+      const unsub = onAuthStateChanged(fbAuth, user => { unsub(); resolve(user); });
+    });
+  }
+  return _fbUserReady;
+}
+
 export async function getSession() {
   if (_session) return _session;
 
   // 1. sessionStorage (misma pestaña / misma sesión del navegador)
   const ss = sessionStorage.getItem('ecofit_session');
-  if (ss) { _session = JSON.parse(ss); return _session; }
+  if (ss) { _session = JSON.parse(ss); }
 
   // 2. localStorage (persiste entre reinicios — funciona OFFLINE)
-  try {
-    const ls = localStorage.getItem(_LS_KEY);
-    if (ls) {
-      const stored = JSON.parse(ls);
-      if (Date.now() - stored._savedAt < _LS_TTL) {
-        const { _savedAt, ...s } = stored;
-        _session = s;
-        // Restaurar sessionStorage para que el resto de la app funcione igual
-        sessionStorage.setItem('ecofit_session', JSON.stringify(s));
-        return _session;
+  if (!_session) {
+    try {
+      const ls = localStorage.getItem(_LS_KEY);
+      if (ls) {
+        const stored = JSON.parse(ls);
+        if (Date.now() - stored._savedAt < _LS_TTL) {
+          const { _savedAt, ...s } = stored;
+          _session = s;
+          // Restaurar sessionStorage para que el resto de la app funcione igual
+          sessionStorage.setItem('ecofit_session', JSON.stringify(s));
+        }
       }
-    }
-  } catch { /* silencioso */ }
+    } catch { /* silencioso */ }
+  }
 
-  return null;
+  if (!_session) return null;
+
+  // Confirmar contra Firebase Auth real — si no hay usuario o es uno distinto
+  // al del cache, la sesión local quedó huérfana: limpiarla y forzar re-login.
+  const fbUser = await _waitForFirebaseUser();
+  if (!fbUser || fbUser.uid !== _session.id) {
+    _session = null;
+    sessionStorage.removeItem('ecofit_session');
+    localStorage.removeItem(_LS_KEY);
+    return null;
+  }
+
+  return _session;
 }
 
 function setSession(profile) {
