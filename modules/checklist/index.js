@@ -427,7 +427,7 @@ function _medicionesPuestaMarchaBlock(project, tipo) {
       { id: 'et-02', n: 'Calcomanías de advertencia "Sistema Fotovoltaico" colocadas' },
       { id: 'cc-03', n: 'Prueba de aislamiento — megóhmetro 1000 VDC, R > 1 MΩ entre conductor y tierra', hasInput: true, inputPlaceholder: 'Ej. 500 MΩ' },
       ..._medicionItems(project),
-      ...(['aislado', 'hibrido', 'hibrido_respaldo'].includes(tipo) ? [
+      ...(['aislado', 'hibrido_respaldo'].includes(tipo) ? [
         { id: 'cc-07', n: 'Voltaje del banco de baterías antes del primer arranque', hasInput: true, inputPlaceholder: 'Ej. 48 V' },
         { id: 'cc-08', n: 'Configuración BMS y SOC inicial — registrar valor en bitácora', hasInput: true, inputPlaceholder: 'Ej. 85 % SOC' },
         { id: 'cc-09', n: 'Prueba de transferencia automática ATS (< 20 ms)' },
