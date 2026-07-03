@@ -51,7 +51,7 @@ window.guardarMiPerfil = async function(id) {
     // Cambiar contraseña en Firebase Auth (solo disponible para el usuario actual)
     if (pass) {
       const { getAuth, updatePassword } = await import(
-        'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js'
+        './vendor/firebase-auth.js'
       );
       const currentUser = getAuth().currentUser;
       if (currentUser) {

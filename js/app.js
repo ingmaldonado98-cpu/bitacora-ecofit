@@ -566,7 +566,7 @@ async function _initPushAndroid(session) {
     Push.addListener('registration', async token => {
       try {
         const { fbDB } = await import('./firebase.js');
-        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+        const { doc, updateDoc } = await import('./vendor/firebase-firestore.js');
         await updateDoc(doc(fbDB, 'users', session.id), { fcmToken: token.value, fcmUpdatedAt: new Date().toISOString() });
       } catch { /* silencioso */ }
     });

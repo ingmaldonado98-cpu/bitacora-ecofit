@@ -1,17 +1,17 @@
 // firebase.js — Integración Firebase v10 · Bitácora Ecofit V6
 // Auth + Firestore con persistencia offline automática
 
-import { initializeApp }                         from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { initializeApp }                         from './vendor/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword,
          signOut, onAuthStateChanged,
-         sendPasswordResetEmail }                 from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+         sendPasswordResetEmail }                 from './vendor/firebase-auth.js';
 import { getFirestore, initializeFirestore,
          persistentLocalCache, persistentMultipleTabManager,
          collection, doc,
          getDoc, getDocs, setDoc, updateDoc,
-         deleteDoc, query, orderBy }              from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+         deleteDoc, query, orderBy }              from './vendor/firebase-firestore.js';
 import { getStorage, ref as storageRef,
-         uploadString, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+         uploadString, uploadBytes, getDownloadURL } from './vendor/firebase-storage.js';
 
 // ── Configuración ──────────────────────────────────────────────────────────
 const FB_CONFIG = {

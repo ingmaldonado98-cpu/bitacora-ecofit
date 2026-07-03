@@ -1,7 +1,7 @@
 // auth.js — Autenticación Firebase · Bitácora Ecofit V6
 
 import { fbAuth, fbUsers, fbUsernameIndex, seedAdminIfEmpty, toEmail } from './firebase.js';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from './vendor/firebase-auth.js';
 import { icon }                                        from './icons.js';
 
 // ── Roles ──────────────────────────────────────────────────────────────────
