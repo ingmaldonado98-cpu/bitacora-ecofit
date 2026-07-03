@@ -4,7 +4,7 @@ import { projects } from './db.js';
 import { esc, toast, fmtFechaHora, isoNow } from './utils.js';
 import { isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
-import { calcDimensionamiento, detectarRiesgos, getChecklistCampo, calcSeccionCable, awgToMm2 } from '../modules/dimensionamiento/index.js';
+import { calcDimensionamiento, detectarRiesgos, calcSeccionCable, awgToMm2 } from '../modules/dimensionamiento/index.js';
 
 // ── Render principal ──────────────────────────────────────────────────────────
 export async function renderDimensionamiento(projectId, session) {
@@ -15,9 +15,6 @@ export async function renderDimensionamiento(projectId, session) {
   const lev   = project.documentacion?.levantamiento || {};
   const res   = calcDimensionamiento(project);
   const riesgos = detectarRiesgos(project);
-  const campo   = getChecklistCampo(res);
-  const savedCC = project.dimensionamiento?.campoChecks || {};
-  const savedCCText = project.dimensionamiento?.campoText || {};
 
   return `
   <div class="breadcrumb">
@@ -116,36 +113,6 @@ export async function renderDimensionamiento(projectId, session) {
     ${_renderDimTable(res, lev, project.trayectorias)}
   </div>
 
-  <!-- D. CHECKLIST DE COMISIONAMIENTO -->
-  <div class="dim-section">
-    <div class="dim-section-hdr">
-      <span class="dim-section-letter">D</span>
-      <h2 class="dim-section-title">Pruebas Eléctricas de Campo</h2>
-    </div>
-    <p class="dim-hint">Registra los valores medidos en sitio. Se guardan en el proyecto automáticamente.</p>
-    <div class="cl-item-list">
-      ${campo.map(it => {
-        const done = !!savedCC[it.id];
-        const val  = savedCCText[it.id] || '';
-        return `
-        <label class="cl-item ${done ? 'cl-item-done' : ''}">
-          <input type="checkbox" ${done ? 'checked' : ''} ${!edit ? 'disabled' : ''}
-            onchange="this.closest('.cl-item').classList.toggle('cl-item-done',this.checked);dimToggleCC('${projectId}','${it.id}',this.checked)">
-          <div class="cl-item-text" style="width:100%">
-            <span class="cl-item-name">${esc(it.n)}</span>
-            ${it.hasInput ? `<div style="margin-top:6px">
-              <input type="text" class="torq-input" style="max-width:200px"
-                aria-label="${esc(it.n)} — valor medido"
-                placeholder="${esc(it.placeholder||'Valor medido')}" ${!edit ? 'disabled' : ''}
-                value="${esc(val)}"
-                onchange="dimSaveCCText('${projectId}','${it.id}',this.value,this)"
-                onclick="event.stopPropagation()">
-            </div>` : ''}
-          </div>
-        </label>`;
-      }).join('')}
-    </div>
-  </div>
   `}`;
 }
 
@@ -226,23 +193,6 @@ function _renderDimTable(res, lev, trayectorias = []) {
   </div>`;
 }
 
-// ── Persistencia de checklist de campo ───────────────────────────────────────
-window.dimToggleCC = (pid, id, v) =>
-  projects.setField(pid, `dimensionamiento.campoChecks.${id}`, v);
-
-// Timer POR campo (no compartido): un timer único descartaba la escritura de un
-// campo si el usuario pasaba a otro antes de 600ms. Además da feedback por-input
-// (clase .field-saved que pulsa el borde) al persistir, igual de claro que el
-// indicador de autoguardado del levantamiento.
-const _dimCCTimers = {};
-window.dimSaveCCText = (pid, id, val, el) => {
-  clearTimeout(_dimCCTimers[id]);
-  _dimCCTimers[id] = setTimeout(async () => {
-    await projects.setField(pid, `dimensionamiento.campoText.${id}`, val);
-    if (el) { el.classList.add('field-saved'); setTimeout(() => el.classList.remove('field-saved'), 1400); }
-  }, 600);
-};
-
 window.dimRecalc = (pid) => navigate(`#dimensionamiento/${pid}`);
 
 // ── Exportar PDF ──────────────────────────────────────────────────────────────
@@ -250,15 +200,9 @@ window.dimExportPDF = async function(projectId) {
   const project = await projects.getById(projectId);
   const res     = calcDimensionamiento(project);
   const riesgos = detectarRiesgos(project);
-  const campo   = getChecklistCampo(res);
-  const savedCC = project.dimensionamiento?.campoChecks || {};
-  const savedCCText = project.dimensionamiento?.campoText || {};
   const lev = project.documentacion?.levantamiento || {};
 
   if (res.error) { toast('Completa el levantamiento antes de exportar.', 'error'); return; }
-
-  const checkRow = (done, label, val) =>
-    `<tr class="${done?'done':''}"><td>${done?'☑':'☐'}</td><td>${label}${val?`<br><b style="color:#16a34a">${esc(val)}</b>`:''}</td></tr>`;
 
   const modeloRows = Object.entries(res.modelo)
     .map(([k,v]) => `<tr><td><b>${_labelModelo(k)}</b></td><td>${esc(v)}</td></tr>`).join('');
@@ -276,10 +220,6 @@ window.dimExportPDF = async function(projectId) {
   const riesgoRows = riesgos.map(r =>
     `<li style="color:${r.nivel==='error'?'#dc2626':'#d97706'}">${esc(r.msg)}</li>`
   ).join('') || '<li style="color:#16a34a">Sin riesgos detectados.</li>';
-
-  const campoRows = campo.map(it =>
-    checkRow(!!savedCC[it.id], it.n, savedCCText[it.id])
-  ).join('');
 
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <title>Memoria Técnica — ${project.displayId}</title>
@@ -308,9 +248,6 @@ window.dimExportPDF = async function(projectId) {
 
   <h2>C. Dimensionamiento Técnico</h2>
   ${_renderDimTable(res, lev, project.trayectorias).replace(/<div[^>]*>/g,'').replace(/<\/div>/g,'')}
-
-  <h2>D. Pruebas Eléctricas de Campo</h2>
-  <table><tbody>${campoRows}</tbody></table>
   </body></html>`;
 
   const blob = new Blob([html], { type:'text/html;charset=utf-8' });

@@ -425,7 +425,13 @@ function _medicionesPuestaMarchaBlock(project, tipo) {
       ...(tipo === 'bombeo' ? _bombaItems : []),
       { id: 'et-01', n: 'Cables identificados: positivo, negativo, fases, neutro, tierra' },
       { id: 'et-02', n: 'Calcomanías de advertencia "Sistema Fotovoltaico" colocadas' },
+      { id: 'cc-03', n: 'Prueba de aislamiento — megóhmetro 1000 VDC, R > 1 MΩ entre conductor y tierra', hasInput: true, inputPlaceholder: 'Ej. 500 MΩ' },
       ..._medicionItems(project),
+      ...(['aislado', 'hibrido', 'hibrido_respaldo'].includes(tipo) ? [
+        { id: 'cc-07', n: 'Voltaje del banco de baterías antes del primer arranque', hasInput: true, inputPlaceholder: 'Ej. 48 V' },
+        { id: 'cc-08', n: 'Configuración BMS y SOC inicial — registrar valor en bitácora', hasInput: true, inputPlaceholder: 'Ej. 85 % SOC' },
+        { id: 'cc-09', n: 'Prueba de transferencia automática ATS (< 20 ms)' },
+      ] : []),
       { id: 'med-02', n: 'Voltajes CA medidos (fase-fase, fase-neutro, fase-tierra)', hasInput: true, inputPlaceholder: 'Ej: 220V / 127V / 127V' },
       { id: 'med-03', n: 'Resistencia de la red de tierra física medida', hasInput: true, inputPlaceholder: 'Ej: 4.8 Ω' },
       { id: 'med-04', n: 'Torque verificado en conexiones eléctricas (breakers, terminales) según especificación del fabricante' },

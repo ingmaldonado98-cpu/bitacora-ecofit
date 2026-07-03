@@ -297,32 +297,3 @@ export function awgToMm2(awg) {
   return entry ? entry.mm2 : null;
 }
 
-// ── Checklist de campo (Sección D) ───────────────────────────────────────────
-export function getChecklistCampo(res) {
-  const base = [
-    { id:'cc-01', n:'Medición Voc por string con multímetro (paneles en circuito abierto, inversor desconectado)', hasInput:true, placeholder:'Ej. 380 V' },
-    { id:'cc-02', n:'Medición Isc por string con pinza amperimétrica DC', hasInput:true, placeholder:'Ej. 14.2 A' },
-    { id:'cc-03', n:'Prueba de aislamiento (megóhmetro 1000 VDC): R > 1 MΩ entre conductor y tierra', hasInput:true, placeholder:'Ej. 500 MΩ' },
-    { id:'cc-04', n:'Verificación de polaridad DC antes de conectar al inversor (+/−)' },
-    { id:'cc-05', n:'Apriete de terminales en borneras, clemas y bus-bar (rach + dado adecuado)' },
-    { id:'cc-06', n:'Encendido del inversor sin alarmas ni fallas — secuencia correcta' },
-  ];
-  if (res?.tipo === 'aislado' || res?.tipo === 'hibrido') {
-    base.push(
-      { id:'cc-07', n:'Voltaje del banco de baterías antes de primer arranque', hasInput:true, placeholder:`Ej. ${(res.batVbus||48)} V` },
-      { id:'cc-08', n:'Configuración BMS y SOC inicial — registrar valor en bitácora', hasInput:true, placeholder:'Ej. 85 % SOC' },
-      { id:'cc-09', n:'Prueba de transferencia automática ATS — simular corte de red y verificar tiempo < 20 ms' },
-    );
-  }
-  if (res?.tipo === 'bombeo') {
-    base.push(
-      { id:'cc-07', n:'Prueba de arranque VFD — verificar frecuencia de salida rampa lenta (0 → 50 Hz)', hasInput:true, placeholder:'Ej. 50 Hz / 380 V' },
-      { id:'cc-08', n:'Medición de caudal real en descarga vs. caudal de diseño', hasInput:true, placeholder:`Ej. ${res.caudal||5} m³/h` },
-    );
-  }
-  base.push(
-    { id:'cc-10', n:'Configuración de parámetros de red en inversor (voltaje, frecuencia, anti-islanding)' },
-    { id:'cc-11', n:'Activación de datalogger / monitoreo — verificar envío de telemetría a plataforma' },
-  );
-  return base;
-}
