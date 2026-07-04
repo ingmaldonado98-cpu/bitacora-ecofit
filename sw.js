@@ -131,6 +131,21 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
+  // Navegación (recarga de página, links) → siempre servir index.html desde caché.
+  // Esto garantiza que un refresh accidental offline no muestre pantalla en blanco.
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      caches.match('./index.html').then(cached =>
+        cached || fetch(e.request).catch(() =>
+          new Response('<h2 style="font-family:sans-serif;padding:24px">Sin conexión — abre la app cuando tengas internet al menos una vez.</h2>', {
+            status: 200, headers: { 'Content-Type': 'text/html;charset=utf-8' },
+          })
+        )
+      )
+    );
+    return;
+  }
+
   // Firebase, CDNs y APIs externas → siempre Network (no cachear)
   if (
     url.origin !== self.location.origin ||
@@ -161,7 +176,9 @@ async function cacheFirst(req) {
     }
     return resp;
   } catch {
-    return new Response('Offline — recurso no disponible', { status: 503 });
+    // Fallback de último recurso para recursos del app shell no cacheados
+    const root = await caches.match('./index.html');
+    return root || new Response('Offline', { status: 503 });
   }
 }
 

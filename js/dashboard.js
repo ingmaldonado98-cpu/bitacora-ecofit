@@ -128,7 +128,8 @@ export async function renderDashboard(session, all, allUsers) {
     ${(!activos.length && !navigator.onLine) ? `
     <div class="empty-state">
       <div class="empty-state-icon">📡</div>
-      <p class="empty-state-msg">Sin proyectos en caché local.<br>Conéctate a internet al menos una vez para sincronizarlos a este dispositivo.</p>
+      <p class="empty-state-msg"><strong>Los proyectos se cargarán cuando recuperes señal.</strong><br><br>Los datos están guardados en el servidor. Cuando tengas internet, se sincronizarán automáticamente.<br><br>Si ya abriste la app con internet antes, espera unos segundos y vuelve a intentarlo.</p>
+      <button class="btn-outline btn-sm" style="margin-top:12px" onclick="window.location.reload()">Reintentar</button>
     </div>` : renderProjectList(activos)}
   </div>
 
