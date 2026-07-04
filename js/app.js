@@ -19,7 +19,7 @@ import { renderChecklistModule, renderChecklistsList } from './checklist.js';
 import { renderDimensionamiento } from './dimensionamiento.js';
 import { renderTrayecto } from './trayecto.js';
 import { renderTrayectorias } from './trayectorias.js';
-import { projects, users, reminders } from './db.js';
+import { projects, users, reminders, syncStatus } from './db.js';
 import { fbErrors } from './firebase.js';
 import { toast, esc, uuid } from './utils.js';
 import { icon } from './icons.js';
@@ -502,9 +502,16 @@ function updateOnline() {
   document.body.classList.toggle('offline', !navigator.onLine);
   const banner = document.getElementById('offline-banner');
   if (banner) banner.style.display = navigator.onLine ? 'none' : 'block';
+  const badge = document.getElementById('sync-pending-badge');
+  if (badge) badge.style.display = (!navigator.onLine && syncStatus.pending() > 0) ? 'inline' : 'none';
 }
 window.addEventListener('online', () => {
   updateOnline();
+  // Cuando sync-queue termina de subir cambios offline, mostrar confirmación
+  window.addEventListener('ecofit:synced', (e) => {
+    if (e.detail?.flushed > 0) toast(`${e.detail.flushed} cambio${e.detail.flushed > 1 ? 's' : ''} sincronizado${e.detail.flushed > 1 ? 's' : ''}`, 'success', 3000);
+    updateOnline();
+  }, { once: true });
   // Procesar cola de fotos offline al reconectar — silent:true porque en
   // campo con señal intermitente el evento 'online' puede dispararse muchas
   // veces en minutos; mostrar un toast por cada disparo apila banners de

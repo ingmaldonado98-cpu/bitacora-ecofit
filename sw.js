@@ -26,6 +26,8 @@ const APP_SHELL = [
   './js/calc-actions.js',
   './js/dashboard.js',
   './js/db.js',
+  './js/local-store.js',
+  './js/sync-queue.js',
   './js/documentacion.js',
   './js/lev-form.js',
   './js/doc-sitio.js',
