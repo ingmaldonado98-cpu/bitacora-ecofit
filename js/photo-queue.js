@@ -10,10 +10,121 @@
 //   op           — Operación Firestore al completar (ver OPERACIONES abajo)
 //   opArgs       — Argumentos específicos de la operación
 //   retryCount   — Reintentos fallidos acumulados (backoff exponencial, ver processQueue)
+//   localPath    — Ruta en DOCUMENTS donde se guardó la copia local (opcional)
 
 const DB_NAME  = 'ecofit-photo-queue';
 const DB_VER   = 1;
 const STORE    = 'queue';
+
+// ── Mapa op → nombre de subcarpeta en Filesystem ─────────────────────────────
+const _OP_CARPETA = {
+  fotoSistema:        'Sistema',
+  fotoFase:           'Ejecucion',
+  fotoArea:           'Levantamiento',
+  fotoLev:            'Levantamiento',
+  fotoTecnica:        'Tecnica',
+  fotoAdicional:      'Adicional',
+  fotoMedidor:        'Levantamiento',
+  sombraFoto:         'Levantamiento',
+  sunSeeker:          'Levantamiento',
+  dronFoto:           'Dron',
+  clienteFoto:        'Cliente',
+  fotoCierrePaso:     'Cierre',
+  fotoArregloPaneles: 'Paneles',
+  estructuraFoto:     'Estructura',
+  reciboFoto:         'Levantamiento',
+  eqFoto:             'Equipos',
+  auditoriaDocFirmado:'Auditoria',
+};
+
+// Elimina el prefijo "data:image/...;base64," de un data URL
+function _stripDataUrl(dataUrl) {
+  const idx = dataUrl ? dataUrl.indexOf(',') : -1;
+  return idx >= 0 ? dataUrl.slice(idx + 1) : (dataUrl || '');
+}
+
+// ── Leer un item de la cola (necesario en dequeuePhoto para obtener localPath) ─
+function _getQueueItem(id) {
+  return new Promise(resolve => {
+    _openDB().then(db => {
+      const tx  = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = e => resolve(e.target.result || null);
+      req.onerror   = () => resolve(null);
+    }).catch(() => resolve(null));
+  });
+}
+
+// ── Guardar copia de la foto (nativo: Filesystem DOCUMENTS / web: OPFS) ───────
+// Ruta: Ecofit/Proyectos/{displayId}/Fotos/{Categoria}_{shortId}.jpg
+// Al completar, actualiza el item con `localPath`.
+// El prefijo "opfs:" indica Origin Private File System (web); sin prefijo = nativo.
+async function _savePhotoLocalAsync(item) {
+  // Nombre de carpeta: displayId limpio o projectId como fallback
+  let folderName = item.projectId;
+  try {
+    const { localStore } = await import('./local-store.js');
+    const p = await localStore.getById(item.projectId);
+    if (p?.displayId) folderName = p.displayId.replace(/[/\\?%*:|"<>]/g, '_').trim();
+  } catch { /* usar projectId */ }
+
+  const carpeta = _OP_CARPETA[item.op] || 'Fotos';
+  const shortId = item.id.slice(0, 8);
+  const relPath = `Ecofit/Proyectos/${folderName}/Fotos/${carpeta}_${shortId}.jpg`;
+
+  const FS = window.Capacitor?.Plugins?.Filesystem;
+  if (FS) {
+    // ── Nativo Android/iOS: Documentos del dispositivo ───────────────────────
+    try {
+      await FS.writeFile({ path: relPath, data: _stripDataUrl(item.base64), directory: 'DOCUMENTS', recursive: true });
+      await updateQueueItem(item.id, { localPath: relPath });
+    } catch { /* silencioso */ }
+  } else if (navigator.storage?.getDirectory) {
+    // ── Web PWA: Origin Private File System (OPFS) ───────────────────────────
+    try {
+      const parts  = relPath.split('/');
+      const fname  = parts.pop();
+      const root   = await navigator.storage.getDirectory();
+      let   dir    = root;
+      for (const seg of parts) dir = await dir.getDirectoryHandle(seg, { create: true });
+      const fh = await dir.getFileHandle(fname, { create: true });
+      const wr = await fh.createWritable();
+      const b64    = _stripDataUrl(item.base64);
+      const binary = atob(b64);
+      const bytes  = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      await wr.write(bytes);
+      await wr.close();
+      await updateQueueItem(item.id, { localPath: 'opfs:' + relPath });
+    } catch { /* silencioso */ }
+  }
+}
+
+// ── Eliminar archivo local tras subida exitosa ────────────────────────────────
+// localPath sin prefijo → Capacitor Filesystem DOCUMENTS
+// localPath con prefijo "opfs:" → Origin Private File System
+function _deletePhotoLocal(localPath) {
+  if (!localPath) return;
+  if (localPath.startsWith('opfs:')) {
+    _deleteFromOPFS(localPath.slice(5));
+    return;
+  }
+  try {
+    const FS = window.Capacitor?.Plugins?.Filesystem;
+    if (FS) FS.deleteFile({ path: localPath, directory: 'DOCUMENTS' }).catch(() => {});
+  } catch { /* silencioso */ }
+}
+
+async function _deleteFromOPFS(relPath) {
+  try {
+    const parts = relPath.split('/');
+    const fname = parts.pop();
+    const root  = await navigator.storage.getDirectory();
+    let   dir   = root;
+    for (const seg of parts) dir = await dir.getDirectoryHandle(seg, { create: false });
+    await dir.removeEntry(fname);
+  } catch { /* silencioso */ }
+}
 
 // Mapa en memoria: pendingId → base64 (para renderizar fotos pendientes sin IndexedDB async)
 window._pendingPhotoMap = window._pendingPhotoMap || {};
@@ -45,6 +156,13 @@ export async function enqueuePhoto(item) {
   // Guardar en mapa de memoria para renderizado inmediato
   window._pendingPhotoMap[item.id] = item.base64;
   _updatePendingBadge();
+  // Guardar copia física en Filesystem (backup accesible en explorador/OneDrive)
+  _savePhotoLocalAsync(item);
+  // Registrar Background Sync para subir cuando vuelva la conexión,
+  // incluso si la app está en background o el tab está dormido
+  navigator.serviceWorker?.ready
+    .then(reg => reg.sync?.register('photo-upload'))
+    .catch(() => {});
 }
 
 // ── Actualizar item en la cola (patch parcial) ───────────────────────────────
@@ -65,6 +183,8 @@ export async function updateQueueItem(id, updates) {
 
 // ── Eliminar de la cola ───────────────────────────────────────────────────────
 export async function dequeuePhoto(id) {
+  // Leer antes de eliminar para obtener localPath
+  const item = await _getQueueItem(id);
   const db = await _openDB();
   await new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
@@ -74,6 +194,8 @@ export async function dequeuePhoto(id) {
   });
   delete window._pendingPhotoMap[id];
   _updatePendingBadge();
+  // Eliminar el archivo local ahora que la foto ya está en Firebase Storage
+  if (item?.localPath) _deletePhotoLocal(item.localPath);
 }
 
 // ── Obtener todos los items en cola ───────────────────────────────────────────
@@ -367,6 +489,12 @@ async function _processQueueImpl(silent) {
   }
 
   const remaining = (await getAllQueued()).length;
+  // Si aún quedan pendientes, volver a registrar el tag para que el SW reintente
+  if (remaining > 0) {
+    navigator.serviceWorker?.ready
+      .then(reg => reg.sync?.register('photo-upload'))
+      .catch(() => {});
+  }
   if (!silent) {
     if (synced > 0) {
       const { toast } = await import('./utils.js');

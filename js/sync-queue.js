@@ -1,12 +1,30 @@
 // sync-queue.js — Cola de escrituras Firestore pendientes (offline → flush al reconectar)
 
-const Q_KEY = 'ecofit_sync_q';
+const Q_KEY      = 'ecofit_sync_q';
+const Q_DEAD_KEY = 'ecofit_sync_dead'; // ítems descartados tras MAX_RETRIES fallos
+const MAX_RETRIES = 5;
+const MAX_DEAD    = 20; // máx entradas en dead-letter (FIFO)
 
 function _load() {
   try { return JSON.parse(localStorage.getItem(Q_KEY) || '[]'); } catch { return []; }
 }
 function _save(q) {
   try { localStorage.setItem(Q_KEY, JSON.stringify(q)); } catch {}
+}
+
+function _quarantine(item) {
+  try {
+    const dead = JSON.parse(localStorage.getItem(Q_DEAD_KEY) || '[]');
+    dead.push({ ...item, deadAt: new Date().toISOString() });
+    localStorage.setItem(Q_DEAD_KEY, JSON.stringify(dead.slice(-MAX_DEAD)));
+  } catch {}
+}
+
+export function getDeadQueue() {
+  try { return JSON.parse(localStorage.getItem(Q_DEAD_KEY) || '[]'); } catch { return []; }
+}
+export function clearDeadQueue() {
+  try { localStorage.removeItem(Q_DEAD_KEY); } catch {}
 }
 
 export const syncQueue = {
@@ -16,10 +34,10 @@ export const syncQueue = {
       // Deduplica por id+path: dos setField sobre el mismo campo = solo el último importa
       const key = args.id + '::' + args.path;
       const idx = q.findIndex(e => e.op === 'setField' && e.key === key);
-      if (idx >= 0) { q[idx] = { op, key, args, ts: Date.now() }; }
-      else          { q.push({ op, key, args, ts: Date.now() }); }
+      if (idx >= 0) { q[idx] = { op, key, args, ts: Date.now(), retries: 0 }; }
+      else          { q.push({ op, key, args, ts: Date.now(), retries: 0 }); }
     } else {
-      q.push({ op, args, ts: Date.now() });
+      q.push({ op, args, ts: Date.now(), retries: 0 });
     }
     _save(q);
   },
@@ -50,7 +68,15 @@ export const syncQueue = {
         else if (item.op === 'add')      await fbProjects.add(item.args.data);
         else if (item.op === 'delete')   await fbProjects.delete(item.args.id);
         flushed++;
-      } catch { failed.push(item); }
+      } catch {
+        const retries = (item.retries || 0) + 1;
+        if (retries >= MAX_RETRIES) {
+          // Ítem persistentemente fallido → quarantine, no bloquea el resto de la cola
+          _quarantine({ ...item, retries });
+        } else {
+          failed.push({ ...item, retries });
+        }
+      }
     }
     _save(failed);
     return flushed;

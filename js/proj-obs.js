@@ -1,7 +1,7 @@
 // proj-obs.js — Observaciones del proyecto: render y CRUD
 // Extraído de project.js. Exporta renderObservaciones.
 
-import { projects } from './db.js';
+import { projects, logChange } from './db.js';
 import { esc, fmtFechaHora, fmtRelativa, PRIORIDADES, isoNow, toast,
          confirmDialog, inputDialog } from './utils.js';
 import { isAdmin, isLider, canEdit, getSession } from './auth.js';
@@ -72,6 +72,7 @@ window._submitObs = async function(id) {
     timestamp: isoNow(),
   }];
   await projects.update(id, { observaciones: obs });
+  logChange(id, { modulo: 'Observaciones', accion: 'observación agregada', detalle: texto.slice(0, 60), quien: session });
   _refreshObsList(obs, session, id, project);
   document.getElementById('obs-form').style.display = 'none';
   document.getElementById('obs-texto').value = '';
@@ -104,6 +105,7 @@ window._resolverObs = async function(id, idx, resolver) {
     obs[idx] = rest;
   }
   await projects.update(id, { observaciones: obs });
+  logChange(id, { modulo: 'Observaciones', accion: resolver ? 'observación resuelta' : 'observación reabierta', detalle: obs[idx]?.texto?.slice(0, 60) || '', quien: session });
   _refreshObsList(obs, session, id, project);
   toast(resolver ? '✓ Observación resuelta' : 'Observación reabierta');
 };

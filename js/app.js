@@ -19,7 +19,7 @@ import { renderChecklistModule, renderChecklistsList } from './checklist.js';
 import { renderDimensionamiento } from './dimensionamiento.js';
 import { renderTrayecto } from './trayecto.js';
 import { renderTrayectorias } from './trayectorias.js';
-import { projects, users, reminders, syncStatus } from './db.js';
+import { projects, users, reminders, syncStatus, setDbSession, triggerSync } from './db.js';
 import { fbErrors } from './firebase.js';
 import { toast, esc, uuid } from './utils.js';
 import { icon } from './icons.js';
@@ -173,6 +173,7 @@ async function route() {
     window.location.hash = '#login';
     return;
   }
+  setDbSession(session);
 
   // Mostrar chrome de la app
   window.__showNav?.();
@@ -192,6 +193,13 @@ async function route() {
         await render(renderDashboard(session, all, allUsers), skeletonDashboard());
         // Poblar select de técnicos ahora que el DOM existe
         populateTecnicoFilter(allUsers);
+        // Pre-calentar fotos de los 5 proyectos más recientes en background
+        if (navigator.onLine && all?.length) {
+          [...all]
+            .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+            .slice(0, 5)
+            .forEach(p => _prewarmProjectPhotos(p));
+        }
         break;
       }
       case 'nuevo-proyecto':
@@ -206,6 +214,8 @@ async function route() {
         if (!id) { navigate('#dashboard'); return; }
         if (!sub) {
           await render(renderProjectDetail(id, session), skeletonProject());
+          // Pre-calentar fotos en background para disponibilidad offline
+          projects.getById(id).then(p => _prewarmProjectPhotos(p)).catch(() => {});
         } else if (sub === 'garantia') {
           const subsub = parts[3];
           if (subsub === 'estructura') {
@@ -498,13 +508,50 @@ window._logout = async function() {
 };
 
 // ── Offline indicator ─────────────────────────────────────────────────────────
+function _relativeTime(ts) {
+  if (!ts) return 'nunca';
+  const mins = Math.floor((Date.now() - Number(ts)) / 60000);
+  if (mins < 1)  return 'hace menos de 1 min';
+  if (mins < 60) return `hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `hace ${hrs} h`;
+  return `hace ${Math.floor(hrs / 24)} días`;
+}
+
 function updateOnline() {
   document.body.classList.toggle('offline', !navigator.onLine);
   const banner = document.getElementById('offline-banner');
   if (banner) banner.style.display = navigator.onLine ? 'none' : 'block';
+
   const badge = document.getElementById('sync-pending-badge');
-  if (badge) badge.style.display = (!navigator.onLine && syncStatus.pending() > 0) ? 'inline' : 'none';
+  if (badge) {
+    const n = syncStatus.pending();
+    if (!navigator.onLine && n > 0) {
+      badge.textContent = `· ${n} cambio${n > 1 ? 's' : ''} por sincronizar`;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  const lastBadge = document.getElementById('sync-last-badge');
+  if (lastBadge) {
+    if (!navigator.onLine) {
+      const ts = localStorage.getItem('ecofit_last_sync');
+      lastBadge.textContent = `· sync: ${_relativeTime(ts)}`;
+      lastBadge.style.display = 'inline';
+    } else {
+      lastBadge.style.display = 'none';
+    }
+  }
 }
+window.addEventListener('ecofit:conflict', (e) => {
+  const cs = e.detail?.conflicts;
+  if (!cs?.length) return;
+  const names = cs.map(c => `${c.displayId} (${c.by})`).join(', ');
+  toast(`⚠ Conflicto detectado: ${names} fue editado por otro técnico mientras estabas sin conexión. Tus cambios se enviaron — revisa el proyecto.`, 'error', 10000);
+});
+
 window.addEventListener('online', () => {
   updateOnline();
   // Cuando sync-queue termina de subir cambios offline, mostrar confirmación
@@ -526,6 +573,28 @@ updateOnline();
 // Inicializar mapa de fotos pendientes (para renderizar mientras se sube)
 initPendingMap().catch(() => {})
 
+// ── Pre-calentar caché de fotos al abrir un proyecto ─────────────────────────
+// Recorre el objeto proyecto buscando URLs de Firebase Storage y las descarga
+// en background para que el SW las guarde en ecofit-photos-v1. Así el técnico
+// puede ver las fotos ya subidas aunque pierda señal después.
+function _prewarmProjectPhotos(project) {
+  if (!navigator.onLine || !project) return;
+  const urls = new Set();
+  function _collect(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    if (Array.isArray(obj)) { obj.forEach(_collect); return; }
+    for (const val of Object.values(obj)) {
+      if (typeof val === 'string' && val.includes('firebasestorage.googleapis.com')) {
+        urls.add(val);
+      } else if (val && typeof val === 'object') {
+        _collect(val);
+      }
+    }
+  }
+  _collect(project);
+  urls.forEach(url => fetch(url).catch(() => {}));
+}
+
 // Si ya hay señal al abrir la app (aunque no haya ocurrido la transición
 // offline→online en esta sesión — ej. se tomó la foto sin señal, se cerró
 // la app, y se reabre días después ya conectado), sincroniza cualquier foto
@@ -535,19 +604,21 @@ initPendingMap().catch(() => {})
 processQueue({ silent: true }).catch(() => {})
 
 // ── SW update banner ──────────────────────────────────────────────────────────
-function showUpdateBanner(newSW) {
+function showUpdateBanner(waitingSW) {
   const existing = document.getElementById('sw-update-banner');
   if (existing) return;
   const banner = document.createElement('div');
   banner.id = 'sw-update-banner';
   banner.innerHTML = `
     <span>🔄 Nueva versión disponible</span>
-    <button onclick="
-      document.getElementById('sw-update-banner')?.remove();
-      navigator.serviceWorker.controller?.postMessage({type:'SKIP_WAITING'});
-    ">Actualizar ahora</button>
+    <button id="sw-update-btn">Actualizar ahora</button>
     <button class="sw-update-dismiss" title="Descartar por ahora" onclick="document.getElementById('sw-update-banner')?.remove();">✕</button>`;
   document.body.appendChild(banner);
+  // Enviar SKIP_WAITING al SW que está esperando (no al controlador activo)
+  document.getElementById('sw-update-btn').addEventListener('click', () => {
+    banner.remove();
+    waitingSW.postMessage({ type: 'SKIP_WAITING' });
+  });
 }
 
 // ── Android: botón Back ───────────────────────────────────────────────────────
@@ -615,6 +686,14 @@ if ('serviceWorker' in navigator && !isNative()) {
     if (e.data?.type === 'SW_VERSION') {
       const el = document.getElementById('sw-ver');
       if (el) el.textContent = e.data.version;
+    }
+    // Background Sync OS: sync de proyectos/recordatorios/kv (incluso tab en background)
+    if (e.data?.type === 'BG_SYNC') {
+      triggerSync();
+    }
+    // SW Background Sync dispara esto al reconectar (incluso con tab en background)
+    if (e.data?.type === 'PROCESS_PHOTO_QUEUE') {
+      processQueue({ silent: true }).catch(() => {});
     }
   });
 }

@@ -1,7 +1,7 @@
 // proj-form.js — Formulario de creación y edición de proyecto
 // Extraído de project.js. Exporta renderProjectForm.
 
-import { projects, users } from './db.js';
+import { projects, users, logChange } from './db.js';
 import { esc, toast, uuid, isoNow, genDisplayId, ESTADOS, PRIORIDADES, TIPOS_SISTEMA,
          capturePhoto } from './utils.js';
 import { getSession } from './auth.js';
@@ -302,6 +302,7 @@ window._submitProject = async function(e, editId) {
         data.displayId = genDisplayId(data.clientName, prev.createdAt, data.tipoSistema, otherIds);
       }
       await projects.update(editId, data);
+      logChange(editId, { modulo: 'Proyecto', accion: 'datos generales actualizados', detalle: data.clientName || '', quien: session });
       toast('Proyecto actualizado');
       navigate(`#proyecto/${editId}`);
     } else {
@@ -328,6 +329,7 @@ window._submitProject = async function(e, editId) {
         updatedAt: createdAt,
       };
       await projects.add(newProject);
+      logChange(newProject.id, { modulo: 'Proyecto', accion: 'proyecto creado', detalle: newProject.displayId, quien: session });
       toast(`Proyecto ${newProject.displayId} creado`);
       navigate(`#proyecto/${newProject.id}`);
     }

@@ -1,8 +1,10 @@
 // sw.js — Service Worker Bitácora Ecofit V6
 // ⚠ Cambiar BUILD_DATE y CACHE_NAME en cada deploy para invalidar caché
-const BUILD_DATE  = '2026-07-04';
-const CACHE_NAME  = 'ecofit-v6-v188';
-const SW_VERSION  = '6.79.17';
+const BUILD_DATE  = '2026-07-07';
+const CACHE_NAME  = 'ecofit-v6-v193';
+const SW_VERSION  = '6.85.0';
+const PHOTO_CACHE = 'ecofit-photos-v1';
+const PHOTO_MAX   = 300; // entradas máx antes de podar
 
 const APP_SHELL = [
   './',
@@ -120,11 +122,15 @@ self.addEventListener('install', e => {
   );
 });
 
-// ── Activate: purge old caches ─────────────────────────────────────────────────
+// ── Activate: purge old caches (excepto caché de fotos — es persistente) ───────
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter(k => k !== CACHE_NAME && k !== PHOTO_CACHE)
+          .map(k => caches.delete(k))
+      )
     ).then(() => self.clients.claim())
   );
 });
@@ -145,6 +151,12 @@ self.addEventListener('fetch', e => {
         )
       )
     );
+    return;
+  }
+
+  // Fotos de Firebase Storage → network-first con caché propia (ver offline)
+  if (url.hostname === 'firebasestorage.googleapis.com') {
+    e.respondWith(photoNetworkFirst(e.request));
     return;
   }
 
@@ -198,15 +210,73 @@ async function networkFirst(req) {
   }
 }
 
+// Fotos de Firebase Storage: network-first → caché propia → 503 transparente.
+// La URL se normaliza eliminando el token de acceso para que la clave sea
+// estable entre sesiones (el contenido no cambia aunque rote el token).
+async function photoNetworkFirst(req) {
+  // Clave de caché sin token (las fotos no cambian, solo el token rota)
+  const cacheKey = _photoKey(req.url);
+  const cache = await caches.open(PHOTO_CACHE);
+  try {
+    const resp = await fetch(req);
+    if (resp.ok) {
+      cache.put(cacheKey, resp.clone());
+      // Podar en background cuando se acerca al límite
+      cache.keys().then(keys => {
+        if (keys.length > PHOTO_MAX) _prunePhotoCache(cache, keys);
+      });
+    }
+    return resp;
+  } catch {
+    const cached = await cache.match(cacheKey);
+    return cached || new Response('', { status: 503 });
+  }
+}
+
+// Normaliza la URL removiendo el token de autenticación de Firebase Storage
+function _photoKey(urlStr) {
+  try {
+    const u = new URL(urlStr);
+    u.searchParams.delete('token');
+    return new Request(u.toString());
+  } catch {
+    return new Request(urlStr);
+  }
+}
+
+// Borra el 25% más antiguo cuando se supera PHOTO_MAX entradas
+async function _prunePhotoCache(cache, keys) {
+  const toDelete = keys.slice(0, Math.floor(keys.length * 0.25));
+  await Promise.all(toDelete.map(k => cache.delete(k)));
+}
+
 // ── Background sync ────────────────────────────────────────────────────────────
 self.addEventListener('sync', e => {
   if (e.tag === 'sync-drive') {
     e.waitUntil(syncDrive());
   }
+  // Sync de proyectos/recordatorios/kv: delegar a la página (Firebase SDK en página)
+  // El OS puede disparar este evento aunque la app esté en background.
+  if (e.tag === 'ecofit-sync') {
+    e.waitUntil(
+      self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
+        .then(clients => {
+          for (const c of clients) c.postMessage({ type: 'BG_SYNC' });
+        })
+    );
+  }
+  // Fotos pendientes: delegar a la página activa (Firebase SDK requiere contexto de página)
+  if (e.tag === 'photo-upload') {
+    e.waitUntil(
+      self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
+        .then(clients => {
+          for (const c of clients) c.postMessage({ type: 'PROCESS_PHOTO_QUEUE' });
+        })
+    );
+  }
 });
 
 async function syncDrive() {
-  // Placeholder: implementar cuando se active integración Drive
   console.log('[SW] Background sync: sync-drive triggered');
 }
 

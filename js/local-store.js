@@ -111,3 +111,33 @@ export const localStore = {
 
   isNative: () => !!getPlugin('Filesystem'),
 };
+
+// ── Purgar proyectos concluidos sin actividad reciente ────────────────────
+// Máximo una vez por día; solo actúa si hay >15 proyectos en caché.
+// Solo elimina estado 'concluido' con updatedAt > maxAgeDays días.
+const _PRUNE_TS = 'ecofit_last_prune';
+export async function pruneOldProjects(maxAgeDays = 60) {
+  try {
+    const last = localStorage.getItem(_PRUNE_TS);
+    if (last && Date.now() - Number(last) < 86_400_000) return 0;
+    const idx = await _read(IDX);
+    if (!idx?.length || idx.length < 15) return 0;
+    const cutoff = new Date(Date.now() - maxAgeDays * 86_400_000).toISOString();
+    const toKeep = [];
+    let pruned = 0;
+    for (const id of idx) {
+      const p = await _read(BASE + id + '.json');
+      if (!p) continue;
+      if (p.estado === 'concluido' && (p.updatedAt || '') < cutoff) {
+        await _del(BASE + id + '.json');
+        _mem.delete(id);
+        pruned++;
+      } else {
+        toKeep.push(id);
+      }
+    }
+    if (pruned > 0) await _write(IDX, toKeep);
+    localStorage.setItem(_PRUNE_TS, String(Date.now()));
+    return pruned;
+  } catch { return 0; }
+}

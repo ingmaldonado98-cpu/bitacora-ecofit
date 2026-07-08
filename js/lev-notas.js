@@ -2,7 +2,7 @@
 
 import { esc, fmtFechaHora, toast, isoNow, uuid, confirmDialog } from './utils.js';
 import { isAdmin, getSession } from './auth.js';
-import { projects } from './db.js';
+import { projects, logChange } from './db.js';
 
 // ── Notas de documentación ─────────────────────────────────────────────────────
 export function renderNotasDoc(notas, session, projectId) {
@@ -33,6 +33,7 @@ window._submitNotaDoc = async function(projectId) {
   const nota = { id: uuid(), texto, autorId: session?.id, autorNombre: session?.nombre || session?.username, createdAt: isoNow() };
   p.documentacion.notas = [...(p.documentacion.notas || []), nota];
   await projects.update(projectId, { documentacion: p.documentacion });
+  logChange(projectId, { modulo: 'Documentación', accion: 'nota agregada', detalle: texto.slice(0, 60), quien: session });
   document.getElementById('dnotas-list').innerHTML = renderNotasDoc(p.documentacion.notas, session, projectId);
   document.getElementById('dnotas-form').style.display = 'none';
   document.getElementById('dnotas-texto').value = '';
@@ -48,6 +49,7 @@ window._delNotaDoc = async function(projectId, idx) {
   const p = await projects.getById(projectId);
   p.documentacion.notas = (p.documentacion.notas || []).filter((_,i) => i !== idx);
   await projects.update(projectId, { documentacion: p.documentacion });
+  logChange(projectId, { modulo: 'Documentación', accion: 'nota eliminada', quien: session });
   document.getElementById('dnotas-list').innerHTML = renderNotasDoc(p.documentacion.notas, session, projectId);
   const tabBtn = document.querySelector('[data-tab="d-notas"]');
   if (tabBtn) tabBtn.innerHTML = p.documentacion.notas.length

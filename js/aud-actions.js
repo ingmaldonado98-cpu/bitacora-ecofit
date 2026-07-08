@@ -1,6 +1,6 @@
 // aud-actions.js — Persistencia, acciones y window globals de Auditoría Técnica
 
-import { projects } from './db.js';
+import { projects, logChange } from './db.js';
 import { fotoMini, capturePhoto, toast, isoNow, confirmDialog } from './utils.js';
 import { uploadPhotoQueued } from './firebase.js';
 import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
@@ -12,6 +12,7 @@ window.switchAudMode = async function(projectId, modo) {
   const aud = p.auditoria || {};
   aud.modo = modo;
   await projects.update(projectId, { auditoria: aud });
+  logChange(projectId, { modulo: 'Auditoría', accion: `modo cambiado a ${modo}` });
   navigate(`#proyecto/${projectId}/auditoria`);
 };
 
@@ -72,6 +73,7 @@ window.guardarRapido = async function(projectId) {
     aud.rapidoObs     = obs;
     if (gps) aud.rapidoGps = gps;
     await projects.update(projectId, { auditoria: aud });
+    logChange(projectId, { modulo: 'Auditoría', accion: 'verificación rápida guardada', detalle: tecnico });
     const gpsMsg = gps ? ` · GPS ±${gps.acc}m` : '';
     toast(`✅ Verificación guardada${gpsMsg}`);
     navigate(`#proyecto/${projectId}`);
@@ -177,6 +179,7 @@ window.guardarFormal = async function(e, projectId) {
     });
 
     await projects.update(projectId, { auditoria: aud });
+    logChange(projectId, { modulo: 'Auditoría', accion: `dictamen guardado: ${aud.resultado || '—'}`, detalle: aud.auditor?.nombre || '' });
     AS.docFirmadoB64 = null;
     toast('✅ Dictamen guardado');
     navigate(`#proyecto/${projectId}`);

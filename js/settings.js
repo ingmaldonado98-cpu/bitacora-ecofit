@@ -1,6 +1,7 @@
 // settings.js — Configuración Admin
 
-import { users, config, kv } from './db.js';
+import { users, config, kv, getPendingQueue } from './db.js';
+import { getDeadQueue, clearDeadQueue } from './sync-queue.js';
 import { esc, toast } from './utils.js';
 import { isAdmin, ROLES } from './auth.js';
 import { icon } from './icons.js';
@@ -17,22 +18,216 @@ async function getOneDriveStatus() {
   return `<span class="${cls}">${st.msg}</span>`;
 }
 
-// Tarjeta de fotos pendientes de subir — visible para todos. El reintento
-// manual resetea las atascadas (las que agotaron sus reintentos automáticos).
-async function fotosPendientesCard() {
-  let total = 0;
+// Tarjeta de cola offline — muestra qué cambios están esperando sync.
+async function pendingQueueCard() {
+  const q = getPendingQueue();
+  if (!q.total) return '';
+
+  // Agrupar cambios de proyectos por ID y enriquecer con displayId
+  const byId = {};
+  for (const item of q.proj) {
+    const id = item.args?.id || item.args?.data?.id || '?';
+    if (!byId[id]) byId[id] = { count: 0, label: item.args?.data?.displayId || id };
+    byId[id].count++;
+  }
+  // Intentar sustituir IDs internos con el displayId almacenado en caché
   try {
-    const { getQueueCount } = await import('./photo-queue.js');
-    total = await getQueueCount();
+    const { localStore } = await import('./local-store.js');
+    for (const id of Object.keys(byId)) {
+      if (byId[id].label === id) {
+        const p = await localStore.getById(id);
+        if (p?.displayId) byId[id].label = p.displayId;
+      }
+    }
+  } catch {}
+
+  const projRows = Object.values(byId)
+    .map(({ label, count }) => `
+      <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:.82rem">
+        <span style="color:var(--text-muted)">${esc(label)}</span>
+        <b>${count} cambio${count > 1 ? 's' : ''}</b>
+      </div>`).join('');
+
+  const kvRow = q.kv.length ? `
+    <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:.82rem">
+      <span style="color:var(--text-muted)">Configuración / inventario</span>
+      <b>${q.kv.length} cambio${q.kv.length > 1 ? 's' : ''}</b>
+    </div>` : '';
+
+  const remRow = q.rem.length ? `
+    <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:.82rem">
+      <span style="color:var(--text-muted)">Recordatorios</span>
+      <b>${q.rem.length} cambio${q.rem.length > 1 ? 's' : ''}</b>
+    </div>` : '';
+
+  return `
+  <div class="card" style="border-color:rgba(251,191,36,.5)">
+    <h3 class="card-title" style="color:var(--warn,#f59e0b)">⏳ Cambios pendientes de sync (${q.total})</h3>
+    <p class="hint-text" style="margin-bottom:8px">Guardados localmente. Se enviarán al servidor cuando recuperes conexión.</p>
+    ${projRows}${kvRow}${remRow}
+  </div>`;
+}
+
+// Tarjeta de fotos pendientes de subir — visible para todos.
+async function fotosPendientesCard() {
+  let total = 0, conBackup = 0;
+  try {
+    const { getAllQueued } = await import('./photo-queue.js');
+    const items = await getAllQueued();
+    total     = items.length;
+    conBackup = items.filter(i => i.localPath).length;
   } catch { /* silencioso */ }
   if (!total) return '';
+  const sinBackup = total - conBackup;
   return `
   <div class="card">
     <h3 class="card-title">Fotos pendientes de subir</h3>
-    <p class="hint-text">Hay <b>${total}</b> foto${total > 1 ? 's' : ''} tomada${total > 1 ? 's' : ''} en este dispositivo que aún no se ${total > 1 ? 'suben' : 'sube'} a la nube. Conéctate a internet y reintenta.</p>
+    <p class="hint-text">
+      <b>${total}</b> foto${total > 1 ? 's' : ''} en cola.
+      ${conBackup > 0 ? `<span style="color:var(--success,#22c55e)">✓ ${conBackup} con backup en Documentos/Ecofit.</span>` : ''}
+      ${sinBackup > 0 ? `<span style="color:var(--warn,#f59e0b)"> ${sinBackup} sin backup local.</span>` : ''}
+    </p>
     <div class="form-actions-row" style="margin-top:10px">
       <button class="btn-primary btn-sm" onclick="window.forceRetryPhotos()">⬆ Reintentar subida (${total})</button>
     </div>
+  </div>`;
+}
+
+// Tarjeta de caché de fotos offline.
+async function fotoCacheCard() {
+  let count = 0;
+  try {
+    const cache = await caches.open('ecofit-photos-v1');
+    const keys  = await cache.keys();
+    count = keys.length;
+  } catch {}
+
+  window._clearPhotoCache = async () => {
+    try {
+      await caches.delete('ecofit-photos-v1');
+      toast('Caché de fotos limpiada', 'success', 3000);
+      const wrap = document.getElementById('foto-cache-card-wrap');
+      if (wrap) wrap.outerHTML = await fotoCacheCard();
+    } catch { toast('Error al limpiar caché de fotos', 'error'); }
+  };
+
+  window._clearOrphanPhotos = async () => {
+    try {
+      const cache = await caches.open('ecofit-photos-v1');
+      const keys  = await cache.keys();
+      if (!keys.length) { toast('Sin fotos en caché', 'info'); return; }
+
+      // Recopilar todas las URLs de fotos en proyectos activos
+      const { localStore } = await import('./local-store.js');
+      const all = await localStore.getAll();
+      const knownUrls = new Set();
+      function _collect(obj) {
+        if (!obj || typeof obj !== 'object') return;
+        if (Array.isArray(obj)) { obj.forEach(_collect); return; }
+        for (const v of Object.values(obj)) {
+          if (typeof v === 'string' && v.includes('firebasestorage.googleapis.com')) {
+            // Normalizar: quitar token igual que hace el SW
+            try { const u = new URL(v); u.searchParams.delete('token'); knownUrls.add(u.toString()); } catch {}
+          } else if (v && typeof v === 'object') { _collect(v); }
+        }
+      }
+      (all || []).forEach(_collect);
+
+      // Eliminar entradas del caché que no coincidan con ningún proyecto
+      let deleted = 0;
+      for (const req of keys) {
+        try {
+          const u = new URL(req.url); u.searchParams.delete('token');
+          if (!knownUrls.has(u.toString())) { await cache.delete(req); deleted++; }
+        } catch {}
+      }
+      toast(deleted > 0 ? `${deleted} foto${deleted > 1 ? 's huérfanas eliminadas' : ' huérfana eliminada'}` : 'Sin fotos huérfanas', 'success', 3000);
+      const wrap = document.getElementById('foto-cache-card-wrap');
+      if (wrap) wrap.outerHTML = await fotoCacheCard();
+    } catch { toast('Error al limpiar fotos huérfanas', 'error'); }
+  };
+
+  return `
+  <div class="card" id="foto-cache-card-wrap">
+    <h3 class="card-title">Fotos disponibles offline</h3>
+    <div style="display:flex;justify-content:space-between;font-size:.85rem;color:var(--text-muted);margin-bottom:4px">
+      <span>Fotos en caché del dispositivo</span><b style="color:var(--text)">${count}</b>
+    </div>
+    <p class="hint-text">Las fotos se almacenan automáticamente al abrirlas online. Se depuran solas al superar 300 entradas.</p>
+    ${count > 0 ? `
+    <div class="form-actions-row" style="margin-top:10px;gap:8px">
+      <button class="btn-outline btn-sm" onclick="window._clearOrphanPhotos()">🧹 Limpiar huérfanas</button>
+      <button class="btn-outline btn-sm" onclick="window._clearPhotoCache()">🗑 Limpiar todo</button>
+    </div>` : `<p class="hint-text" style="color:var(--text-muted);margin-top:4px">Sin fotos en caché aún.</p>`}
+  </div>`;
+}
+
+// Tarjeta de ítems descartados tras 5 fallos de sync (dead-letter queue).
+async function deadLetterCard() {
+  const dead = getDeadQueue();
+  if (!dead.length) return '';
+
+  window._clearDeadQueue = () => {
+    clearDeadQueue();
+    toast('Cola de fallos limpiada', 'success', 3000);
+    document.getElementById('dead-letter-card')?.remove();
+  };
+
+  const rows = dead.slice(-10).reverse().map(item => {
+    const id = item.args?.id || item.args?.data?.displayId || '?';
+    const op = item.op || '?';
+    const date = item.deadAt ? new Date(item.deadAt).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '';
+    return `<div style="font-size:.78rem;color:var(--text-muted);padding:2px 0">${op} · ${esc(id)} · ${date} · ${item.retries} intentos</div>`;
+  }).join('');
+
+  return `
+  <div class="card card-danger" id="dead-letter-card">
+    <h3 class="card-title card-title-danger">⚠ Cambios que no pudieron sincronizarse (${dead.length})</h3>
+    <p class="hint-text" style="margin-bottom:8px">Estos cambios fallaron ${5} veces y fueron descartados. Verifica tu conexión y permisos en Firestore.</p>
+    ${rows}
+    <div class="form-actions-row" style="margin-top:10px">
+      <button class="btn-outline btn-danger btn-sm" onclick="window._clearDeadQueue()">Limpiar lista</button>
+    </div>
+  </div>`;
+}
+
+// Tarjeta de estado de caché local — visible para todos.
+async function cacheStatusCard() {
+  let proyectos = 0;
+  const lastSyncTs = localStorage.getItem('ecofit_last_sync');
+  const lastSync   = lastSyncTs
+    ? new Date(Number(lastSyncTs)).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
+    : 'nunca';
+  try {
+    const { localStore } = await import('./local-store.js');
+    const all = await localStore.getAll();
+    proyectos = all?.length || 0;
+  } catch {}
+
+  window._purgeCacheOld = async () => {
+    const { toast } = await import('./utils.js');
+    try {
+      const { pruneOldProjects } = await import('./local-store.js');
+      const n = await pruneOldProjects(60);
+      toast(n > 0 ? `${n} proyecto${n > 1 ? 's eliminados' : ' eliminado'} de la caché` : 'No hay proyectos viejos para limpiar', 'info', 3000);
+    } catch { toast('Error al limpiar caché', 'error', 3000); }
+  };
+
+  return `
+  <div class="card">
+    <h3 class="card-title">Datos locales en este dispositivo</h3>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:.85rem;color:var(--text-muted)">
+      <div style="display:flex;justify-content:space-between">
+        <span>Proyectos en caché</span><b style="color:var(--text)">${proyectos}</b>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span>Último sync con servidor</span><b style="color:var(--text)">${lastSync}</b>
+      </div>
+    </div>
+    <div class="form-actions-row" style="margin-top:10px">
+      <button class="btn-outline btn-sm" onclick="window._purgeCacheOld()">🗑 Limpiar proyectos viejos (+60 días)</button>
+    </div>
+    <p class="hint-text" style="margin-top:6px">Solo elimina proyectos <em>concluidos</em> sin actividad en más de 60 días. Los activos nunca se tocan.</p>
   </div>`;
 }
 
@@ -74,7 +269,11 @@ export async function renderSettings(session) {
       </div>
     </div>
 
+    ${await deadLetterCard()}
+    ${await pendingQueueCard()}
     ${await fotosPendientesCard()}
+    ${await fotoCacheCard()}
+    ${await cacheStatusCard()}
 
     <!-- Info de la app -->
     <div class="card">
@@ -349,6 +548,7 @@ export async function renderSettings(session) {
   </div>
 
   ${await fotosPendientesCard()}
+  ${await cacheStatusCard()}
 
   <div class="card">
     <h3 class="card-title">Actualización de la app</h3>
