@@ -254,7 +254,7 @@ async function route() {
         } else if (sub === 'qr') {
           await render(renderQR(id, session));
         } else if (sub === 'pdf') {
-          await render(renderPDFExport(id, session));
+          await render(await renderPDFExport(id, session));
         }
         break;
 

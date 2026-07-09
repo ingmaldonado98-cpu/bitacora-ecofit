@@ -194,8 +194,6 @@ async function deadLetterCard() {
   </div>`;
 }
 
-<<<<<<< HEAD
-=======
 window._exportPendingQueue = () => {
   const q = getPendingQueue();
   const dead = getDeadQueue();
@@ -213,7 +211,6 @@ window._exportPendingQueue = () => {
   URL.revokeObjectURL(url);
 };
 
->>>>>>> b8acf80 (feat(ux): alerta datos obsoletos + export cola JSON + lazy load jsPDF)
 // Tarjeta de estado de caché local — visible para todos.
 async function cacheStatusCard() {
   let proyectos = 0;
