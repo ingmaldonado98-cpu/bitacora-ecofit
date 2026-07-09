@@ -1688,6 +1688,26 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
   background: transparent; color: var(--text-muted); padding: 5px 6px; font-weight: 400;
 }
 
+/* ── Alerta de datos obsoletos ───────────────────────────────────────────── */
+.stale-banner {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 300; background: #7a5a00; border-bottom: 2px solid #b88000;
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 12px;
+  font-size: .84rem; color: #fff; box-shadow: var(--shadow);
+  flex-wrap: wrap;
+}
+.stale-banner span { flex: 1; min-width: 0; }
+.stale-banner button {
+  background: rgba(255,255,255,.2); color: #fff; border: 1px solid rgba(255,255,255,.4);
+  border-radius: 6px; padding: 4px 12px; font-size: .8rem; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.stale-banner .stale-dismiss {
+  background: transparent; border: none; color: rgba(255,255,255,.7);
+  padding: 4px 6px; font-weight: 400; font-size: 1rem;
+}
+
 /* ── Skeleton screens ────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -400px 0; }

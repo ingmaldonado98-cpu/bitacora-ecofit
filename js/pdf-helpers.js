@@ -13,8 +13,21 @@ export const BLANCO    = [255,255,255];
 export const GRIS      = [45, 55, 45];
 export const GRIS_CLR  = [120,140,120];
 
+// ── Carga lazy de jsPDF (no se incluye en el bundle inicial) ─────────────────
+async function _ensureJsPDF() {
+  if (window.jspdf) return true;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = './js/vendor/jspdf.umd.min.js';
+    s.onload  = () => resolve(true);
+    s.onerror = () => reject(new Error('No se pudo cargar jsPDF'));
+    document.head.appendChild(s);
+  });
+}
+
 // ── Instancia jsPDF ───────────────────────────────────────────────────────────
-export function newDoc() {
+export async function newDoc() {
+  await _ensureJsPDF();
   if (!window.jspdf) { alert('jsPDF no cargó. Verifica conexión a internet.'); return null; }
   return new window.jspdf.jsPDF({ orientation:'p', unit:'mm', format:'a4' });
 }

@@ -22,7 +22,7 @@ window.exportarPDFCliente = async function(projectId) {
       getContacto(),
       getLogoB64(),
     ]);
-    const doc = newDoc(); if (!doc) return;
+    const doc = await newDoc(); if (!doc) return;
     const tipo = TIPOS_SISTEMA[project.tipoSistema];
     const totalPaneles = getSerialesFlat(project.garantia).length;
     const totalKwp = totalPaneles * ((project.garantia?.paneles?.wp||0)/1000);

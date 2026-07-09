@@ -9,7 +9,13 @@ import { renderDocumentacion, renderLevantamientoView } from './documentacion.js
 import { renderAuditoria } from './auditoria.js';
 import { renderQR } from './qr.js';
 import { renderClientePublico } from './cliente-publico.js';
-import { renderPDFExport } from './pdf.js';
+let _renderPDFExport = null;
+async function renderPDFExport(id, session) {
+  if (!_renderPDFExport) {
+    ({ renderPDFExport: _renderPDFExport } = await import('./pdf.js'));
+  }
+  return _renderPDFExport(id, session);
+}
 import { renderSettings } from './settings.js';
 import { renderRecordatorios, updateRecordatoriosBadge, calcRecordatoriosCount } from './recordatorios.js';
 import { renderConcluidos } from './concluidos.js';
@@ -569,6 +575,36 @@ window.addEventListener('online', () => {
 });
 window.addEventListener('offline', updateOnline);
 updateOnline();
+
+// ── Alerta de datos obsoletos ─────────────────────────────────────────────────
+// Si el usuario lleva >6h en línea sin que los datos se hayan sincronizado,
+// muestra un aviso para que sepa que sus datos locales pueden estar desactualizados.
+const STALE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 horas
+function _checkStaleData() {
+  if (!navigator.onLine) return;
+  const ts = localStorage.getItem('ecofit_last_sync');
+  if (!ts) return;
+  const age = Date.now() - Number(ts);
+  if (age > STALE_THRESHOLD_MS) {
+    const existing = document.getElementById('stale-data-banner');
+    if (existing) return;
+    const h = Math.round(age / 3600000);
+    const banner = document.createElement('div');
+    banner.id = 'stale-data-banner';
+    banner.className = 'stale-banner';
+    banner.innerHTML = `
+      <span>⚠ Los datos locales tienen ${h}h sin sincronizarse. Recarga para obtener la versión más reciente.</span>
+      <button onclick="navigate(window.location.hash||'#dashboard')">Recargar</button>
+      <button class="stale-dismiss" onclick="document.getElementById('stale-data-banner')?.remove()">✕</button>`;
+    document.body.appendChild(banner);
+  }
+}
+// Revisar al cargar y cada 30 min mientras la app está abierta
+_checkStaleData();
+setInterval(_checkStaleData, 30 * 60 * 1000);
+window.addEventListener('ecofit:synced', () => {
+  document.getElementById('stale-data-banner')?.remove();
+});
 
 // Inicializar mapa de fotos pendientes (para renderizar mientras se sube)
 initPendingMap().catch(() => {})

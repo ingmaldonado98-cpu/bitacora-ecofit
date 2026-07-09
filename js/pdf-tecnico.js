@@ -29,7 +29,7 @@ window.exportarPDFTecnico = async function(projectId) {
   await pdfYield();
   try {
     const [project] = await Promise.all([projects.getById(projectId), getLogoB64()]);
-    const doc = newDoc(); if (!doc) return;
+    const doc = await newDoc(); if (!doc) return;
 
     const sec = (id) => document.getElementById(id)?.checked;
     const tipo = TIPOS_SISTEMA[project.tipoSistema];

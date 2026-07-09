@@ -65,6 +65,9 @@ async function pendingQueueCard() {
     <h3 class="card-title" style="color:var(--warn,#f59e0b)">⏳ Cambios pendientes de sync (${q.total})</h3>
     <p class="hint-text" style="margin-bottom:8px">Guardados localmente. Se enviarán al servidor cuando recuperes conexión.</p>
     ${projRows}${kvRow}${remRow}
+    <div class="form-actions-row" style="margin-top:10px">
+      <button class="btn-outline btn-sm" onclick="window._exportPendingQueue()">⬇ Descargar backup JSON</button>
+    </div>
   </div>`;
 }
 
@@ -191,6 +194,26 @@ async function deadLetterCard() {
   </div>`;
 }
 
+<<<<<<< HEAD
+=======
+window._exportPendingQueue = () => {
+  const q = getPendingQueue();
+  const dead = getDeadQueue();
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    pending: { proj: q.proj, kv: q.kv, rem: q.rem, total: q.total },
+    deadLetter: dead,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `ecofit-cola-pendiente-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+>>>>>>> b8acf80 (feat(ux): alerta datos obsoletos + export cola JSON + lazy load jsPDF)
 // Tarjeta de estado de caché local — visible para todos.
 async function cacheStatusCard() {
   let proyectos = 0;
