@@ -2,7 +2,7 @@
 
 import { projects, logChange } from './db.js';
 import { fotoMini, capturePhoto, toast, isoNow, confirmDialog } from './utils.js';
-import { uploadPhotoQueued } from './firebase.js';
+import { uploadPhotoQueued, buildFotoPath } from './firebase.js';
 import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
 import { AS } from './aud-state.js';
 
@@ -196,7 +196,7 @@ window.capDocFirmado = function(projectId) {
     if (slot) slot.innerHTML = fotoMini(b64, 'Documento firmado');
     toast('Subiendo documento…');
     const result = await uploadPhotoQueued(
-      b64, `projects/${projectId}/auditoria/doc-firmado-${Date.now()}.jpg`,
+      b64, buildFotoPath(projectId, `auditoria_doc-firmado-${Date.now()}.jpg`),
       projectId, 'auditoriaDocFirmado'
     );
     AS.docFirmadoB64 = result.url || (result.pending ? { pending: true, pendingId: result.pendingId } : null);

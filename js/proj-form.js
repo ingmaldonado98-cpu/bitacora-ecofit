@@ -5,7 +5,7 @@ import { projects, users, logChange } from './db.js';
 import { esc, toast, uuid, isoNow, genDisplayId, ESTADOS, PRIORIDADES, TIPOS_SISTEMA,
          capturePhoto } from './utils.js';
 import { getSession } from './auth.js';
-import { uploadPhotoQueued } from './firebase.js';
+import { uploadPhotoQueued, buildFotoPath } from './firebase.js';
 import { icon } from './icons.js';
 
 // ── Foto del cliente pendiente de subir en el form actual ─────────────────────
@@ -284,7 +284,7 @@ window._submitProject = async function(e, editId) {
   if (esPequeno && _clienteFotoB64) {
     const pid = editId || 'temp_' + uuid();
     const result = await uploadPhotoQueued(_clienteFotoB64,
-      `projects/${editId || pid}/cliente.jpg`, editId || pid, 'clienteFoto');
+      buildFotoPath(editId || pid, 'cliente.jpg'), editId || pid, 'clienteFoto');
     data.clienteFoto = result.url || null;
     _clienteFotoB64 = null;
     _clienteFotoUrl = null;

@@ -2,7 +2,7 @@
 // Extraído de documentacion.js — accede a window._lev (expuesto por documentacion.js)
 
 import { esc, fotoMini, capturePhoto, toast, uuid } from './utils.js';
-import { uploadPhotoQueued } from './firebase.js';
+import { uploadPhotoQueued, buildFotoPath } from './firebase.js';
 import { icon } from './icons.js';
 
 // ── Recibos CFE ───────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ window.capReciboFoto = function(i) {
     toast('Subiendo foto del recibo…');
     const fid = uuid();
     const pid = window._lev?.pid;
-    const path = pid ? `projects/${pid}/recibo_${fid}.jpg` : `levantamiento/recibo_${fid}.jpg`;
+    const path = buildFotoPath(pid || 'levantamiento_temp', `recibo_${fid}.jpg`);
     const result = await uploadPhotoQueued(b64, path, pid || 'levantamiento_temp', 'reciboFoto');
     window._lev.recibos[i].foto = result.url
       || (result.pending ? { pending: true, pendingId: result.pendingId } : null);

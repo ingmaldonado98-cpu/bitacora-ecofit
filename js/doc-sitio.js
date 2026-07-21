@@ -5,7 +5,7 @@ import { projects }                                    from './db.js';
 import { esc, fotoMini, capturePhoto, toast, uuid,
          isoNow, confirmDialog, inputDialog,
          uploadProgressBar, getFotosTecnicas }         from './utils.js';
-import { uploadPhotoQueued }                           from './firebase.js';
+import { uploadPhotoQueued, buildFotoPath }            from './firebase.js';
 import { icon }                                        from './icons.js';
 
 // ── Slots técnicos de cierre por sitio ───────────────────────────────────────
@@ -171,7 +171,7 @@ window.capFotoSistemaDoc = function(projectId) {
   capturePhoto(async (b64) => {
     toast('Subiendo foto…');
     try {
-      const result = await uploadPhotoQueued(b64, `projects/${projectId}/sistema.jpg`, projectId, 'fotoSistema');
+      const result = await uploadPhotoQueued(b64, buildFotoPath(projectId, 'sistema.jpg'), projectId, 'fotoSistema');
       const fotoSistema = result.url
         || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
       // setField puntual en vez de getById+update completo — evita pisar cambios
@@ -210,7 +210,7 @@ window.capFotoTecnicaDoc = function(projectId, key) {
         prog.update(i + 1);
         const fid = uuid();
         const result = await uploadPhotoQueued(fotos[i],
-          `projects/${projectId}/tecnica_${key}_${fid}.jpg`, projectId, 'fotoTecnica', { key, itemId: fid });
+          buildFotoPath(projectId, `tecnica_${key}_${fid}.jpg`), projectId, 'fotoTecnica', { key, itemId: fid });
         existentes.push({ url: result.url || null, id: fid, createdAt: isoNow(),
           ...(result.pending && { pending: true, pendingId: result.pendingId }) });
         subidas++;
@@ -256,7 +256,7 @@ window.capFotoAdicionalDoc = function(projectId) {
         prog.update(i + 1);
         const fid = uuid();
         const result = await uploadPhotoQueued(fotos[i],
-          `projects/${projectId}/adicional_${fid}.jpg`, projectId, 'fotoAdicional', { itemId: fid });
+          buildFotoPath(projectId, `adicional_${fid}.jpg`), projectId, 'fotoAdicional', { itemId: fid });
         nuevas.push({ data: result.url || null,
           nota: '', id: fid, createdAt: isoNow(),
           ...(result.pending && { pending: true, pendingId: result.pendingId }) });

@@ -102,6 +102,12 @@ export async function uploadVideo(file, path) {
   return _withTimeout(getDownloadURL(sRef), UPLOAD_TIMEOUT_MS, 'Obtener URL de video');
 }
 
+// ── Ruta estándar de Storage: proyectos/{id}/bitacora_{fecha}/{archivo}.jpg ─
+export function buildFotoPath(projectId, filename) {
+  const fecha = new Date().toISOString().slice(0, 10);
+  return `proyectos/${projectId}/bitacora_${fecha}/${filename}`;
+}
+
 // ── Subir foto con cola offline ────────────────────────────────────────────
 // op / opArgs: describen cómo actualizar Firestore al completar el sync.
 // Retorna { url, pending, pendingId }

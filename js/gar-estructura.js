@@ -6,6 +6,7 @@ import { esc, fotoMini, toast, MARCAS_ESTRUCTURA, SISTEMAS_ESTRUCTURALES, TIPOS_
 import { getSession } from './auth.js';
 import { icon } from './icons.js';
 import { updateQueueItem } from './photo-queue.js';
+import { buildFotoPath } from './firebase.js';
 import { _eqFotos, _clearEqFotos } from './gar-equipos.js';
 import { railCutForRow, getRowsData, getTotalPanels, getPanelWidth, getPanelHeight, buildTorqueTable } from '../modules/calculadora/index.js';
 
@@ -221,7 +222,7 @@ window.guardarEstructura = async function(e, projectId) {
     if (fotoMem && typeof fotoMem === 'object' && fotoMem.pending && fotoMem.pendingId) {
       await updateQueueItem(fotoMem.pendingId, {
         projectId,
-        storagePath: `projects/${projectId}/estructura_${tipo}_${fotoMem.pendingId}.jpg`,
+        storagePath: buildFotoPath(projectId, `estructura_${tipo}_${fotoMem.pendingId}.jpg`),
         op: 'estructuraFoto',
         opArgs: { campo },
       });

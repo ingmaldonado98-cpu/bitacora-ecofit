@@ -5,7 +5,7 @@ import { projects, logChange } from './db.js';
 import { esc, fotoMini, toast, confirmDialog, inputDialog, uuid, isoNow,
          openScannerOverlay, capturePhoto } from './utils.js';
 import { getSession, isAdmin } from './auth.js';
-import { uploadPhotoQueued } from './firebase.js';
+import { uploadPhotoQueued, buildFotoPath } from './firebase.js';
 import { icon } from './icons.js';
 import { _serialUbicacion } from './gar-equipos.js';
 
@@ -254,7 +254,7 @@ window.capFotoArreglo = function(projectId, tipo) {
   capturePhoto(async (b64) => {
     toast('Subiendo foto…');
     const fid = uuid();
-    const result = await uploadPhotoQueued(b64, `projects/${projectId}/arreglo_${tipo}_${fid}.jpg`,
+    const result = await uploadPhotoQueued(b64, buildFotoPath(projectId, `arreglo_${tipo}_${fid}.jpg`),
       projectId, 'fotoArregloPaneles', { tipo, itemId: fid });
     const p = await projects.getById(projectId);
     p.garantia = p.garantia || {};

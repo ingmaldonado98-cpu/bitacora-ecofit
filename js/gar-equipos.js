@@ -5,7 +5,7 @@ import { projects, logChange } from './db.js';
 import { esc, fotoMini, capturePhoto, toast, confirmDialog, inputDialog, uuid, isoNow,
          fmtFechaHora, MARCAS_EQUIPOS, TIPOS_SISTEMA, openScannerOverlay } from './utils.js';
 import { getSession } from './auth.js';
-import { uploadPhotoQueued } from './firebase.js';
+import { uploadPhotoQueued, buildFotoPath } from './firebase.js';
 import { updateQueueItem } from './photo-queue.js';
 import { icon } from './icons.js';
 import { getSerialesFlat } from './gar-paneles.js';
@@ -266,7 +266,7 @@ window.capEqFoto = function(tipo, slotId) {
   capturePhoto(async (b64) => {
     toast('Subiendo foto…');
     const fid = uuid();
-    const result = await uploadPhotoQueued(b64, `projects/equipo_${tipo}_${fid}.jpg`,
+    const result = await uploadPhotoQueued(b64, buildFotoPath('equipo_temp', `equipo_${tipo}_${fid}.jpg`),
       'equipo_temp', 'eqFoto', { tipo });
     _eqFotos[tipo] = result.url || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
     const slot = document.getElementById(slotId);
@@ -415,7 +415,7 @@ window.guardarEquipo = async function(projectId) {
       if (fotoMem && typeof fotoMem === 'object' && fotoMem.pending && fotoMem.pendingId) {
         await updateQueueItem(fotoMem.pendingId, {
           projectId,
-          storagePath: `projects/${projectId}/equipo_${tipo}_${fotoMem.pendingId}.jpg`,
+          storagePath: buildFotoPath(projectId, `equipo_${tipo}_${fotoMem.pendingId}.jpg`),
           op: 'eqFoto',
           opArgs: { eqId: equipo.id, campo },
         });

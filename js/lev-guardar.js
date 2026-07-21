@@ -5,7 +5,7 @@ import { projects, logChange } from './db.js';
 import { toast, isoNow, genDisplayId, capturePhoto, captureVideo, uuid, uploadProgressBar, confirmDialog } from './utils.js';
 import { getSession } from './auth.js';
 import { calcVocPuro } from './garantia.js';
-import { uploadPhotoQueued, uploadVideo } from './firebase.js';
+import { uploadPhotoQueued, uploadVideo, buildFotoPath } from './firebase.js';
 import { _sujecionPorTecho } from './lev-areas.js';
 import { getTotalPanels } from '../modules/calculadora/index.js';
 
@@ -275,7 +275,7 @@ async function _saveLevFormNow(projectId) {
 window.capSombraFoto = function(pid) {
   capturePhoto(async b64 => {
     toast('Subiendo foto de sombra…');
-    const result = await uploadPhotoQueued(b64, `projects/${pid}/sombra.jpg`, pid, 'sombraFoto');
+    const result = await uploadPhotoQueued(b64, buildFotoPath(pid, 'sombra.jpg'), pid, 'sombraFoto');
     const p = await projects.getById(pid);
     p.documentacion = p.documentacion || {};
     p.documentacion.levantamiento = p.documentacion.levantamiento || {};
@@ -298,7 +298,7 @@ window.delSombraFoto = async function(pid) {
 window.capFotoMedidor = function(pid) {
   capturePhoto(async b64 => {
     toast('Subiendo foto del medidor…');
-    const result = await uploadPhotoQueued(b64, `projects/${pid}/medidor.jpg`, pid, 'fotoMedidor');
+    const result = await uploadPhotoQueued(b64, buildFotoPath(pid, 'medidor.jpg'), pid, 'fotoMedidor');
     const p = await projects.getById(pid);
     p.documentacion = p.documentacion || {};
     p.documentacion.levantamiento = p.documentacion.levantamiento || {};
@@ -350,7 +350,7 @@ window.capFotoLev = function(pid) {
   capturePhoto(async b64 => {
     toast('Subiendo foto del levantamiento…');
     const fid = uuid();
-    const result = await uploadPhotoQueued(b64, `projects/${pid}/lev_${fid}.jpg`, pid, 'fotoLev', { itemId: fid });
+    const result = await uploadPhotoQueued(b64, buildFotoPath(pid, `lev_${fid}.jpg`), pid, 'fotoLev', { itemId: fid });
     const p = await projects.getById(pid);
     p.documentacion = p.documentacion || {};
     p.documentacion.levantamiento = p.documentacion.levantamiento || {};
@@ -381,7 +381,7 @@ window.capSunSeeker = function(pid, etiqueta) {
   capturePhoto(async b64 => {
     toast('Subiendo captura Sun Seeker…');
     const fid = uuid();
-    const result = await uploadPhotoQueued(b64, `projects/${pid}/sunseeker_${fid}.jpg`, pid, 'sunSeeker', { itemId: fid });
+    const result = await uploadPhotoQueued(b64, buildFotoPath(pid, `sunseeker_${fid}.jpg`), pid, 'sunSeeker', { itemId: fid });
     const p = await projects.getById(pid);
     p.documentacion = p.documentacion || {};
     p.documentacion.levantamiento = p.documentacion.levantamiento || {};
@@ -421,7 +421,7 @@ window.capDronFoto = function(pid, fase) {
   capturePhoto(async b64 => {
     toast('Subiendo foto de dron…');
     const fid = uuid();
-    const result = await uploadPhotoQueued(b64, `projects/${pid}/dron_${fase}_${fid}.jpg`, pid, 'dronFoto', { fase, itemId: fid });
+    const result = await uploadPhotoQueued(b64, buildFotoPath(pid, `dron_${fase}_${fid}.jpg`), pid, 'dronFoto', { fase, itemId: fid });
     const p = await projects.getById(pid);
     p.documentacion = p.documentacion || {};
     p.documentacion.levantamiento = p.documentacion.levantamiento || {};
@@ -487,7 +487,7 @@ window.capFotoArea = function(pid, areaIdx) {
         prog.update(i + 1);
         const fid = uuid();
         const result = await uploadPhotoQueued(fotos[i],
-          `projects/${pid}/area${areaIdx}_${fid}.jpg`, pid, 'fotoArea',
+          buildFotoPath(pid, `area${areaIdx}_${fid}.jpg`), pid, 'fotoArea',
           { areaIdx, itemId: fid });
         areas[areaIdx].fotos.push({
           url: result.url || null, id: fid, createdAt: isoNow(),

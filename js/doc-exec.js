@@ -440,12 +440,12 @@ window._syncCierreReveal = function(checkboxEl) {
 // ── Handlers de evidencias de cierre ──────────────────────────────────────────
 window.capFotoCierrePaso = function(projectId, blockId, slotId) {
   capturePhoto(async (b64) => {
-    const { uploadPhotoQueued } = await import('./firebase.js');
+    const { uploadPhotoQueued, buildFotoPath } = await import('./firebase.js');
     const { projects } = await import('./db.js');
     toast('Subiendo foto…');
     const fid = uuid();
     const result = await uploadPhotoQueued(b64,
-      `projects/${projectId}/cierre_${blockId}_${slotId}_${fid}.jpg`, projectId,
+      buildFotoPath(projectId, `cierre_${blockId}_${slotId}_${fid}.jpg`), projectId,
       'fotoCierrePaso', { blockId, slotId, itemId: fid });
     const foto = {
       url: result.url || null, id: fid, createdAt: isoNow(),
