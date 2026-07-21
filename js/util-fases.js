@@ -92,7 +92,8 @@ export function calcFaseEstado(project) {
   const doc = project.documentacion || {};
   const gar = project.garantia      || {};
   const aud = project.auditoria     || {};
-  const esPequeno = project.tipoSistema === 'sistema_pequeno';
+  const esPequeno    = project.tipoSistema === 'sistema_pequeno';
+  const esAmpliacion = project.tipoSistema === 'ampliacion';
 
   // ── Documentación / Progreso de obra ─────────────────────────────────────────
   // Levantamiento (gate de desbloqueo de Garantía) — sistema pequeño solo necesita esto.
@@ -123,7 +124,7 @@ export function calcFaseEstado(project) {
   const totalPaneles = (gar.paneles?.seriales ?? (gar.paneles?.strings||[]).flatMap(s=>s.paneles||[])).length;
 
   // Sistema pequeño no tiene tablero AC / inversor de red
-  const garItemsL = esPequeno
+  const garItemsL = (esPequeno || esAmpliacion)
     ? [
         ['foto general del sistema', !!gar.fotoSistema],
         ['equipos registrados',      (gar.equipos?.length||0) > 0],
@@ -144,7 +145,7 @@ export function calcFaseEstado(project) {
 
   // ── Auditoría ─────────────────────────────────────────────────────────────────
   // Sistema pequeño no tiene auditoría formal
-  const audDesbloqueada = !esPequeno && garDesbloqueada && garItemsOk >= 2;
+  const audDesbloqueada = !esPequeno && !esAmpliacion && garDesbloqueada && garItemsOk >= 2;
   const audItems = [
     (aud.checklist?.length||0) >= 11,
     !!aud.resultado,

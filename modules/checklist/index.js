@@ -456,7 +456,7 @@ function _medicionesPuestaMarchaBlock(project, tipo) {
 export function getExecBlocks(project, techo) {
   const tipo = project?.tipoSistema || 'interconectado';
   const t    = techo || 'cemento';
-  return [
+  const todos = [
     // Bloque 1 — Estructura, Anclaje y Canalización Fotovoltaica
     _anclajeMontajeBlock(t, project),
     _conduitFvBlock,
@@ -468,4 +468,9 @@ export function getExecBlocks(project, techo) {
     _validacionTechoPanelesBlock(t),
     _medicionesPuestaMarchaBlock(project, tipo),
   ];
+  if (tipo === 'ampliacion') {
+    const _AMP_IDS = ['anclaje-montaje', 'canal-fv', 'cableado-peinado', 'techo-paneles'];
+    return todos.filter(b => _AMP_IDS.includes(b.id));
+  }
+  return todos;
 }

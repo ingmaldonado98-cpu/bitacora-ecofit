@@ -38,6 +38,9 @@ export async function renderGarantia(projectId, session) {
     if (found) fuenteCalcPanel = found;
   }
 
+  const esAmpliacion = project.tipoSistema === 'ampliacion';
+  const tabDefault   = esAmpliacion ? 'g-estructura' : 'g-equipos';
+
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
@@ -54,19 +57,20 @@ export async function renderGarantia(projectId, session) {
   ${renderVencimientos(g, projectId, edit)}
 
   <div class="tab-bar" id="garantia-tabs" role="tablist" aria-label="Secciones de garantía">
-    <button class="tab-btn tab-active" role="tab" aria-selected="true"  aria-controls="g-equipos"   tabindex="0"  data-tab="g-equipos"   onclick="switchTab('garantia-tabs','g-equipos',this)">Equipos</button>
-    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-voc"       tabindex="-1" data-tab="g-voc"       onclick="switchTab('garantia-tabs','g-voc',this)">
+    ${!esAmpliacion ? `
+    <button class="tab-btn ${tabDefault==='g-equipos'?'tab-active':''}" role="tab" aria-selected="${tabDefault==='g-equipos'}" aria-controls="g-equipos" tabindex="${tabDefault==='g-equipos'?'0':'-1'}" data-tab="g-equipos" onclick="switchTab('garantia-tabs','g-equipos',this)">Equipos</button>
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-voc" tabindex="-1" data-tab="g-voc" onclick="switchTab('garantia-tabs','g-voc',this)">
       Voc${(() => { const v = project.garantia?.validacionVoc; return v ? `<span class="tab-badge ${v.resultado==='seguro'?'tab-ok':v.resultado==='excede'?'tab-err':''}">${v.resultado==='seguro'?'✓':v.resultado==='excede'?'⚠':'~'}</span>` : ''; })()}
-    </button>
-    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-estructura" tabindex="-1" data-tab="g-estructura" onclick="switchTab('garantia-tabs','g-estructura',this)">Estructura</button>
+    </button>` : ''}
+    <button class="tab-btn ${tabDefault==='g-estructura'?'tab-active':''}" role="tab" aria-selected="${tabDefault==='g-estructura'}" aria-controls="g-estructura" tabindex="${tabDefault==='g-estructura'?'0':'-1'}" data-tab="g-estructura" onclick="switchTab('garantia-tabs','g-estructura',this)">Estructura</button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-paneles"   tabindex="-1" data-tab="g-paneles"   onclick="switchTab('garantia-tabs','g-paneles',this)">Paneles</button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-notas"     tabindex="-1" data-tab="g-notas"     onclick="switchTab('garantia-tabs','g-notas',this)">
       Notas${(g.notas||[]).length ? `<span class="tab-badge tab-ok">${(g.notas||[]).length}</span>` : ''}
     </button>
   </div>
 
-  <!-- Equipos — tab activo por defecto -->
-  <div id="g-equipos" class="tab-panel tab-panel-active">
+  <!-- Equipos — solo para tipos con equipos nuevos -->
+  <div id="g-equipos" class="tab-panel ${tabDefault==='g-equipos'?'tab-panel-active':''}" ${esAmpliacion?'hidden':''}>
     <div class="card-title-row" style="padding:0 0 12px">
       <h3 class="card-title">Equipos instalados (${(g.equipos||[]).length})</h3>
       ${edit ? `<button class="btn-primary btn-sm" onclick="showFormEquipo('${projectId}')">+ Equipo</button>` : ''}
@@ -81,13 +85,13 @@ export async function renderGarantia(projectId, session) {
     </div>
   </div>
 
-  <!-- Validación Voc -->
-  <div id="g-voc" class="tab-panel">
-    ${renderVocTab(project, projectId, edit)}
+  <!-- Validación Voc — solo para tipos con inversor de red -->
+  <div id="g-voc" class="tab-panel" ${esAmpliacion?'hidden':''}>
+    ${esAmpliacion ? '' : renderVocTab(project, projectId, edit)}
   </div>
 
-  <!-- 1D: Estructura -->
-  <div id="g-estructura" class="tab-panel">
+  <!-- Estructura -->
+  <div id="g-estructura" class="tab-panel ${tabDefault==='g-estructura'?'tab-panel-active':''}">
     <div class="card">
       <h3 class="card-title">Estructura de montaje</h3>
       ${renderEstructura(g.estructura, projectId, edit, project.projectConfig)}

@@ -47,14 +47,15 @@ export async function renderProjectDetail(id, session) {
   const admin = isAdmin(session);
 
   // ── Cálculo donut de progreso ──
-  const _esPeq = project.tipoSistema === 'sistema_pequeno';
+  const _esPeq  = project.tipoSistema === 'sistema_pequeno';
+  const _esAmp  = project.tipoSistema === 'ampliacion';
   const _dDoc  = project.documentacion || {};
   const _dGar  = project.garantia || {};
   const _dFt   = _dGar.fotosTecnicas || {};
   const levPct  = calcLevPct(_dDoc, project.tipoSistema);
   // "Obra %" = avance real por Bloque 1/2/3 (no el esquema viejo de fotos por sitio).
   const docPct  = _esPeq ? 0 : calcObraStatus(project).pct;
-  const _gItems = _esPeq
+  const _gItems = (_esPeq || _esAmp)
     ? [!!_dGar.fotoSistema, totalEquipos>0, totalPaneles>0]
     : [!!_dGar.fotoSistema, !!(_dFt.tableroAC||_dFt.inversorEnergizado), totalEquipos>0, totalPaneles>0];
   const garPct     = Math.round(_gItems.filter(Boolean).length / _gItems.length * 100);
@@ -257,7 +258,8 @@ function renderModulosProgreso(project, id, session, admin) {
   const aud = project.auditoria || {};
   const ft  = gar.fotosTecnicas || {};
 
-  const esPequenoTipo = project.tipoSistema === 'sistema_pequeno';
+  const esPequenoTipo  = project.tipoSistema === 'sistema_pequeno';
+  const esAmpliacion   = project.tipoSistema === 'ampliacion';
 
   const levItems = calcLevItems(doc, project.tipoSistema);
   const levPct   = calcLevPct(doc, project.tipoSistema);
@@ -270,7 +272,7 @@ function renderModulosProgreso(project, id, session, admin) {
   const docPct  = esPequenoTipo ? 0 : _obra.pct;
 
   const totalPaneles = getSerialesFlat(gar).length;
-  const garItems = esPequenoTipo
+  const garItems = (esPequenoTipo || esAmpliacion)
     ? [
         { label: 'Foto del sistema',                    ok: !!gar.fotoSistema },
         { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
@@ -375,7 +377,8 @@ function renderQuickCheck(project, id, admin, inline = false) {
   const gar = project.garantia || {};
   const aud = project.auditoria || {};
   const ft  = gar.fotosTecnicas || {};
-  const esPequeno = project.tipoSistema === 'sistema_pequeno';
+  const esPequeno    = project.tipoSistema === 'sistema_pequeno';
+  const esAmpliacion = project.tipoSistema === 'ampliacion';
   const estado = calcFaseEstado(project);
 
   const totalPaneles = getSerialesFlat(gar).length;
@@ -387,7 +390,7 @@ function renderQuickCheck(project, id, admin, inline = false) {
     : calcObraStatus(project).bloques
         .filter(b => b.total > 0)
         .map(b => ({ label: `${b.label} (${b.done}/${b.total})`, desc: b.desc, tab: `d-bloque${b.bloque}`, ok: b.completo }));
-  const garItems = esPequeno
+  const garItems = (esPequeno || esAmpliacion)
     ? [
         { label: 'Foto del sistema',                     desc: 'Foto general del sistema terminado, para la garantía.', ok: !!gar.fotoSistema },
         { label: `Equipos (${gar.equipos?.length||0})`,  desc: 'Números de serie de inversor, protecciones y otros equipos.', ok: (gar.equipos?.length||0) > 0 },

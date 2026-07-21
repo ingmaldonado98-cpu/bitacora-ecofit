@@ -293,8 +293,8 @@ function renderLevantamiento(project, tipo, edit) {
       })()}
     `)}
 
-    ${/* Eléctrico y consumo — no aplica para 'otro'. Sistema pequeño usa solo el bloque DC (dinamico) */
-      tipo !== 'otro' ? acc('elec_consumo', 'Eléctrico y consumo', '⚡', hasElecConsumo, `
+    ${/* Eléctrico y consumo — no aplica para 'otro' ni para 'ampliacion' (sin instalación eléctrica nueva) */
+      (tipo !== 'otro' && tipo !== 'ampliacion') ? acc('elec_consumo', 'Eléctrico y consumo', '⚡', hasElecConsumo, `
       ${!_SIN_CFE.includes(tipo) ? `
       <div class="form-group"><label>Tipo de servicio CFE</label>
         <select name="tipoServicioCFE" ${dis} onchange="window._onTipoServicioCFEChange(this)">
