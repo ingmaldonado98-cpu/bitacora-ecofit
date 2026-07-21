@@ -32,9 +32,10 @@ export async function renderDocumentacion(projectId, session) {
   const cl    = project.checklistData || {};
   const techo = project.projectConfig?.techo || cl.techo || 'cemento';
 
-  const allExecBlocks = getExecBlocks(project, techo);
+  const allExecBlocks  = getExecBlocks(project, techo);
   const bloqueStatus   = computeBloqueStatus(allExecBlocks, cl);
-  const cNotas        = (project.documentacion?.notas || []).length;
+  const cNotas         = (project.documentacion?.notas || []).length;
+  const esAmpliacion   = project.tipoSistema === 'ampliacion';
 
   const _badge = (bloque) => {
     const s = bloqueStatus[bloque];
@@ -44,7 +45,8 @@ export async function renderDocumentacion(projectId, session) {
     return `<span class="tab-badge">${s.done}/${s.total}</span>`;
   };
 
-  const BLOQUES = [1, 2, 3];
+  // Para ampliación no hay Bloque 2 (equipos/cuarto de máquinas)
+  const BLOQUES = esAmpliacion ? [1, 3] : [1, 2, 3];
 
   return `
   <div class="view-header">
@@ -73,12 +75,14 @@ export async function renderDocumentacion(projectId, session) {
   <div id="d-bloque${b}" class="tab-panel ${i===0?'tab-panel-active':''}">
     <p class="form-hint" style="margin:0 0 10px">${esc(BLOQUE_DESC[b])}</p>
     ${renderReferenciaIngenieria(project, b)}
-    ${b === 2 ? `
+    ${(b === 2 && !esAmpliacion) ? `
       <details class="cl-exec-block" open>
         <summary class="cl-exec-block-hdr"><span class="cl-exec-block-title">⚡ Equipos (Cuarto de máquinas)</span><span class="cl-exec-caret">▾</span></summary>
         <div style="padding:0 4px 8px">${renderSitio(project, 'centrosCarga', edit, projectId, 2)}</div>
       </details>` : ''}
-    ${(_SITIOS_POR_BLOQUE[b] || []).map(sitio => `
+    ${(_SITIOS_POR_BLOQUE[b] || [])
+      .filter(sitio => !esAmpliacion || sitio === 'techo')
+      .map(sitio => `
       <details class="cl-exec-block" open>
         <summary class="cl-exec-block-hdr"><span class="cl-exec-block-title">${SITIO_LABEL[sitio] || sitio}</span><span class="cl-exec-caret">▾</span></summary>
         <div style="padding:0 4px 8px">${renderSitio(project, sitio, edit, projectId, b)}</div>
