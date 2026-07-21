@@ -17,9 +17,10 @@ export async function renderProjectForm(id, session) {
   _clienteFotoB64 = null;
   _clienteFotoUrl = null;
 
-  const [project, allUsers] = await Promise.all([
+  const [project, allUsers, allProjects] = await Promise.all([
     id ? projects.getById(id) : Promise.resolve(null),
     users.getAll(),
+    projects.getAll(),
   ]);
   const tecnicos = allUsers.filter(u => u.activo && u.rol !== 'admin');
   const isEditing = project !== null;
@@ -55,7 +56,7 @@ export async function renderProjectForm(id, session) {
     <div class="form-group">
       <label>Tipo de sistema *</label>
       <select name="tipoSistema" id="tipo-val"
-              onchange="document.getElementById('campos-cliente').style.display=this.value==='sistema_pequeno'?'':'none'">
+              onchange="document.getElementById('campos-cliente').style.display=this.value==='sistema_pequeno'?'':'none';document.getElementById('campos-ampliacion').style.display=this.value==='ampliacion'?'':'none'">
         ${Object.entries(TIPOS_SISTEMA)
           .filter(([,v]) => !v.legacy)
           .map(([k,v]) => {
@@ -113,6 +114,21 @@ export async function renderProjectForm(id, session) {
             : `<button type="button" class="btn-outline btn-sm" onclick="window._capClienteFoto()">
                 ${icon('camera', 14)} Tomar foto</button>`}
         </div>
+      </div>
+    </div>
+
+    <!-- Proyecto origen — solo para Ampliación -->
+    <div id="campos-ampliacion" style="display:${project?.tipoSistema === 'ampliacion' ? '' : 'none'}">
+      <div class="form-group">
+        <label>Proyecto origen <span class="hint-opt">(instalación que se va a ampliar)</span></label>
+        <select name="proyectoOrigenId">
+          <option value="">— Seleccionar proyecto —</option>
+          ${allProjects
+            .filter(p => p.tipoSistema !== 'ampliacion' && p.id !== id)
+            .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+            .map(p => `<option value="${p.id}" ${project?.proyectoOrigenId === p.id ? 'selected' : ''}>${esc(p.displayId || p.clientName)}</option>`)
+            .join('')}
+        </select>
       </div>
     </div>
 
@@ -257,7 +273,8 @@ window._submitProject = async function(e, editId) {
     document.getElementById('chip-tipo')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
-  const esPequeno = tipoSistema === 'sistema_pequeno';
+  const esPequeno    = tipoSistema === 'sistema_pequeno';
+  const esAmpliacion = tipoSistema === 'ampliacion';
 
   const lat = parseFloat(fd.get('coordLat'));
   const lng = parseFloat(fd.get('coordLng'));
@@ -278,6 +295,7 @@ window._submitProject = async function(e, editId) {
     coordenadas,
     clienteTelefono:  fd.get('clienteTelefono')?.trim() || null,
     notas:            fd.get('notas')?.trim() || null,
+    proyectoOrigenId: esAmpliacion ? (fd.get('proyectoOrigenId') || null) : null,
   };
 
   // Foto del cliente

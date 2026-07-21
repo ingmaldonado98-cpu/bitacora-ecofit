@@ -35,6 +35,7 @@ export const TIPOS_SISTEMA = {
   bombeo:           { label: 'Bombeo Solar',          icon: 'waves' },
   sistema_pequeno:  { label: 'Sistema Pequeño',       icon: 'snowflake',
                       hint: 'Congeladores / refrigeradores solares, apoyos de gobierno' },
+  ampliacion:       { label: 'Ampliación',             icon: 'plus-circle' },
   otro:             { label: 'Otro',                  icon: 'squares-four' },
   // Legado — proyectos anteriores a la fusión (no aparece en nuevos formularios)
   hibrido:          { label: 'Híbrido',               icon: 'battery-charging', legacy: true },

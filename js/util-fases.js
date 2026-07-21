@@ -173,6 +173,12 @@ export function calcFaseEstado(project) {
 export function calcLevItems(doc, tipoSistema) {
   const lev = doc?.levantamiento || {};
   const levAreas = lev.areasTecho?.length || 0;
+  if (tipoSistema === 'ampliacion') {
+    return [
+      { label: `Área(s) de techo nueva (${levAreas})`, ok: levAreas > 0 },
+      { label: 'Fotos del levantamiento',              ok: (lev.fotosLevantamiento?.length || 0) > 0 },
+    ];
+  }
   const items = [
     { label: 'Tipo de techo',           ok: !!lev.tipTecho },
     { label: `Áreas (${levAreas})`,     ok: levAreas > 0 },

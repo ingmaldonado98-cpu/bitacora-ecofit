@@ -2504,6 +2504,21 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
 
 /* ── Coordenadas GPS ──────────────────────────────────────────────────────── */
 .coords-row .meta-val { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ── Ampliaciones ─────────────────────────────────────────────────────────── */
+.ampliacion-origen-link {
+  color: var(--solar); font-weight: 600; text-decoration: none; font-size: .9rem;
+}
+.ampliacion-origen-link:hover { text-decoration: underline; }
+.ampliaciones-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.chip-ampliacion {
+  display: inline-flex; align-items: center;
+  background: rgba(232,188,36,.12); color: var(--solar);
+  border: 1px solid rgba(232,188,36,.3);
+  border-radius: 20px; padding: 3px 10px;
+  font-size: .78rem; font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.chip-ampliacion:hover { background: rgba(232,188,36,.22); }
 .btn-maps {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: .78rem; font-weight: 600; color: var(--accent);

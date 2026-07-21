@@ -26,7 +26,7 @@ window._lev = _lev;
 // ── Levantamiento dinámico ─────────────────────────────────────────────────────
 // Tipos de sistema sin conexión a la red CFE — no aplican campos de
 // tarifa/tablero/voltajes medidos (antes solo se excluía sistema_pequeno).
-const _SIN_CFE = ['sistema_pequeno', 'aislado', 'bombeo'];
+const _SIN_CFE = ['sistema_pequeno', 'aislado', 'bombeo', 'ampliacion'];
 
 function renderLevantamiento(project, tipo, edit) {
   const lev = project.documentacion?.levantamiento || {};
@@ -209,7 +209,7 @@ function renderLevantamiento(project, tipo, edit) {
       </div>
     `)}
 
-    ${acc('sombras', 'Análisis de sombras', '🌿', hasSombras, `
+    ${tipo === 'ampliacion' ? '' : acc('sombras', 'Análisis de sombras', '🌿', hasSombras, `
       <div class="sombras-check">
         ${['Árboles','Tinacos','Antenas','Edificios','Postes','Otra'].map(s=>`
           <label class="check-chip ${(lev.sombras?.checklist||[]).includes(s)?'check-active':''}">
@@ -270,7 +270,7 @@ function renderLevantamiento(project, tipo, edit) {
       </details>
     `)}
 
-    ${acc('dron', 'Tomas con dron', '🚁', hasDron, `
+    ${tipo === 'ampliacion' ? '' : acc('dron', 'Tomas con dron', '🚁', hasDron, `
       <p class="form-hint" style="margin:0 0 8px">Foto y video aéreo del sitio antes de instalar. El video se sube solo con conexión (máx. 60 MB); las fotos también funcionan offline. La toma aérea de cierre (obra terminada) se captura más adelante, en Progreso de obra → Bloque 3.</p>
       ${(() => {
         const d = lev.dron?.antes || { fotos:[], videos:[] };

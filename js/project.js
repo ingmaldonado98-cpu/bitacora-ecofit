@@ -20,8 +20,15 @@ export { renderProjectForm } from './proj-form.js';
 
 // ── Vista detalle del proyecto ─────────────────────────────────────────────────
 export async function renderProjectDetail(id, session) {
-  const [project, allUsers] = await Promise.all([projects.getById(id), users.getAll()]);
+  const [project, allUsers, allProjects] = await Promise.all([
+    projects.getById(id), users.getAll(), projects.getAll(),
+  ]);
   if (!project) return '<p class="empty-msg">Proyecto no encontrado.</p>';
+
+  const ampliaciones = allProjects.filter(p => p.proyectoOrigenId === id);
+  const proyectoOrigen = project.proyectoOrigenId
+    ? allProjects.find(p => p.id === project.proyectoOrigenId)
+    : null;
 
   const lider = allUsers.find(u => u.id === project.tecnicoLiderId);
   const apoyo = (project.tecnicosApoyo || []).map(uid => allUsers.find(u => u.id === uid)).filter(Boolean);
@@ -101,6 +108,23 @@ export async function renderProjectDetail(id, session) {
            target="_blank" rel="noopener">
           ${icon('chat-circle-dots', 14)} WhatsApp
         </a>
+      </div>
+    </div>` : ''}
+    ${proyectoOrigen ? `
+    <div class="meta-item ampliacion-origen-row">
+      <span class="meta-lbl">Ampliación de</span>
+      <a class="meta-val ampliacion-origen-link" onclick="navigate('#proyecto/${proyectoOrigen.id}')" href="#">
+        ${esc(proyectoOrigen.displayId || proyectoOrigen.clientName)}
+      </a>
+    </div>` : ''}
+    ${ampliaciones.length > 0 ? `
+    <div class="meta-item">
+      <span class="meta-lbl">Ampliaciones</span>
+      <div class="ampliaciones-chips">
+        ${ampliaciones.map(a => `
+          <a class="chip chip-ampliacion" onclick="navigate('#proyecto/${a.id}')" href="#">
+            ${esc(a.displayId || a.clientName)}
+          </a>`).join('')}
       </div>
     </div>` : ''}
     <div class="card-row">
