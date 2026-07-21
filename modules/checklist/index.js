@@ -453,10 +453,50 @@ function _medicionesPuestaMarchaBlock(project, tipo) {
 }
 
 // ── Ensamble final — orden = secuencia física real de la obra ────────────────
+// Paso 3.3 simplificado para Ampliación — solo tierra, protecciones DC,
+// etiquetado, prueba de aislamiento, mediciones del string nuevo y limpieza.
+// No incluye cableado AC, arranque de inversor ni comisionamiento de red.
+function _ampliacionCierreBlock(project) {
+  return {
+    id: 'ampliacion-cierre', paso: '3.3', label: '3.3 Tierra, Protecciones y Cierre', bloque: 3,
+    herramientas: ['Multímetro digital', 'Megóhmetro 1000 VDC', 'Pinza ponchadora MC4', 'Llave de torque'],
+    nota: 'Instalar varilla PTR y conectar cable de tierra a la nueva estructura. Montar fusibles DC y seccionador del string nuevo. Medir Voc/Isc y prueba de aislamiento. Limpiar y retirar materiales.',
+    fotosCierre: [
+      { id: 'tierra-nueva',  label: 'Varilla PTR y Cable de Tierra del String Nuevo', obligatoria: false },
+      { id: 'fusibles-dc',   label: 'Fusibles DC y Seccionador Instalados', obligatoria: false },
+    ],
+    items: [
+      { id: 'ptr-01', n: 'Varilla PTR enterrada (profundidad suficiente)' },
+      { id: 'ptr-02', n: 'Continuidad de tierra verificada con multímetro' },
+      { id: 'ptr-03', n: 'Cable de tierra conectado a estructura metálica de paneles' },
+      { id: 'pd-01', n: 'Fusibles DC instalados — calibre correcto por string' },
+      { id: 'pd-02', n: 'Seccionador DC instalado y accesible' },
+      { id: 'pd-03', n: 'DPS DC instalado (si aplica por normativa)' },
+      { id: 'et-01', n: 'Cables identificados: positivo, negativo, tierra' },
+      { id: 'et-02', n: 'Calcomanías de advertencia "Sistema Fotovoltaico" colocadas' },
+      { id: 'cc-03', n: 'Prueba de aislamiento — megóhmetro 1000 VDC, R > 1 MΩ', hasInput: true, inputPlaceholder: 'Ej. 500 MΩ' },
+      ..._medicionItems(project),
+      { id: 'ci-01', n: 'Herramientas y materiales sobrantes retirados del techo' },
+      { id: 'ci-02', n: 'Revisión de raspaduras o daños en impermeabilización' },
+      { id: 'ci-03', n: 'Módulos lavados con agua pura — sin polvo de obra' },
+      { id: 'pm-04', n: 'Cliente informado del string nuevo integrado al sistema' },
+    ],
+  };
+}
+
 export function getExecBlocks(project, techo) {
   const tipo = project?.tipoSistema || 'interconectado';
   const t    = techo || 'cemento';
-  const todos = [
+  if (tipo === 'ampliacion') {
+    return [
+      _anclajeMontajeBlock(t, project),
+      _conduitFvBlock,
+      _cableadoPeinadoBlock,
+      _validacionTechoPanelesBlock(t),
+      _ampliacionCierreBlock(project),
+    ];
+  }
+  return [
     // Bloque 1 — Estructura, Anclaje y Canalización Fotovoltaica
     _anclajeMontajeBlock(t, project),
     _conduitFvBlock,
@@ -468,9 +508,4 @@ export function getExecBlocks(project, techo) {
     _validacionTechoPanelesBlock(t),
     _medicionesPuestaMarchaBlock(project, tipo),
   ];
-  if (tipo === 'ampliacion') {
-    const _AMP_IDS = ['anclaje-montaje', 'canal-fv', 'cableado-peinado', 'techo-paneles'];
-    return todos.filter(b => _AMP_IDS.includes(b.id));
-  }
-  return todos;
 }
