@@ -254,6 +254,22 @@ async function _updatePendingBadge() {
   } else {
     badge.style.display = 'none';
   }
+
+  // Badge compacto en el header
+  const hdrBtn   = document.getElementById('hdr-queue-btn');
+  const hdrCount = document.getElementById('hdr-queue-count');
+  if (hdrBtn && hdrCount) {
+    if (total > 0) {
+      hdrBtn.style.display = '';
+      hdrCount.textContent = total > 99 ? '99+' : String(total);
+      hdrBtn.classList.toggle('hdr-queue-stuck', stuck > 0);
+      hdrBtn.title = stuck > 0
+        ? `${total} foto${total > 1 ? 's' : ''} pendiente${total > 1 ? 's' : ''} (${stuck} atascada${stuck > 1 ? 's' : ''}) — ir a Configuración`
+        : `${total} foto${total > 1 ? 's' : ''} pendiente${total > 1 ? 's' : ''} de subir — ir a Configuración`;
+    } else {
+      hdrBtn.style.display = 'none';
+    }
+  }
 }
 
 // ── Procesar la cola completa (llamar al reconectar) ─────────────────────────

@@ -355,6 +355,29 @@ body {
 }
 .hdr-logout-btn:hover { color: #f87171; background: rgba(248,113,113,.1); }
 
+/* ── Botón de cola de fotos en el header ─────────────────────────────────── */
+.hdr-queue-btn {
+  position: relative;
+  background: none; border: none; cursor: pointer;
+  color: var(--solar);
+  width: 44px; height: 44px; flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  transition: color .15s, background .15s;
+}
+.hdr-queue-btn:hover { background: rgba(232,188,36,.12); }
+.hdr-queue-btn.hdr-queue-stuck { color: #f87171; }
+.hdr-queue-btn.hdr-queue-stuck:hover { background: rgba(248,113,113,.1); }
+.hdr-queue-count {
+  position: absolute; top: 5px; right: 5px;
+  background: var(--solar); color: #000;
+  font-size: .58rem; font-weight: 800;
+  min-width: 15px; height: 15px; padding: 0 3px;
+  border-radius: 8px; line-height: 15px; text-align: center;
+  pointer-events: none;
+}
+.hdr-queue-stuck .hdr-queue-count { background: #f87171; color: #fff; }
+
 /* ── Bottom nav ───────────────────────────────────────────────────────────── */
 #bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0;
