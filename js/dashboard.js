@@ -174,8 +174,8 @@ window._toggleConcluidos = async function() {
   if (btn) btn.classList.toggle('dash-toggle-conc-active', _showConcluidos);
   const all = await projects.getAll();
   _allProjects = _showConcluidos
-    ? all.filter(p => ['cerrado', 'cancelado'].includes(p.estado))
-    : all.filter(p => !['cerrado', 'cancelado'].includes(p.estado));
+    ? all.filter(p =>  _ARCHIVADOS.includes(p.estado))
+    : all.filter(p => !_ARCHIVADOS.includes(p.estado));
   _page = 0;
   applyFilters();
 };

@@ -267,7 +267,7 @@ window.exportarWordTecnico = async function(projectId) {
   // Dimensionamiento eléctrico — memoria técnica preliminar (mismo motor que la vista Dimensionamiento)
   if (sec('sec-dimensionamiento')) {
     const res = calcDimensionamiento(project);
-    if (!res.error) {
+    if (!res.error && !res.noAplica) {
       addSec('Dimensionamiento eléctrico');
       const lev2 = project.documentacion?.levantamiento || {};
       const riesgos = detectarRiesgos(project);

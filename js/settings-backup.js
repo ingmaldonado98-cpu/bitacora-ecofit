@@ -4,6 +4,7 @@
 import { exportBackup, importBackup } from './db.js';
 import { toast, confirmDialog } from './utils.js';
 import { pickFolder, requestPermission, testAccess } from './onedrive.js';
+import { getPlugin } from './platform.js';
 
 // ── OneDrive ───────────────────────────────────────────────────────────────────
 window.seleccionarCarpetaOneDrive = async function() {
@@ -63,7 +64,26 @@ window.importarDatos = async function(e) {
 window.limpiarDatos = async function() {
   if (!await confirmDialog('¿ELIMINAR TODOS los datos locales? Esta acción es IRREVERSIBLE.')) return;
   if (!await confirmDialog('Segunda confirmación: ¿Seguro? Perderás todos los proyectos.')) return;
-  indexedDB.deleteDatabase('ecofitV6');
+
+  // Borrado completo: antes solo tocaba la IndexedDB principal y dejaba vivos
+  // el caché de proyectos (localStorage en web / Filesystem en nativo), la
+  // cola de fotos pendientes (IndexedDB separada) y la cola de sincronización
+  // (localStorage) — el usuario veía "eliminado" pero datos viejos reaparecían.
+  await new Promise(res => {
+    const req = indexedDB.deleteDatabase('ecofitV6');
+    req.onsuccess = req.onerror = req.onblocked = res;
+  });
+  await new Promise(res => {
+    const req = indexedDB.deleteDatabase('ecofit-photo-queue');
+    req.onsuccess = req.onerror = req.onblocked = res;
+  });
+
+  const FS = getPlugin('Filesystem');
+  if (FS) {
+    try { await FS.rmdir({ path: 'ecofit', directory: 'DATA', recursive: true }); } catch (_) { /* directorio pudo no existir */ }
+  }
+
+  localStorage.clear();
   sessionStorage.clear();
   toast('Datos eliminados. Recargando…');
   setTimeout(() => location.reload(), 1500);

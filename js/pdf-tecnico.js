@@ -297,7 +297,7 @@ window.exportarPDFTecnico = async function(projectId) {
     // Dimensionamiento eléctrico — memoria técnica preliminar (mismo motor que la vista Dimensionamiento)
     if (sec('sec-dimensionamiento')) {
       const res = calcDimensionamiento(project);
-      if (!res.error) {
+      if (!res.error && !res.noAplica) {
         doc.addPage(); addHeader(doc,'Dimensionamiento eléctrico',project); y=44;
         const lev2 = project.documentacion?.levantamiento || {};
         const riesgos = detectarRiesgos(project);

@@ -3601,6 +3601,15 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
   .dim-modelo-key { flex:none; }
 }
 
+/* ── QR: aviso de sincronización fallida ────────────────────────────────── */
+.qr-sync-warn {
+  display: flex; gap: 8px; align-items: flex-start;
+  background: rgba(245,196,0,.1); border: 1px solid rgba(245,196,0,.4);
+  color: #f5c400; border-radius: var(--radius-sm);
+  padding: 10px 12px; margin-bottom: 12px; font-size: .8rem; line-height: 1.4;
+}
+.qr-sync-warn svg { flex-shrink: 0; margin-top: 1px; }
+
 /* ── Trayectorias de canalización ─────────────────────────────────────────── */
 .tray-seg { padding: 12px 14px; }
 .tray-seg-head {

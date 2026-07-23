@@ -30,6 +30,7 @@ export async function renderDimensionamiento(projectId, session) {
     <span class="hdr-sub">${esc(project.displayId)}</span>
   </div>
 
+  ${!res.noAplica ? `
   <div class="dim-actions-row">
     <button class="btn-outline btn-sm" onclick="navigate('#proyecto/${projectId}/levantamiento')">
       ${icon('pencil-simple', 14)} Editar levantamiento
@@ -40,9 +41,18 @@ export async function renderDimensionamiento(projectId, session) {
     <button class="btn-primary btn-sm" onclick="dimRecalc('${projectId}')">
       ${icon('arrows-clockwise', 14)} Recalcular
     </button>
-  </div>
+  </div>` : ''}
 
-  ${res.error ? `
+  ${res.noAplica ? `
+  <div class="dim-error-card">
+    ${icon('info', 24)}
+    <div>
+      <strong>No aplica para este tipo de proyecto</strong>
+      <p>${project.tipoSistema === 'ampliacion'
+        ? 'Una ampliación añade paneles a un sistema ya dimensionado — no requiere una memoria técnica propia. Consulta el dimensionamiento del proyecto origen si necesitas esos datos.'
+        : 'El tipo de sistema "Otro" no tiene un modelo eléctrico estándar para calcular automáticamente.'}</p>
+    </div>
+  </div>` : res.error ? `
   <div class="dim-error-card">
     ${icon('warning', 24)}
     <div>
@@ -202,6 +212,7 @@ window.dimExportPDF = async function(projectId) {
   const riesgos = detectarRiesgos(project);
   const lev = project.documentacion?.levantamiento || {};
 
+  if (res.noAplica) { toast('El dimensionamiento no aplica para este tipo de proyecto.', 'error'); return; }
   if (res.error) { toast('Completa el levantamiento antes de exportar.', 'error'); return; }
 
   const modeloRows = Object.entries(res.modelo)

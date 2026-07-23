@@ -207,6 +207,12 @@ export function calcBombeo(lev) {
   };
 }
 
+// Tipos sin memoria técnica propia: 'ampliacion' añade paneles a un sistema ya
+// dimensionado (no se re-dimensiona desde cero) y 'otro' no tiene un modelo
+// eléctrico estándar que calcular. No es un error de datos faltantes — el
+// módulo simplemente no aplica a estos tipos.
+export const SIN_DIMENSIONAMIENTO = ['ampliacion', 'otro'];
+
 // ── Dispatcher principal ──────────────────────────────────────────────────────
 export function calcDimensionamiento(project) {
   const lev  = project.documentacion?.levantamiento || {};
@@ -215,6 +221,7 @@ export function calcDimensionamiento(project) {
   if (tipo === 'hibrido' || tipo === 'hibrido_respaldo') return calcHibrido(lev);
   if (tipo === 'aislado' || tipo === 'sistema_pequeno')  return calcAislado(lev);
   if (tipo === 'bombeo')                            return calcBombeo(lev);
+  if (SIN_DIMENSIONAMIENTO.includes(tipo))          return { noAplica: true };
   return { error: `Tipo de sistema "${tipo}" no reconocido.` };
 }
 

@@ -42,7 +42,16 @@ export async function renderQR(projectId, session) {
     } : {}),
     contacto: contacto || '',
   };
-  await publicCards.set(projectId, cardData).catch(() => {});
+  // Si esto falla (offline, permisos), el QR se ve bien aquí pero el cliente
+  // que lo escanee en obra verá "Información no disponible" — avisar al
+  // técnico en vez de fallar en silencio.
+  let cardSyncError = false;
+  try {
+    await publicCards.set(projectId, cardData);
+  } catch (err) {
+    cardSyncError = true;
+    console.warn('publicCards.set failed:', err);
+  }
 
   const qrUrl = `${location.origin}${location.pathname}#cliente/${projectId}`;
 
@@ -53,6 +62,12 @@ export async function renderQR(projectId, session) {
     </button>
     <h1 class="hdr-title">QR del cliente</h1>
   </div>
+
+  ${cardSyncError ? `
+  <div class="qr-sync-warn">
+    ${icon('warning', 16)}
+    <span>No se pudo sincronizar la información pública — el cliente podría ver "Información no disponible" al escanear. Revisa tu conexión y vuelve a abrir esta pantalla.</span>
+  </div>` : ''}
 
   <div class="card qr-card">
     <div class="qr-header">

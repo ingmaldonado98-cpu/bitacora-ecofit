@@ -8,6 +8,7 @@ import { icon } from './icons.js';
 import { getSerialesFlat } from './gar-paneles.js';
 import { getExecBlocks, BLOQUE_LABELS, BLOQUE_DESC } from '../modules/checklist/index.js';
 import { computeBloqueStatus } from './doc-exec.js';
+import { SIN_DIMENSIONAMIENTO } from '../modules/dimensionamiento/index.js';
 
 // Navega a un paso; si lleva tab de bloque, lo deja seleccionado en Progreso de
 // obra (documentacion.js lee 'doc-tab-target' tras renderizar).
@@ -79,15 +80,20 @@ function buildPasos(project, id) {
   });
 
   // ── Paso: Dimensionamiento eléctrico — memoria técnica preliminar ───────────
-  pasos.push({
-    id:       'dimensionamiento',
-    emoji:    '📐',
-    titulo:   'Dimensionamiento eléctrico',
-    desc:     'Revisa y exporta la memoria técnica preliminar (diagnóstico energético, cableado, riesgos).',
-    ok:       !!project.dimensionamiento?.exportadoAt,
-    link:     `#dimensionamiento/${id}`,
-    hint:     project.dimensionamiento?.exportadoAt ? 'Memoria técnica exportada' : 'Sin exportar aún',
-  });
+  // No aplica a ampliación (no re-dimensiona un sistema ya existente) ni a
+  // "otro" (sin modelo eléctrico estándar) — omitir el paso en vez de dejarlo
+  // permanentemente incompleto.
+  if (!SIN_DIMENSIONAMIENTO.includes(project.tipoSistema)) {
+    pasos.push({
+      id:       'dimensionamiento',
+      emoji:    '📐',
+      titulo:   'Dimensionamiento eléctrico',
+      desc:     'Revisa y exporta la memoria técnica preliminar (diagnóstico energético, cableado, riesgos).',
+      ok:       !!project.dimensionamiento?.exportadoAt,
+      link:     `#dimensionamiento/${id}`,
+      hint:     project.dimensionamiento?.exportadoAt ? 'Memoria técnica exportada' : 'Sin exportar aún',
+    });
+  }
 
   // Helper para un paso ligado a un bloque de Progreso de obra
   const _bloquePaso = (n, emoji) => {

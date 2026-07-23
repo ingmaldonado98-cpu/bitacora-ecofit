@@ -114,8 +114,10 @@ export const localStore = {
 
 // ── Purgar proyectos concluidos sin actividad reciente ────────────────────
 // Máximo una vez por día; solo actúa si hay >15 proyectos en caché.
-// Solo elimina estado 'concluido' con updatedAt > maxAgeDays días.
+// Solo elimina estados terminales (cerrado/cancelado/fuera_garantia) con
+// updatedAt > maxAgeDays días.
 const _PRUNE_TS = 'ecofit_last_prune';
+const _ESTADOS_PURGABLES = ['cerrado', 'cancelado', 'fuera_garantia'];
 export async function pruneOldProjects(maxAgeDays = 60) {
   try {
     const last = localStorage.getItem(_PRUNE_TS);
@@ -128,7 +130,7 @@ export async function pruneOldProjects(maxAgeDays = 60) {
     for (const id of idx) {
       const p = await _read(BASE + id + '.json');
       if (!p) continue;
-      if (p.estado === 'concluido' && (p.updatedAt || '') < cutoff) {
+      if (_ESTADOS_PURGABLES.includes(p.estado) && (p.updatedAt || '') < cutoff) {
         await _del(BASE + id + '.json');
         _mem.delete(id);
         pruned++;

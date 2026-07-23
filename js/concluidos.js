@@ -12,7 +12,7 @@ export async function renderConcluidos(session) {
   _page = 0;
   const all = await projects.getAll();
   _allConcluidos = all
-    .filter(p => ['cerrado', 'cancelado'].includes(p.estado))
+    .filter(p => ['cerrado', 'cancelado', 'fuera_garantia'].includes(p.estado))
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 
   return `
@@ -34,9 +34,10 @@ export async function renderConcluidos(session) {
       ${Object.entries(TIPOS_SISTEMA).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
     </select>
     <select id="conc-filter-estado" class="filter-select" onchange="window._concFilter()">
-      <option value="">Cerrados y cancelados</option>
+      <option value="">Todos los concluidos</option>
       <option value="cerrado">Solo cerrados</option>
       <option value="cancelado">Solo cancelados</option>
+      <option value="fuera_garantia">Solo fuera de garantía</option>
     </select>
   </div>
 
@@ -84,7 +85,7 @@ function concCard(p) {
       ${p.fechaInicio ? `<span class="pc-tag">${icon('calendar', 12)} ${fmtFecha(p.fechaInicio)}</span>` : ''}
     </div>
     <div class="pc-footer">
-      <span class="pc-updated">Cerrado ${fmtRelativa(p.updatedAt || p.createdAt)}</span>
+      <span class="pc-updated">${est.label} ${fmtRelativa(p.updatedAt || p.createdAt)}</span>
       <ph-icon name="caret-right" class="pc-arrow"></ph-icon>
     </div>
   </div>`;
@@ -97,7 +98,7 @@ window._concSearch = function(q) {
   _searchTimer = setTimeout(async () => {
     const all = await projects.getAll();
     _allConcluidos = all.filter(p => {
-      if (!['cerrado', 'cancelado'].includes(p.estado)) return false;
+      if (!['cerrado', 'cancelado', 'fuera_garantia'].includes(p.estado)) return false;
       if (!q.trim()) return true;
       const lower = q.toLowerCase();
       return (
