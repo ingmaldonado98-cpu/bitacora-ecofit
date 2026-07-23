@@ -81,7 +81,7 @@ export async function renderDocumentacion(projectId, session) {
         <div style="padding:0 4px 8px">${renderSitio(project, 'centrosCarga', edit, projectId, 2)}</div>
       </details>` : ''}
     ${(_SITIOS_POR_BLOQUE[b] || [])
-      .filter(sitio => !esAmpliacion || sitio === 'techo')
+      .filter(sitio => !esAmpliacion)
       .map(sitio => `
       <details class="cl-exec-block" open>
         <summary class="cl-exec-block-hdr"><span class="cl-exec-block-title">${SITIO_LABEL[sitio] || sitio}</span><span class="cl-exec-caret">▾</span></summary>

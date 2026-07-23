@@ -124,7 +124,11 @@ export function calcFaseEstado(project) {
   const totalPaneles = (gar.paneles?.seriales ?? (gar.paneles?.strings||[]).flatMap(s=>s.paneles||[])).length;
 
   // Sistema pequeño no tiene tablero AC / inversor de red
-  const garItemsL = (esPequeno || esAmpliacion)
+  const garItemsL = esAmpliacion
+    ? [
+        ['seriales de paneles del string nuevo', totalPaneles > 0],
+      ]
+    : esPequeno
     ? [
         ['foto general del sistema', !!gar.fotoSistema],
         ['equipos registrados',      (gar.equipos?.length||0) > 0],
@@ -139,7 +143,7 @@ export function calcFaseEstado(project) {
   const garItems = garItemsL.map(([,ok]) => ok);
   const garFaltantes = garItemsL.filter(([,ok]) => !ok).map(([l]) => l);
   const garItemsOk  = garItems.filter(Boolean).length;
-  const garCompleta = garItemsOk >= (esPequeno ? 2 : 2);
+  const garCompleta = garItemsOk >= (esAmpliacion ? 1 : 2);
   const garPct      = Math.round(garItemsOk / garItems.length * 100);
   const garFirmada  = !!(project.fases?.firmas?.gar);
 

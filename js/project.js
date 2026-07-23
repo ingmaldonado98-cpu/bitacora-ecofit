@@ -55,7 +55,9 @@ export async function renderProjectDetail(id, session) {
   const levPct  = calcLevPct(_dDoc, project.tipoSistema);
   // "Obra %" = avance real por Bloque 1/2/3 (no el esquema viejo de fotos por sitio).
   const docPct  = _esPeq ? 0 : calcObraStatus(project).pct;
-  const _gItems = (_esPeq || _esAmp)
+  const _gItems = _esAmp
+    ? [totalPaneles>0]
+    : _esPeq
     ? [!!_dGar.fotoSistema, totalEquipos>0, totalPaneles>0]
     : [!!_dGar.fotoSistema, !!(_dFt.tableroAC||_dFt.inversorEnergizado), totalEquipos>0, totalPaneles>0];
   const garPct     = Math.round(_gItems.filter(Boolean).length / _gItems.length * 100);
@@ -272,7 +274,11 @@ function renderModulosProgreso(project, id, session, admin) {
   const docPct  = esPequenoTipo ? 0 : _obra.pct;
 
   const totalPaneles = getSerialesFlat(gar).length;
-  const garItems = (esPequenoTipo || esAmpliacion)
+  const garItems = esAmpliacion
+    ? [
+        { label: `Paneles (${totalPaneles})`, ok: totalPaneles > 0 },
+      ]
+    : esPequenoTipo
     ? [
         { label: 'Foto del sistema',                    ok: !!gar.fotoSistema },
         { label: `Equipos (${gar.equipos?.length||0})`, ok: (gar.equipos?.length||0) > 0 },
@@ -390,7 +396,11 @@ function renderQuickCheck(project, id, admin, inline = false) {
     : calcObraStatus(project).bloques
         .filter(b => b.total > 0)
         .map(b => ({ label: `${b.label} (${b.done}/${b.total})`, desc: b.desc, tab: `d-bloque${b.bloque}`, ok: b.completo }));
-  const garItems = (esPequeno || esAmpliacion)
+  const garItems = esAmpliacion
+    ? [
+        { label: `Paneles (${totalPaneles})`, desc: 'Números de serie de cada panel del string nuevo.', ok: totalPaneles > 0 },
+      ]
+    : esPequeno
     ? [
         { label: 'Foto del sistema',                     desc: 'Foto general del sistema terminado, para la garantía.', ok: !!gar.fotoSistema },
         { label: `Equipos (${gar.equipos?.length||0})`,  desc: 'Números de serie de inversor, protecciones y otros equipos.', ok: (gar.equipos?.length||0) > 0 },
