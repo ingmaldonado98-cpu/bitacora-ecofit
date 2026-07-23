@@ -5,7 +5,7 @@ import { esc, fotoMini } from './utils.js';
 import { canEdit, isAdmin, isLider } from './auth.js';
 import { icon } from './icons.js';
 import { renderFirmaBlock } from './project.js';
-import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES, RESULTADOS_FORMAL } from './aud-data.js';
+import { checklistRapidoPara, checklistFormalPara, MEDICIONES, RESULTADOS_FORMAL } from './aud-data.js';
 import { AS } from './aud-state.js';
 
 // ── Render principal ──────────────────────────────────────────────────────────
@@ -24,6 +24,7 @@ export async function renderAuditoria(projectId, session) {
 
   AS.edit = edit;
   AS.projectId = projectId;
+  AS.tipoSistema = project.tipoSistema;
   AS.rapidoMap = { ...(aud.rapidoChecklist || {}) };
   AS.formalMap = { ...(aud.formalChecklist || {}) };
   AS.formalObs = { ...(aud.formalObs || {}) };
@@ -72,11 +73,12 @@ export async function renderAuditoria(projectId, session) {
     // Completud para habilitar firma
     let firmaReady = false, firmaHint = '';
     if (modo === 'formal') {
+      const lista = checklistFormalPara(project.tipoSistema);
       const fcl  = aud.formalChecklist || {};
-      const done = CHECKLIST_FORMAL.filter(i => fcl[i.id]).length;
-      firmaReady = !!aud.resultado && done === CHECKLIST_FORMAL.length;
+      const done = lista.filter(i => fcl[i.id]).length;
+      firmaReady = !!aud.resultado && done === lista.length;
       if (!aud.resultado) firmaHint = 'Selecciona el dictamen (Cumple / No Cumple / Observaciones)';
-      else if (done < CHECKLIST_FORMAL.length) firmaHint = `Faltan ${CHECKLIST_FORMAL.length - done} ítems del checklist`;
+      else if (done < lista.length) firmaHint = `Faltan ${lista.length - done} ítems del checklist`;
     } else {
       firmaReady = !!aud.rapidoFecha;
       if (!firmaReady) firmaHint = 'Guarda la verificación rápida primero';
@@ -89,14 +91,15 @@ export async function renderAuditoria(projectId, session) {
 
 // ── Modo Rápido ───────────────────────────────────────────────────────────────
 function renderRapido(project, aud, edit, session) {
+  const lista = checklistRapidoPara(project.tipoSistema);
   const cl = aud.rapidoChecklist || {};
-  const done = CHECKLIST_RAPIDO.filter(i => cl[i.id]).length;
-  const total = CHECKLIST_RAPIDO.length;
+  const done = lista.filter(i => cl[i.id]).length;
+  const total = lista.length;
   const pct = Math.round(done / total * 100);
 
   // Agrupar por sección
   const sections = {};
-  CHECKLIST_RAPIDO.forEach(item => {
+  lista.forEach(item => {
     if (!sections[item.sec]) sections[item.sec] = [];
     sections[item.sec].push(item);
   });
@@ -173,13 +176,14 @@ function renderFormal(project, aud, edit) {
   const fobs = aud.formalObs       || {};
   const med  = aud.mediciones      || {};
 
-  const done  = CHECKLIST_FORMAL.filter(i => fcl[i.id]).length;
-  const total = CHECKLIST_FORMAL.length;
+  const lista = checklistFormalPara(project.tipoSistema);
+  const done  = lista.filter(i => fcl[i.id]).length;
+  const total = lista.length;
   const pct   = Math.round(done / total * 100);
 
   // Agrupar por sección
   const sections = {};
-  CHECKLIST_FORMAL.forEach(item => {
+  lista.forEach(item => {
     if (!sections[item.sec]) sections[item.sec] = [];
     sections[item.sec].push(item);
   });

@@ -9,7 +9,7 @@ import {
   savePDF, pdfYield, btnLoading, btnDone,
   VERDE, VERDE_MED, GRIS, GRIS_CLR,
 } from './pdf-helpers.js';
-import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
+import { checklistRapidoPara, checklistFormalPara, MEDICIONES } from './aud-data.js';
 import { getSerialesFlat } from './gar-paneles.js';
 import { getExecBlocks, BLOQUE_LABELS } from '../modules/checklist/index.js';
 import { MESES_CORTO } from './lev-consumo.js';
@@ -580,7 +580,7 @@ window.exportarPDFTecnico = async function(projectId) {
       y=campo(doc,'Resultado',aud.resultado?.replace(/_/g,' ').toUpperCase(),14,y);
 
       const esFormal   = aud.modo === 'formal';
-      const itemsAud   = esFormal ? CHECKLIST_FORMAL : CHECKLIST_RAPIDO;
+      const itemsAud   = esFormal ? checklistFormalPara(project.tipoSistema) : checklistRapidoPara(project.tipoSistema);
       const resultsAud = esFormal ? (aud.formalChecklist||{}) : (aud.rapidoChecklist||{});
       const obsAud     = aud.formalObs || {};
       doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...VERDE);

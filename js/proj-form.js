@@ -3,7 +3,7 @@
 
 import { projects, users, logChange } from './db.js';
 import { esc, toast, uuid, isoNow, genDisplayId, ESTADOS, PRIORIDADES, TIPOS_SISTEMA,
-         capturePhoto } from './utils.js';
+         capturePhoto, confirmDialog } from './utils.js';
 import { getSession } from './auth.js';
 import { uploadPhotoQueued, buildFotoPath } from './firebase.js';
 import { icon } from './icons.js';
@@ -198,16 +198,6 @@ export async function renderProjectForm(id, session) {
 }
 
 // ── Chip helpers ──────────────────────────────────────────────────────────────
-window.selChip = function(groupId, value, inputId, btn) {
-  document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('chip-active'));
-  (btn || document.activeElement).classList.add('chip-active');
-  document.getElementById(inputId).value = value;
-  if (inputId === 'tipo-val') {
-    const camposCliente = document.getElementById('campos-cliente');
-    if (camposCliente) camposCliente.style.display = value === 'sistema_pequeno' ? '' : 'none';
-  }
-};
-
 window.toggleApoyo = function(id, btn) {
   btn.classList.toggle('chip-active');
   const input = document.getElementById('apoyo-val');
@@ -270,7 +260,7 @@ window._submitProject = async function(e, editId) {
     btn.classList.remove('btn-saving');
     btn.textContent = btnLabel;
     toast('Selecciona el tipo de sistema', 'error');
-    document.getElementById('chip-tipo')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('tipo-val')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
   const esPequeno    = tipoSistema === 'sistema_pequeno';
@@ -324,6 +314,23 @@ window._submitProject = async function(e, editId) {
   try {
     if (editId) {
       const prev = await projects.getById(editId);
+      // Cambiar el tipo altera qué módulos/campos aplican; los datos ya capturados
+      // del tipo anterior (p.ej. tarifa CFE, recibos) quedan guardados pero dejan
+      // de mostrarse — avisar antes de continuar.
+      if (prev && prev.tipoSistema !== data.tipoSistema) {
+        const tipoPrevio = TIPOS_SISTEMA[prev.tipoSistema]?.label || prev.tipoSistema;
+        const tipoNuevo  = TIPOS_SISTEMA[data.tipoSistema]?.label || data.tipoSistema;
+        const ok = await confirmDialog(
+          `⚠ Vas a cambiar el tipo de sistema de "${tipoPrevio}" a "${tipoNuevo}".\n\n` +
+          `Los datos del levantamiento capturados para el tipo anterior se conservan pero pueden dejar de aplicar (p. ej. datos CFE, consumo, bombeo).\n\n¿Continuar?`
+        );
+        if (!ok) {
+          btn.disabled = false;
+          btn.classList.remove('btn-saving');
+          btn.textContent = btnLabel;
+          return;
+        }
+      }
       if (prev && (prev.clientName !== data.clientName || prev.tipoSistema !== data.tipoSistema)) {
         const all = await projects.getAll();
         const otherIds = all.filter(x => x.id !== editId).map(x => x.displayId).filter(Boolean);
@@ -369,22 +376,3 @@ window._submitProject = async function(e, editId) {
   }
 };
 
-// ── Importar desde JSON de calculadora ───────────────────────────────────────
-window._importCalc = async function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    if (data.clientName) document.querySelector('[name="clientName"]').value = data.clientName;
-    if (data.tipo) {
-      const legacyMap = { hibrido: 'hibrido_respaldo', respaldo: 'hibrido_respaldo' };
-      const tipo = legacyMap[data.tipo] || data.tipo;
-      const sel = document.getElementById('tipo-val');
-      if (sel) sel.value = tipo;
-    }
-    toast('✅ Datos importados — completa el formulario y crea el proyecto');
-  } catch(err) {
-    toast('Error al importar: ' + err.message, 'error');
-  }
-};

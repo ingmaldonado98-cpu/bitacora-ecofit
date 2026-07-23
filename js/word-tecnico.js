@@ -4,7 +4,7 @@
 
 import { projects } from './db.js';
 import { fmtFecha, TIPOS_SISTEMA, ESTADOS, fotoToImageBuffer } from './utils.js';
-import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
+import { checklistRapidoPara, checklistFormalPara, MEDICIONES } from './aud-data.js';
 import { getSerialesFlat } from './gar-paneles.js';
 import { newDoc, heading1, heading2, campo, p, table, hr, imageBlock, pageBreak,
          Paragraph, TextRun, ImageRun, AlignmentType, BorderStyle, saveDocx } from './word-helpers.js';
@@ -465,7 +465,7 @@ window.exportarWordTecnico = async function(projectId) {
     addCampo('Resultado', aud.resultado?.replace(/_/g, ' ').toUpperCase());
 
     const esFormalW   = aud.modo === 'formal';
-    const itemsAudW   = esFormalW ? CHECKLIST_FORMAL : CHECKLIST_RAPIDO;
+    const itemsAudW   = esFormalW ? checklistFormalPara(project.tipoSistema) : checklistRapidoPara(project.tipoSistema);
     const resultsAudW = esFormalW ? (aud.formalChecklist || {}) : (aud.rapidoChecklist || {});
     const obsAudW     = aud.formalObs || {};
     children.push(p(`Checklist técnico (${esFormalW ? 'Formal' : 'Rápido'})`, { bold: true }));

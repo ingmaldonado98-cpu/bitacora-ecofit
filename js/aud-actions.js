@@ -3,7 +3,7 @@
 import { projects, logChange } from './db.js';
 import { fotoMini, capturePhoto, toast, isoNow, confirmDialog } from './utils.js';
 import { uploadPhotoQueued, buildFotoPath } from './firebase.js';
-import { CHECKLIST_RAPIDO, CHECKLIST_FORMAL, MEDICIONES } from './aud-data.js';
+import { checklistRapidoPara, checklistFormalPara, MEDICIONES } from './aud-data.js';
 import { AS } from './aud-state.js';
 
 // ── Switch modo ───────────────────────────────────────────────────────────────
@@ -32,8 +32,8 @@ window.setRapido = async function(itemId, val, btn, projectId) {
   });
   btn.classList.add('rq-active', `rq-active-${val}`);
 
-  const done  = CHECKLIST_RAPIDO.filter(i => AS.rapidoMap[i.id]).length;
-  const pct   = Math.round(done / CHECKLIST_RAPIDO.length * 100);
+  const done  = checklistRapidoPara(AS.tipoSistema).filter(i => AS.rapidoMap[i.id]).length;
+  const pct   = Math.round(done / checklistRapidoPara(AS.tipoSistema).length * 100);
   const bar   = document.getElementById('rq-prog-bar');
   if (bar) bar.style.width = pct + '%';
 
@@ -42,9 +42,9 @@ window.setRapido = async function(itemId, val, btn, projectId) {
 
 // ── Rápido: guardar ───────────────────────────────────────────────────────────
 window.guardarRapido = async function(projectId) {
-  const done = CHECKLIST_RAPIDO.filter(i => AS.rapidoMap[i.id]).length;
-  if (done < CHECKLIST_RAPIDO.length) {
-    toast(`Faltan ${CHECKLIST_RAPIDO.length - done} ítem${CHECKLIST_RAPIDO.length - done !== 1 ? 's' : ''} sin responder`, 'error', 3000);
+  const done = checklistRapidoPara(AS.tipoSistema).filter(i => AS.rapidoMap[i.id]).length;
+  if (done < checklistRapidoPara(AS.tipoSistema).length) {
+    toast(`Faltan ${checklistRapidoPara(AS.tipoSistema).length - done} ítem${checklistRapidoPara(AS.tipoSistema).length - done !== 1 ? 's' : ''} sin responder`, 'error', 3000);
     return;
   }
 
@@ -97,15 +97,15 @@ window.setFormal = async function(itemId, val, btn, projectId) {
     .forEach(b => b.classList.remove('chk-active'));
   btn.classList.add('chk-active');
 
-  const done = CHECKLIST_FORMAL.filter(i => AS.formalMap[i.id]).length;
-  const pct  = Math.round(done / CHECKLIST_FORMAL.length * 100);
+  const done = checklistFormalPara(AS.tipoSistema).filter(i => AS.formalMap[i.id]).length;
+  const pct  = Math.round(done / checklistFormalPara(AS.tipoSistema).length * 100);
   const bar  = document.getElementById('fm-prog-bar');
   const lbl  = document.getElementById('fm-prog-lbl');
   if (bar) bar.style.width = pct + '%';
-  if (lbl) lbl.textContent = `${done} / ${CHECKLIST_FORMAL.length}`;
+  if (lbl) lbl.textContent = `${done} / ${checklistFormalPara(AS.tipoSistema).length}`;
 
   // Auto-sugerir dictamen si todos los ítems están evaluados
-  if (done === CHECKLIST_FORMAL.length) {
+  if (done === checklistFormalPara(AS.tipoSistema).length) {
     const hayNC = Object.values(AS.formalMap).some(v => v === 'no_cumple');
     const sug   = hayNC ? 'no_aprobado' : 'aprobado';
     const resEl = document.getElementById('fm-resultado');
@@ -147,7 +147,7 @@ window.guardarFormal = async function(e, projectId) {
   // del checklist marcado) — error de captura accidental. Si hay progreso
   // parcial sí se permite guardar (es un borrador del dictamen).
   const _fd0 = new FormData(e.target);
-  const _checklistDone = CHECKLIST_FORMAL.filter(i => AS.formalMap[i.id]).length;
+  const _checklistDone = checklistFormalPara(AS.tipoSistema).filter(i => AS.formalMap[i.id]).length;
   if (!_fd0.get('resultado') && _checklistDone === 0) {
     toast('Marca al menos un ítem del checklist o selecciona un dictamen antes de guardar', 'error', 5000);
     return;

@@ -48,6 +48,26 @@ export const CHECKLIST_FORMAL = [
   { id: 'f20', sec: 'Puesta en marcha',               label: 'Torque aplicado según especificaciones del fabricante', ref: 'Manual Puesta en Marcha' },
 ];
 
+// ── Filtrado por tipo de sistema ──────────────────────────────────────────────
+// Ítems que solo aplican a sistemas interconectados a la red CFE: anti-isla,
+// letrero de dos fuentes, regla del 120%, desconectador para CFE. En sistemas
+// sin red (aislado, bombeo, sistema pequeño) se excluyen — antes aparecían y
+// obligaban a marcarlos aunque no existiera la instalación referida.
+const _SOLO_RED_RAPIDO = ['r15', 'r18'];
+const _SOLO_RED_FORMAL = ['f11', 'f12', 'f13', 'f18'];
+const _SIN_RED = ['aislado', 'bombeo', 'sistema_pequeno'];
+
+export function checklistRapidoPara(tipoSistema) {
+  return _SIN_RED.includes(tipoSistema)
+    ? CHECKLIST_RAPIDO.filter(i => !_SOLO_RED_RAPIDO.includes(i.id))
+    : CHECKLIST_RAPIDO;
+}
+export function checklistFormalPara(tipoSistema) {
+  return _SIN_RED.includes(tipoSistema)
+    ? CHECKLIST_FORMAL.filter(i => !_SOLO_RED_FORMAL.includes(i.id))
+    : CHECKLIST_FORMAL;
+}
+
 export const MEDICIONES = [
   { id: 'voc',        label: 'Voltaje Voc (cadena)',         unit: 'V',  ref: 'No superar Voc máx. del inversor' },
   { id: 'isc',        label: 'Corriente Isc (cadena)',       unit: 'A',  ref: 'Isc módulo × 1.25' },

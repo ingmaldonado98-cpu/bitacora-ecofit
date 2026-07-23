@@ -10,7 +10,7 @@ import { icon } from './icons.js';
 import { renderFirmaBlock } from './proj-firmas.js';
 import { renderObservaciones } from './proj-obs.js';
 import { getSerialesFlat } from './gar-paneles.js';
-import './proj-form.js';   // registra window.selChip, toggleApoyo, _submitProject, etc.
+import './proj-form.js';   // registra window.toggleApoyo, _submitProject, etc.
 import './proj-obs.js';    // registra window._showAddObs, _submitObs, _delObs, _resolverObs
 
 // Re-exportar para que app.js y otros importadores no necesiten cambiar
