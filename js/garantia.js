@@ -41,6 +41,13 @@ export async function renderGarantia(projectId, session) {
   const esAmpliacion = project.tipoSistema === 'ampliacion';
   const tabDefault   = esAmpliacion ? 'g-estructura' : 'g-equipos';
 
+  const proyectoOrigen = (esAmpliacion && project.proyectoOrigenId)
+    ? await projects.getById(project.proyectoOrigenId).catch(() => null)
+    : null;
+
+  const cl = project.checklistData || {};
+  const fotoMppt = cl.fotosCierre?.['ampliacion-cierre']?.['string-mppt'];
+
   return `
   <div class="view-header">
     <button class="btn-back" onclick="navigate('#proyecto/${projectId}')">
@@ -55,6 +62,7 @@ export async function renderGarantia(projectId, session) {
 
   <!-- Puesta en marcha + vencimientos -->
   ${renderVencimientos(g, projectId, edit)}
+  ${_renderOrigenCtx(proyectoOrigen, projectId)}
 
   <div class="tab-bar" id="garantia-tabs" role="tablist" aria-label="Secciones de garantía">
     ${!esAmpliacion ? `
@@ -96,6 +104,7 @@ export async function renderGarantia(projectId, session) {
       <h3 class="card-title">Estructura de montaje</h3>
       ${renderEstructura(g.estructura, projectId, edit, project.projectConfig)}
     </div>
+    ${esAmpliacion ? _renderFotoMppt(fotoMppt, projectId) : ''}
   </div>
 
   <!-- 1E: Paneles -->
@@ -173,6 +182,50 @@ function renderKitPendientes(kitEquipo, projectId, edit) {
         <span>⚠️ Pendiente de serial</span>
         <span class="kit-pend-nombre">${esc(it.nombre || 'Sin nombre')}</span>
       </div>`).join('')}
+  </div>`;
+}
+
+// ── Contexto del sistema origen (solo ampliación) ─────────────────────────────
+function _renderOrigenCtx(po, projectId) {
+  if (!po) return '';
+  const g   = po.garantia || {};
+  const pan = g.paneles   || {};
+  const seriales  = pan.seriales ?? (pan.strings || []).flatMap(s => s.paneles || []);
+  const total     = seriales.length;
+  const kWp       = total && pan.wp ? (total * pan.wp / 1000).toFixed(2) : null;
+  const inv       = (g.equipos || []).find(e => e.tipo === 'inversor');
+
+  const filas = [
+    kWp   ? `<div class="origen-row"><span>Potencia instalada</span><b>${kWp} kWp</b></div>` : '',
+    total ? `<div class="origen-row"><span>Paneles</span><b>${total} × ${pan.wp || '?'} Wp</b></div>` : '',
+    inv   ? `<div class="origen-row"><span>Inversor</span><b>${esc(`${inv.marca || ''} ${inv.modelo || ''}`.trim() || '—')}</b></div>` : '',
+  ].filter(Boolean).join('');
+
+  return `
+  <div class="card" style="margin-bottom:8px;border-left:3px solid var(--primary)">
+    <div class="card-title-row" style="padding-bottom:6px">
+      <h4 class="card-title" style="font-size:.82rem">${icon('bolt', 13)} Sistema origen</h4>
+      <a class="link-sm" onclick="navigate('#proyecto/${po.id}')" href="#" style="font-size:.8rem">${esc(po.displayId || po.clientName || '')}</a>
+    </div>
+    ${filas || '<p class="empty-msg-sm">Sin datos de garantía registrados aún en el proyecto origen.</p>'}
+  </div>`;
+}
+
+// ── Foto string→MPPT (referencia desde checklist paso 3.3) ────────────────────
+function _renderFotoMppt(fotoMppt, projectId) {
+  const url = fotoMppt?.url;
+  return `
+  <div class="card" style="margin-top:8px">
+    <div class="card-title-row" style="padding-bottom:6px">
+      <h3 class="card-title">${icon('camera', 14)} Conexión al Inversor (MPPT)</h3>
+    </div>
+    ${url
+      ? `<img src="${esc(url)}" alt="String conectado a MPPT" style="width:100%;border-radius:6px;max-height:220px;object-fit:cover">`
+      : `<p class="empty-msg-sm" style="margin-bottom:8px">Foto pendiente — registrar en Progreso de Obra, paso 3.3.</p>
+         <button class="btn-outline btn-sm" onclick="sessionStorage.setItem('doc-tab-target','d-bloque3');navigate('#documentacion/${projectId}')">
+           Ir a Paso 3.3 →
+         </button>`
+    }
   </div>`;
 }
 

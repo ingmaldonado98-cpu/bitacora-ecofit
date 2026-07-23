@@ -464,6 +464,7 @@ function _ampliacionCierreBlock(project) {
     fotosCierre: [
       { id: 'tierra-nueva',  label: 'Varilla PTR y Cable de Tierra del String Nuevo', obligatoria: false },
       { id: 'fusibles-dc',   label: 'Fusibles DC y Seccionador Instalados', obligatoria: false },
+      { id: 'string-mppt',   label: 'String Nuevo Conectado a MPPT del Inversor Existente', obligatoria: false },
     ],
     items: [
       { id: 'ptr-01', n: 'Varilla PTR enterrada (profundidad suficiente)' },

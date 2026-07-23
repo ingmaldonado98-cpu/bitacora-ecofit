@@ -2519,6 +2519,14 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
   font-size: .78rem; font-weight: 600; text-decoration: none; cursor: pointer;
 }
 .chip-ampliacion:hover { background: rgba(232,188,36,.22); }
+.origen-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .82rem; padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.origen-row:last-child { border-bottom: none; }
+.origen-row span { color: var(--text-muted); }
+.origen-row b { font-weight: 600; }
 .btn-maps {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: .78rem; font-weight: 600; color: var(--accent);
