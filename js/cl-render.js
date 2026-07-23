@@ -3,7 +3,7 @@
 import { projects } from './db.js';
 import { esc, fmtFechaHora } from './utils.js';
 import { canEdit, isAdmin } from './auth.js';
-import { HERRAMIENTA, ADMIN_REVIEW_ITEMS, getExecBlocks } from '../modules/checklist/index.js';
+import { HERRAMIENTA, ADMIN_REVIEW_ITEMS } from '../modules/checklist/index.js';
 import { buildDiagramSVG, buildGuiaData, buildTorqueTable, getRowsData, getPanelWidth, getPanelHeight, getTotalPanels } from '../modules/calculadora/index.js';
 import { icon } from './icons.js';
 
@@ -463,16 +463,18 @@ export async function renderChecklistsList(session) {
     const herr = HERRAMIENTA[techo] || HERRAMIENTA.cemento;
     const cons = cfg ? (cfg.computed?.consumibles || []) : [];
 
-    const execBlocksL   = getExecBlocks(p, techo);
-    const execAllItemsL = execBlocksL.flatMap(b => b.items);
-    const kitValsL      = Object.values(cl.kitEquipo || {});
+    // Contar SOLO lo que el módulo Checklist muestra (Herramienta + Materiales:
+    // BOM + consumibles + kit). Los ítems de ejecución viven en Progreso de obra
+    // y los de revisión admin no se renderizan aquí — incluirlos inflaba el
+    // denominador y la tarjeta nunca podía llegar a 100% desde esta vista.
+    const bomItemsL = cfg?.computed?.bom || [];
+    const kitValsL  = Object.values(cl.kitEquipo || {});
 
-    const totalItems = herr.length + cons.length + ADMIN_REVIEW_ITEMS.length + execAllItemsL.length + kitValsL.length;
+    const totalItems = herr.length + bomItemsL.length + cons.length + kitValsL.length;
     const doneItems  =
       herr.filter(h => cl.herr?.[h.id]).length +
+      bomItemsL.filter(it => cl.bom?.[it.partNum || it.name]).length +
       cons.filter((_, i) => cl.cons?.[String(i)]).length +
-      ADMIN_REVIEW_ITEMS.filter(it => cl.admin?.[it.id]).length +
-      execAllItemsL.filter(it => cl.exec?.[it.id]).length +
       kitValsL.filter(it => it.empacado).length;
 
     const pct      = totalItems > 0 ? Math.round(doneItems / totalItems * 100) : 0;

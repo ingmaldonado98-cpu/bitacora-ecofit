@@ -8,6 +8,12 @@ import { AS } from './aud-state.js';
 
 // ── Switch modo ───────────────────────────────────────────────────────────────
 window.switchAudMode = async function(projectId, modo) {
+  // Solo-lectura (apoyo): cambiar de vista sin escribir en el proyecto ni en el historial
+  if (!AS.edit) {
+    sessionStorage.setItem('aud-modo-view', modo);
+    navigate(`#proyecto/${projectId}/auditoria`);
+    return;
+  }
   const p = await projects.getById(projectId);
   const aud = p.auditoria || {};
   aud.modo = modo;
@@ -129,6 +135,9 @@ window.setResultadoFormal = function(val, color, btn) {
   btn.style.background = color;
   btn.style.color = '#0f1a14';
   document.getElementById('fm-resultado').value = val;
+  // "Condiciones para aprobación diferida" solo tiene sentido si el dictamen no es "Aprobado" limpio
+  const condWrap = document.getElementById('fm-condiciones-wrap');
+  if (condWrap) condWrap.style.display = (val === 'aprobado_con_obs' || val === 'no_aprobado') ? '' : 'none';
 };
 
 // ── Formal: guardar ───────────────────────────────────────────────────────────

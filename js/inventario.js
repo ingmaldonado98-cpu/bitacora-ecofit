@@ -42,6 +42,9 @@ function renderApp(){
       <span class="hdr-sub">${S.materials.length} materiales</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
+      ${S.month !== nowLabel()
+        ? `<span class="inv-month-warn" title="El período mostrado no es el mes actual (${nowLabel()})">⚠ período pasado</span>`
+        : ''}
       ${isAdmin()
         ?`<input id="inv-month" value="${S.month}" placeholder="${nowLabel()}"
             class="inv-month-inp">`
@@ -58,7 +61,7 @@ function renderApp(){
 
 function invBind(){
   const mi=document.getElementById('inv-month');
-  if(mi) mi.onchange=e=>{ S.month=e.target.value; };
+  if(mi) mi.onchange=e=>{ S.month=e.target.value; invRender(); };
 
   if(S.tab==='captura')   bindCaptura();
   if(S.tab==='catalogo')  bindCatalogo();

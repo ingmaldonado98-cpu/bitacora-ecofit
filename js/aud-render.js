@@ -13,13 +13,14 @@ export async function renderAuditoria(projectId, session) {
   const project = await projects.getById(projectId);
   if (!project) return '<p class="empty-msg">Proyecto no encontrado.</p>';
 
-  if (!isAdmin(session) && !isLider(session)) {
-    return '<p class="empty-msg">Sin acceso a esta sección.</p>';
-  }
-
-  const edit = canEdit(session, project) || isAdmin(session);
+  // Apoyo entra en modo solo-lectura: necesita consultar las correcciones que
+  // le pidieron, aunque no pueda editar el dictamen.
+  const puedeEditar = isAdmin(session) || isLider(session);
+  const edit = puedeEditar && (canEdit(session, project) || isAdmin(session));
   const aud  = project.auditoria || {};
-  const modo = aud.modo || 'rapido';
+  // En solo-lectura el cambio de modo no se persiste — se lee de sessionStorage
+  const modoView = !puedeEditar ? sessionStorage.getItem('aud-modo-view') : null;
+  const modo = modoView || aud.modo || 'rapido';
 
   AS.edit = edit;
   AS.projectId = projectId;
@@ -42,6 +43,11 @@ export async function renderAuditoria(projectId, session) {
     <h1 class="hdr-title">Auditoría Técnica</h1>
     <span class="hdr-sub">${esc(project.displayId)}</span>
   </div>
+
+  ${!puedeEditar ? `
+  <p class="form-hint" style="margin:0 0 10px">
+    ${icon('eye', 13)} Vista de solo lectura — la auditoría la edita el técnico líder o un administrador.
+  </p>` : ''}
 
   <!-- Selector de modo -->
   <div class="aud-mode-bar">
@@ -303,7 +309,10 @@ function renderFormal(project, aud, edit) {
       <textarea name="observaciones" rows="3" placeholder="Hallazgos y notas…"
                 ${!edit?'disabled':''}>${esc(aud.observaciones||'')}</textarea>
     </div>
-    <div class="form-group"><label>Condiciones para aprobación diferida</label>
+    <!-- Solo aplica cuando el dictamen NO es "Aprobado" limpio -->
+    <div class="form-group" id="fm-condiciones-wrap"
+         style="display:${(aud.resultado === 'aprobado_con_obs' || aud.resultado === 'no_aprobado') ? '' : 'none'}">
+      <label>Condiciones para aprobación diferida</label>
       <textarea name="condicionesAprobacion" rows="2"
                 placeholder="Correcciones requeridas antes de re-inspección…"
                 ${!edit?'disabled':''}>${esc(aud.condicionesAprobacion||'')}</textarea>

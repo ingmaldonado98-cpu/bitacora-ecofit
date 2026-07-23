@@ -1919,6 +1919,12 @@ body.theme-sched .ico-sched       { display: flex; color: var(--accent); }
   font-size: .78rem; font-family: monospace; color: var(--text);
   background: var(--surface2); padding: 4px 8px; border-radius: 6px;
 }
+.inv-month-warn {
+  font-size: .7rem; font-weight: 700; white-space: nowrap;
+  color: #f5c400; background: rgba(245,196,0,.12);
+  border: 1px solid rgba(245,196,0,.4);
+  padding: 3px 7px; border-radius: 6px;
+}
 
 /* Historial header colapsable */
 .inv-hhead {
@@ -3159,6 +3165,17 @@ details.calc-section[open] .calc-section-caret { transform: rotate(180deg); }
                     font-size: .82rem; color: #a88000; margin: 8px 0; }
 .voc-stale-banner span { flex: 1; }
 .voc-stale-banner .btn-primary { padding: 4px 12px; font-size: .78rem; white-space: nowrap; }
+
+/* ── T-min badge en el summary (visible aun colapsado) ──────────────────── */
+.tmin-summary-badge {
+  font-size: .7rem; font-weight: 700; font-family: monospace;
+  color: var(--g300); background: rgba(46,189,66,.1);
+  padding: 2px 7px; border-radius: 5px; margin-left: 6px;
+}
+.tmin-summary-warn {
+  color: #f5c400; background: rgba(245,196,0,.12);
+  border: 1px solid rgba(245,196,0,.4);
+}
 
 /* ── T-min desglose (levantamiento) ─────────────────────────────────────── */
 .tmin-desglose { font-size: .78rem; font-family: monospace; color: var(--g300);

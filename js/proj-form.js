@@ -120,8 +120,8 @@ export async function renderProjectForm(id, session) {
     <!-- Proyecto origen — solo para Ampliación -->
     <div id="campos-ampliacion" style="display:${project?.tipoSistema === 'ampliacion' ? '' : 'none'}">
       <div class="form-group">
-        <label>Proyecto origen <span class="hint-opt">(instalación que se va a ampliar)</span></label>
-        <select name="proyectoOrigenId">
+        <label>Proyecto origen * <span class="hint-opt">(instalación que se va a ampliar)</span></label>
+        <select name="proyectoOrigenId" id="sel-proyecto-origen">
           <option value="">— Seleccionar proyecto —</option>
           ${allProjects
             .filter(p => p.tipoSistema !== 'ampliacion' && p.id !== id)
@@ -275,6 +275,16 @@ window._submitProject = async function(e, editId) {
   }
   const esPequeno    = tipoSistema === 'sistema_pequeno';
   const esAmpliacion = tipoSistema === 'ampliacion';
+
+  // Una ampliación sin proyecto origen es un registro huérfano — no permitirlo
+  if (esAmpliacion && !fd.get('proyectoOrigenId')) {
+    btn.disabled = false;
+    btn.classList.remove('btn-saving');
+    btn.textContent = btnLabel;
+    toast('Selecciona el proyecto origen de la ampliación', 'error');
+    document.getElementById('sel-proyecto-origen')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
 
   const lat = parseFloat(fd.get('coordLat'));
   const lng = parseFloat(fd.get('coordLng'));

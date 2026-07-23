@@ -370,6 +370,15 @@ window.guardarEquipo = async function(projectId) {
   p.garantia = p.garantia || {};
   p.garantia.equipos = p.garantia.equipos || [];
 
+  // Duplicado de serial también al teclear a mano (antes solo avisaba el escáner).
+  // En edición se ignora el propio equipo — su serial no cuenta como duplicado.
+  const serialNuevo = document.getElementById('eq-serial').value.trim();
+  if (serialNuevo) {
+    const otros = { garantia: { ...p.garantia, equipos: p.garantia.equipos.filter((_, i) => i !== editIdx) } };
+    const dup = _serialUbicacion(otros, serialNuevo);
+    if (dup && !await confirmDialog(`⚠ El serial "${serialNuevo}" ya está registrado en ${dup}. ¿Guardar de todas formas?`)) return;
+  }
+
   const vocMaxRaw      = document.getElementById('eq-vocmax')?.value?.trim();
   const potenciaAcRaw  = document.getElementById('eq-potencia-ac')?.value?.trim();
   const bateriaKwhRaw  = document.getElementById('eq-bateria-kwh')?.value?.trim();

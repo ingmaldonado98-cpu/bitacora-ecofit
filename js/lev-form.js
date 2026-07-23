@@ -110,7 +110,11 @@ function renderLevantamiento(project, tipo, edit) {
            duplicaba la decisión y podía contradecir lo capturado por área. -->
       <!-- Temperatura mínima del sitio — colapsable -->
       <details class="pd-details" ${lev.tMinCiudad ? 'open' : ''}>
-        <summary>Temperatura mínima del sitio <span class="pd-caret">▾</span></summary>
+        <summary>Temperatura mínima del sitio
+          ${lev.tMinCiudad
+            ? `<span class="tmin-summary-badge">${lev.tMin ?? 3}°C · ${esc(lev.tMinCiudad)}</span>`
+            : `<span class="tmin-summary-badge tmin-summary-warn" title="Se está usando el valor por defecto — selecciona el estado para el cálculo correcto de Voc">⚠ ${lev.tMin ?? 3}°C por defecto — verificar</span>`}
+          <span class="pd-caret">▾</span></summary>
         <div class="pd-body">
       <div class="form-row">
         <div class="form-group">
@@ -209,7 +213,8 @@ function renderLevantamiento(project, tipo, edit) {
       </div>
     `)}
 
-    ${tipo === 'ampliacion' ? '' : acc('sombras', 'Análisis de sombras', '🌿', hasSombras, `
+    ${/* Sombras SÍ aplica a ampliación — la zona nueva de techo necesita su propio análisis */
+      acc('sombras', 'Análisis de sombras', '🌿', hasSombras, `
       <div class="sombras-check">
         ${['Árboles','Tinacos','Antenas','Edificios','Postes','Otra'].map(s=>`
           <label class="check-chip ${(lev.sombras?.checklist||[]).includes(s)?'check-active':''}">
