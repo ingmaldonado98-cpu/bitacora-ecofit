@@ -270,7 +270,7 @@ function renderModulosProgreso(project, id, session, admin) {
   const _obra   = esPequenoTipo ? null : calcObraStatus(project);
   const docItems = esPequenoTipo
     ? []
-    : _obra.bloques.map(b => ({ label: `${b.label} (${b.done}/${b.total})`, ok: b.completo }));
+    : _obra.bloques.filter(b => b.total > 0).map(b => ({ label: `${b.label} (${b.done}/${b.total})`, ok: b.completo }));
   const docPct  = esPequenoTipo ? 0 : _obra.pct;
 
   const totalPaneles = getSerialesFlat(gar).length;
