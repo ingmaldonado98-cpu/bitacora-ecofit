@@ -10,8 +10,8 @@ import {
 } from './pdf-helpers.js';
 import { getSerialesFlat } from './gar-paneles.js';
 
-window.exportarPDFCliente = async function(projectId) {
-  const btn = document.querySelector('.pdf-card .btn-primary');
+window.exportarPDFCliente = async function(projectId, btnEl) {
+  const btn = btnEl || document.querySelector('.pdf-card .btn-primary');
   btnLoading(btn, 'Generando…');
   const { toast } = await import('./utils.js');
   toast('Generando PDF cliente…', 'info', 0);

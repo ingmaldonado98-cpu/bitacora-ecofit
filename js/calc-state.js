@@ -104,27 +104,38 @@ export function getRowData() {
 
 export function totalPanels() { return getRowData().reduce((s,c)=>s+c,0); }
 
+// Única fuente de verdad de "qué falta" — wizardStep() (qué sección mostrar)
+// y calcValidacion() (bloqueo duro antes de guardar/exportar) leen de aquí en
+// vez de repetir cada condición por separado, para no arriesgar que diverjan.
+// Cada entrada usa el step de wizardStep en el que ese campo se captura.
+function _camposFaltantes() {
+  const faltantes = [];
+  if (!cs.estructura) {
+    faltantes.push({ step: 1, label: 'Sistema de estructura' });
+  } else if (cs.estructura === 'k2' && !cs.subtipo) {
+    faltantes.push({ step: 2, label: 'Subtipo K2' });
+  } else if (cs.estructura === 'aluminex' && !cs.base) {
+    faltantes.push({ step: 2, label: 'Base Aluminex' });
+  }
+  if (!cs.techo) {
+    faltantes.push({ step: 3, label: 'Tipo de techo' });
+  } else if (cs.techo === 'madera' && !cs.subtipoMadera) {
+    faltantes.push({ step: 3, label: 'Subtipo de techo de madera' });
+  }
+  if (!cs.pW || cs.pW <= 0) faltantes.push({ step: 4, label: 'Dimensiones del panel' });
+  return faltantes;
+}
+
 export function wizardStep() {
-  if (!cs.estructura)                               return 1;
-  if (cs.estructura === 'k2' && !cs.subtipo)        return 2;
-  if (cs.estructura === 'aluminex' && !cs.base)     return 2;
-  if (!cs.techo)                                    return 3;
-  if (cs.techo === 'madera' && !cs.subtipoMadera)   return 3;
-  if (!cs.pW || cs.pW === 0)                        return 4;
-  return 5;
+  const [primero] = _camposFaltantes();
+  return primero ? primero.step : 5;
 }
 
 // Validación dura antes de permitir guardar/exportar — más estricta que
 // wizardStep(), que solo controla qué secciones se muestran. Cubre el caso
 // de borde alcanzable desde la UI (calcIrrRemove vaciando todas las filas).
 export function calcValidacion() {
-  const faltantes = [];
-  if (!cs.estructura) faltantes.push('Sistema de estructura');
-  else if (cs.estructura === 'k2' && !cs.subtipo) faltantes.push('Subtipo K2');
-  else if (cs.estructura === 'aluminex' && !cs.base) faltantes.push('Base Aluminex');
-  if (!cs.techo) faltantes.push('Tipo de techo');
-  else if (cs.techo === 'madera' && !cs.subtipoMadera) faltantes.push('Subtipo de techo de madera');
-  if (!cs.pW || cs.pW <= 0) faltantes.push('Dimensiones del panel');
+  const faltantes = _camposFaltantes().map(f => f.label);
   const rd = getRowData();
   if (!rd.length || rd.every(c => c <= 0)) faltantes.push('Al menos una fila de paneles');
   return { ok: faltantes.length === 0, faltantes };

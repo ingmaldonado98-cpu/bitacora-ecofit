@@ -494,7 +494,7 @@ export async function renderSettings(session) {
               <span class="panel-dims">${p.pW}m × ${p.pH}m${p.voc?` · Voc ${p.voc}V`:''}${p.imp?` · Imp ${p.imp}A`:''}</span>
             </div>
             <div class="panel-row-actions">
-              <button class="btn-icon-sm" onclick="editarPanel('${esc(p.id)}','${esc(p.label)}',${p.wp||''},${p.pW},${p.pH},${p.voc||''},${p.imp||''})" title="Editar">✎</button>
+              <button class="btn-icon-sm" onclick="editarPanel('${esc(p.id)}')" title="Editar">✎</button>
               <button class="btn-del-sm" onclick="eliminarPanel('${esc(p.id)}')" title="Eliminar">✕</button>
             </div>
           </div>

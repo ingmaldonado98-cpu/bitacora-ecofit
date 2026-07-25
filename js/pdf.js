@@ -44,7 +44,7 @@ export async function renderPDFExport(projectId, session) {
         <li>✅ QR del sistema</li>
         <li>✅ Datos de contacto Ecofit</li>
       </ul>
-      <button class="btn-primary btn-full" onclick="exportarPDFCliente('${projectId}')">
+      <button class="btn-primary btn-full" onclick="exportarPDFCliente('${projectId}',this)">
         ${icon('file-pdf')} Generar PDF Cliente
       </button>
     </div>
@@ -85,7 +85,7 @@ export async function renderPDFExport(projectId, session) {
           </label>`).join('')}
       </div>
       <div style="display:flex;gap:8px;margin-top:14px">
-        <button class="btn-primary btn-full" onclick="exportarPDFTecnico('${projectId}')">
+        <button class="btn-primary btn-full" onclick="exportarPDFTecnico('${projectId}',this)">
           ${icon('file-pdf')} PDF Técnico
         </button>
         <button class="btn-secondary btn-full" onclick="exportarWordTecnico('${projectId}')">

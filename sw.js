@@ -68,7 +68,6 @@ const APP_SHELL = [
   './js/proj-obs.js',
   './js/qr.js',
   './js/cliente-publico.js',
-  './js/scanner.js',
   './js/settings.js',
   './js/settings-users.js',
   './js/settings-backup.js',

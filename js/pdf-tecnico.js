@@ -21,8 +21,8 @@ import { withExplicitSize, svgToPngDataUri } from './pdf-calculadora.js';
 const ESTADOS_LABEL = Object.fromEntries(Object.entries(ESTADOS).map(([k,v]) => [k, v.label]));
 
 // ── PDF Técnico ───────────────────────────────────────────────────────────────
-window.exportarPDFTecnico = async function(projectId) {
-  const btn = document.querySelector('.pdf-card:last-child .btn-primary');
+window.exportarPDFTecnico = async function(projectId, btnEl) {
+  const btn = btnEl || document.querySelector('.pdf-card:last-child .btn-primary');
   btnLoading(btn, 'Generando…');
   const { toast } = await import('./utils.js');
   toast('Generando PDF técnico…', 'info', 0);
