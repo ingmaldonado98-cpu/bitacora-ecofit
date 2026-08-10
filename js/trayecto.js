@@ -24,7 +24,8 @@ function buildPasos(project, id) {
   const aud = project.auditoria || {};
   const ft  = gar.fotosTecnicas || {};
   const lev = doc.levantamiento || {};
-  const esPequeno = project.tipoSistema === 'sistema_pequeno';
+  const esPequeno    = project.tipoSistema === 'sistema_pequeno';
+  const esAmpliacion = project.tipoSistema === 'ampliacion';
 
   // Fotos por área — a.fotos es un arreglo plano (no hay sub-fases antes/durante/cierre)
   const areas = lev.areasTecho || [];
@@ -128,7 +129,11 @@ function buildPasos(project, id) {
     });
 
     // ── Paso 4: Bloque 2 — Canalización Central y Montaje de Equipos ──────────
-    pasos.push(_bloquePaso(2, '⚡'));
+    // No aplica a ampliación (sin cuarto de máquinas/equipos nuevos) — el
+    // bloque queda con 0 ítems y 'ok' nunca sería true, bloqueando el 100%
+    // del Trayecto para siempre (mismo problema que ya se corrigió en
+    // Dimensionamiento).
+    if (!esAmpliacion) pasos.push(_bloquePaso(2, '⚡'));
 
     // ── Paso 5: Bloque 3 — Cableado, Paneles y Cierre ────────────────────────
     pasos.push(_bloquePaso(3, '🔆'));
@@ -159,17 +164,22 @@ function buildPasos(project, id) {
   }
 
   // ── Paso 8: Foto del sistema ───────────────────────────────────────────────
-  pasos.push({
-    id:       'foto-sistema',
-    emoji:    '📸',
-    titulo:   'Foto del sistema instalado',
-    desc:     'Foto general del sistema terminado para la garantía.',
-    ok:       !!gar.fotoSistema,
-    link:     `#proyecto/${id}/garantia`,
-    hint:     gar.fotoSistema ? 'Foto capturada' : 'Sin foto del sistema',
-  });
+  // No aplica a ampliación — Garantía ya no exige esta foto para ese tipo
+  // (ver util-fases.js garItemsL), incluirla aquí la dejaría eternamente
+  // pendiente.
+  if (!esAmpliacion) {
+    pasos.push({
+      id:       'foto-sistema',
+      emoji:    '📸',
+      titulo:   'Foto del sistema instalado',
+      desc:     'Foto general del sistema terminado para la garantía.',
+      ok:       !!gar.fotoSistema,
+      link:     `#proyecto/${id}/garantia`,
+      hint:     gar.fotoSistema ? 'Foto capturada' : 'Sin foto del sistema',
+    });
+  }
 
-  if (!esPequeno) {
+  if (!esPequeno && !esAmpliacion) {
     // ── Paso 8: Fotos técnicas ───────────────────────────────────────────────
     pasos.push({
       id:       'fotos-tecnicas',
@@ -183,16 +193,20 @@ function buildPasos(project, id) {
   }
 
   // ── Paso 9: Equipos ────────────────────────────────────────────────────────
-  const nEquipos = gar.equipos?.length || 0;
-  pasos.push({
-    id:       'equipos',
-    emoji:    '🔧',
-    titulo:   'Registrar equipos',
-    desc:     'Escanea o ingresa los números de serie de inversor, protecciones y otros equipos.',
-    ok:       nEquipos > 0,
-    link:     `#proyecto/${id}/garantia`,
-    hint:     nEquipos > 0 ? `${nEquipos} equipo${nEquipos!==1?'s':''} registrado${nEquipos!==1?'s':''}` : 'Sin equipos registrados',
-  });
+  // No aplica a ampliación — no hay equipos nuevos que registrar (mismo
+  // criterio que Garantía).
+  if (!esAmpliacion) {
+    const nEquipos = gar.equipos?.length || 0;
+    pasos.push({
+      id:       'equipos',
+      emoji:    '🔧',
+      titulo:   'Registrar equipos',
+      desc:     'Escanea o ingresa los números de serie de inversor, protecciones y otros equipos.',
+      ok:       nEquipos > 0,
+      link:     `#proyecto/${id}/garantia`,
+      hint:     nEquipos > 0 ? `${nEquipos} equipo${nEquipos!==1?'s':''} registrado${nEquipos!==1?'s':''}` : 'Sin equipos registrados',
+    });
+  }
 
   // ── Paso 10: Paneles ───────────────────────────────────────────────────────
   pasos.push({
