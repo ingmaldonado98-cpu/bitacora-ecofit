@@ -51,6 +51,15 @@ service cloud.firestore {
       return desde in m && rol in m[desde] && hasta in m[desde][rol];
     }
 
+    // Reutilizable fuera de /projects/{projectId} — mismo criterio que
+    // isAsignado() de ese match block, para reglas que referencian un
+    // projectId desde otra colección (ej. publicCards/{id} == projectId).
+    function isAsignadoAProyecto(projectId) {
+      let proj = get(/databases/$(database)/documents/projects/$(projectId)).data;
+      return myRol() == 'apoyo' &&
+        (proj.tecnicoLiderId == uid() || uid() in proj.tecnicosApoyo);
+    }
+
     // ── Proyectos ─────────────────────────────────────────────────────────────
     match /projects/{projectId} {
       // Cualquier usuario activo puede leer proyectos
@@ -62,6 +71,13 @@ service cloud.firestore {
       function tocaEstado() {
         return request.resource.data.diff(resource.data).affectedKeys().hasAny(['estado']);
       }
+      // Auditoría es solo-lectura para 'apoyo' a nivel de interfaz (aud-render.js) —
+      // sin esta regla esa restricción era puramente cosmética: cualquier apoyo
+      // asignado podía escribir directo a Firestore (ej. desde DevTools) y saltarse
+      // el candado de solo-lectura del dictamen/checklist de auditoría.
+      function tocaAuditoria() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasAny(['auditoria']);
+      }
       function isAsignado() {
         return myRol() == 'apoyo' && (
           resource.data.tecnicoLiderId == uid() ||
@@ -72,13 +88,14 @@ service cloud.firestore {
       // Admin: override total (incluye cambios de estado fuera de la máquina de estados).
       // Líder/apoyo: si el write toca 'estado', debe ser una transición válida para su
       // rol (replica TRANSITIONS de js/auth.js); si no toca 'estado', aplican las reglas
-      // normales de edición (líder cualquier proyecto, apoyo solo el suyo asignado).
+      // normales de edición (líder cualquier proyecto, apoyo solo el suyo asignado,
+      // pero apoyo nunca puede tocar el campo 'auditoria').
       allow update: if isActive() && (
         isAdmin() ||
         (tocaEstado()
           ? isValidTransition(resource.data.estado, request.resource.data.estado, myRol()) &&
             (myRol() == 'lider' || isAsignado())
-          : (isLider() || isAsignado()))
+          : (isLider() || (isAsignado() && !tocaAuditoria())))
       );
 
       // Solo admin puede eliminar
@@ -91,9 +108,15 @@ service cloud.firestore {
     // colección espejo solo guarda el correo, nunca nombre/rol/datos sensibles.
     match /usernameIndex/{username} {
       allow read: if true;
-      // Solo puedes escribir tu propio mapeo, apuntando a tu propio correo real
-      // — evita que otro usuario autenticado sabotee el login de alguien más.
-      allow write: if isAuth() && request.resource.data.authEmail == request.auth.token.email;
+      // Solo puedes escribir TU PROPIO mapeo: el username de la ruta debe ser
+      // el tuyo (según tu perfil) Y el correo debe ser el tuyo real. Antes solo
+      // se validaba el correo — cualquier usuario autenticado (incluso uno
+      // desactivado, isActive() no se exigía) podía sobrescribir el mapeo de
+      // OTRO username apuntándolo a su propio correo, bloqueando el login de
+      // ese usuario (usernameIndex hijacking / DoS de login).
+      allow write: if isActive() &&
+        request.resource.data.authEmail == request.auth.token.email &&
+        myProfile().username == username;
     }
 
     // ── Usuarios ──────────────────────────────────────────────────────────────
@@ -112,9 +135,18 @@ service cloud.firestore {
     }
 
     // ── KV store (inventario, presets de panel, config ligera) ───────────────
+    // 'stock' e 'history' son captura diaria de bodega — la UI (inv-captura.js)
+    // deja escribir a CUALQUIER usuario logueado, incluido 'apoyo' (solo
+    // 'catalog'/'areas'/presets de panel están gateados a admin/líder en la
+    // interfaz, vía inv-admin.js). Antes la regla exigía isLider() para TODO
+    // /kv/{key} sin distinción — la captura de un técnico 'apoyo' se guardaba
+    // bien en su caché local (por eso no se notaba en su pantalla) pero el
+    // intento de sincronizar a Firestore era rechazado por permisos, no por
+    // estar offline, así que la cola de reintento fallaba para siempre y esos
+    // datos nunca llegaban al servidor ni se veían en otros dispositivos.
     match /kv/{key} {
       allow read: if isActive();
-      allow write: if isLider() && isActive(); // admin y líderes escriben KV
+      allow write: if isActive() && (key in ['stock', 'history'] || isLider());
     }
 
     // ── Configuración global ──────────────────────────────────────────────────
@@ -127,10 +159,13 @@ service cloud.firestore {
     // Única colección legible SIN sesión — solo guarda el subconjunto de datos
     // ya pensado para mostrarse al cliente final (sin seriales/notas/fotos
     // internas). Se escribe desde la app (qr.js) cada vez que un técnico abre
-    // la vista de QR del proyecto.
+    // la vista de QR del proyecto — el id del documento ES el projectId.
+    // Antes cualquier usuario activo podía sobrescribir la tarjeta de
+    // CUALQUIER proyecto (no solo el suyo) — acotado al mismo criterio de
+    // asignación que ya rige la edición de /projects/{id}.
     match /publicCards/{id} {
       allow read: if true;
-      allow write: if isActive();
+      allow write: if isActive() && (isLider() || isAsignadoAProyecto(id));
     }
 
     // ── Recordatorios globales ────────────────────────────────────────────────
