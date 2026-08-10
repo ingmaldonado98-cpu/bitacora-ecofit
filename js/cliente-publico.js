@@ -36,8 +36,8 @@ export async function renderClientePublico(projectId) {
     <div class="qr-info">
       <div class="qr-row"><span>Cliente</span><strong>${esc(data.cliente || '—')}</strong></div>
       <div class="qr-row"><span>Tipo de sistema</span><strong>${esc(data.tipo || '—')}</strong></div>
-      <div class="qr-row"><span>Capacidad</span><strong>${esc(data.capacidad || '—')}</strong></div>
-      <div class="qr-row"><span>Paneles</span><strong>${esc(String(data.paneles ?? '—'))}</strong></div>
+      ${data.capacidad ? `<div class="qr-row"><span>Capacidad</span><strong>${esc(data.capacidad)}</strong></div>` : ''}
+      ${data.paneles ? `<div class="qr-row"><span>Paneles</span><strong>${esc(String(data.paneles))}</strong></div>` : ''}
       ${data.baterias ? `<div class="qr-row"><span>Baterías</span><strong>${esc(String(data.baterias))}${data.capacidadBaterias ? ` · ${esc(data.capacidadBaterias)}` : ''}</strong></div>` : ''}
       ${data.fecha ? `<div class="qr-row"><span>Fecha de instalación</span><strong>${esc(data.fecha)}</strong></div>` : ''}
       ${data.equipos ? `<div class="qr-row"><span>Equipos</span><strong style="white-space:pre-line">${esc(data.equipos)}</strong></div>` : ''}

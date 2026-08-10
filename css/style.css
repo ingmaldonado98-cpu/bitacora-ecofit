@@ -1611,6 +1611,7 @@ body.scanner-native-active > *:not(.scanner-native-ui) { visibility: hidden; }
 .qr-info { text-align: left; margin-bottom: 16px; }
 .qr-row  { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .85rem; gap: 10px; }
 .qr-row span { color: var(--text-muted); flex-shrink: 0; }
+.qr-row-warn strong { color: #f5c400; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; text-align: right; }
 .qr-actions { display: flex; justify-content: center; }
 
 /* ── PDF export ───────────────────────────────────────────────────────────── */

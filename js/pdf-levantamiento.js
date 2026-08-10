@@ -159,11 +159,15 @@ window.exportarWordLevantamiento = async function(projectId) {
   const AREAS_ORDER = ['General', 'Sala/Comedor', 'Cocina', 'Habitación 1', 'Habitación 2', 'Habitación 3',
                        'Baño', 'Cuarto de lavado', 'Cochera', 'Entrada', 'Patio/Jardín', 'Sala de máquinas', 'Otro'];
 
-  if (tieneElec) {
+  // Un proyecto puede haber capturado autonomía/banco de baterías cuando era
+  // de otro tipo (p.ej. 'aislado') y luego migrar a 'bombeo' — esos datos ya
+  // capturados no deben desaparecer del reporte solo porque tieneElec es
+  // false para el tipo actual.
+  if (tieneElec || hayBaterias) {
     addSec('Eléctrico, consumo y cargas');
 
     // CFE y contrato
-    if (tieneCFE && (lev.nisServicio || lev.rpu || lev.titularServicio || lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga || lev.tarifaCFE)) {
+    if (tieneElec && tieneCFE && (lev.nisServicio || lev.rpu || lev.titularServicio || lev.tipoServicioCFE || lev.tierraFisica || lev.centroCarga || lev.tarifaCFE)) {
       if (lev.nisServicio)     addCampo('NIS (Núm. de Servicio CFE)', lev.nisServicio);
       if (lev.rpu)             addCampo('RPU', lev.rpu);
       if (lev.titularServicio) addCampo('Titular del servicio', lev.titularServicio);
@@ -195,7 +199,7 @@ window.exportarWordLevantamiento = async function(projectId) {
     }
 
     // Recibos CFE
-    if (recibos.length) {
+    if (tieneElec && recibos.length) {
       const conKwh = recibos.filter(r => r.kwh > 0);
       children.push(p('Recibos CFE', { bold: true }));
       const rows = recibos.map(r => [
@@ -218,7 +222,7 @@ window.exportarWordLevantamiento = async function(projectId) {
     }
 
     // Aparatos por zona
-    if (aparatos.length) {
+    if (tieneElec && aparatos.length) {
       children.push(p('Consumo por zona', { bold: true }));
       const zoneMap = {};
       aparatos.forEach(ap => { const z = ap.area || 'General'; if (!zoneMap[z]) zoneMap[z] = []; zoneMap[z].push(ap); });
@@ -243,7 +247,7 @@ window.exportarWordLevantamiento = async function(projectId) {
     }
 
     // Cargas a respaldar (críticas y secundarias)
-    if (cCrit.length || cSec.length) {
+    if (tieneElec && (cCrit.length || cSec.length)) {
       children.push(p('Cargas a respaldar', { bold: true }));
       const addCargas = (lista, label, colorHex, bgHex) => {
         if (!lista.length) return;

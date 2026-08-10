@@ -27,13 +27,18 @@ export async function renderQR(projectId, session) {
   // a publicCards/{id} (lectura pública vía firestore.rules) y el QR codifica
   // la URL a #cliente/{id}, no el JSON directo, para que cualquier cámara lo
   // abra como página en vez de mostrar texto crudo.
+  // Si aún no hay seriales de panel registrados, "0 paneles / 0.00 kWp" no es
+  // un dato real — es un hueco de captura. Omitir los campos en vez de
+  // mostrarle al cliente una capacidad falsa de cero.
   const cardData = {
     empresa: 'Ecofit Solar Solutions',
     proyecto: project.displayId,
     cliente: project.clientName || '',
     tipo: tipo?.label || project.tipoSistema || '',
-    capacidad: `${totalKwp.toFixed(2)} kWp`,
-    paneles: totalPaneles,
+    ...(totalPaneles > 0 ? {
+      capacidad: `${totalKwp.toFixed(2)} kWp`,
+      paneles: totalPaneles,
+    } : {}),
     fecha: fmtFecha(project.fechaInicio) || '',
     equipos: equiposPublicos,
     ...(baterias.length ? {
@@ -85,8 +90,10 @@ export async function renderQR(projectId, session) {
     <div class="qr-info">
       <div class="qr-row"><span>Cliente</span><strong>${esc(project.clientName || '—')}</strong></div>
       <div class="qr-row"><span>Tipo de sistema</span><strong>${esc(tipo?.label || '—')}</strong></div>
+      ${totalPaneles > 0 ? `
       <div class="qr-row"><span>Capacidad</span><strong>${totalKwp.toFixed(2)} kWp</strong></div>
-      <div class="qr-row"><span>Paneles</span><strong>${totalPaneles}</strong></div>
+      <div class="qr-row"><span>Paneles</span><strong>${totalPaneles}</strong></div>` : `
+      <div class="qr-row qr-row-warn"><span>Capacidad / Paneles</span><strong>${icon('warning', 13)} Sin seriales registrados aún — se omiten en la tarjeta del cliente</strong></div>`}
       ${baterias.length ? `<div class="qr-row"><span>Baterías</span><strong>${baterias.length}${totalBatKwh ? ` · ${totalBatKwh.toFixed(2)} kWh` : ''}</strong></div>` : ''}
       <div class="qr-row"><span>Fecha de instalación</span><strong>${fmtFecha(project.fechaInicio)}</strong></div>
       ${equiposPublicos ? `<div class="qr-row"><span>Equipos</span><strong style="white-space:pre-line">${esc(equiposPublicos)}</strong></div>` : ''}

@@ -113,6 +113,18 @@ window.crearUsuario = async function() {
   const btn = document.querySelector('#form-nuevo-usuario .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
 
+  // Re-verificar el tope de 10 usuarios con datos frescos justo antes de crear
+  // — el botón "+ Agregar" ya lo oculta en el render, pero eso solo protege
+  // contra el caso normal; una segunda sesión de admin abierta al mismo
+  // tiempo podría no haber refrescado su vista y seguir mostrando el botón.
+  const currentUsers = await users.getAll();
+  if (currentUsers.length >= 10) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Crear'; }
+    toast('Límite de 10 usuarios alcanzado', 'error');
+    navigate('#settings');
+    return;
+  }
+
   try {
     // 1. Crear en Firebase Auth (sin cerrar sesión actual)
     // Si se proporcionó email real, se usa como email de Firebase Auth (permite reset real)

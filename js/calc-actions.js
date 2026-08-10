@@ -57,8 +57,22 @@ window.calcSetDims = () => {
   if (!isNaN(ph)) cs.pH=ph;
 };
 
+// ── Firma del BOM — para detectar si es el mismo BOM ya descontado ────────
+// Solo material + cantidad importa para inventario, no el orden ni otros
+// campos del BOM (nombre, precio, etc.).
+function _bomSignature(bom) {
+  return (bom || [])
+    .filter(i => BOM_INV_MAP[i.partNum])
+    .map(i => `${i.partNum}:${i.qty}`)
+    .sort()
+    .join('|');
+}
+
 // ── Descuento automático de inventario ────────────────────────────────────
-async function _deductBOMFromStock(bom) {
+// deltaQtys: si se pasa, descuenta esa cantidad por invId en vez de item.qty
+// — se usa para re-guardar un BOM que cambió sin volver a restar lo que ya
+// se descontó la vez anterior (evita doble deducción del mismo material).
+async function _deductBOMFromStock(bom, deltaQtys = null) {
   const stockData = await invStore.get('stock');
   const stock     = { ...(stockData?.data ?? {}) };
   const month     = stockData?.month ?? '';
@@ -67,16 +81,37 @@ async function _deductBOMFromStock(bom) {
   for (const item of bom) {
     const invId = BOM_INV_MAP[item.partNum];
     if (!invId || stock[invId] === undefined) continue;
+    const qty = deltaQtys ? (deltaQtys[invId] || 0) : item.qty;
+    if (qty === 0) continue;
     const before = stock[invId] || 0;
-    const after  = Math.max(0, before - item.qty);
+    const after  = Math.max(0, before - qty);
     stock[invId] = after;
-    deducted.push({ invId, name: item.name, qty: item.qty, before, after });
+    deducted.push({ invId, name: item.name, qty, before, after });
   }
 
   if (deducted.length > 0) {
     await invStore.set('stock', { month, data: stock });
   }
   return deducted;
+}
+
+// Cantidad neta por invId a descontar cuando el BOM cambió respecto al ya
+// descontado — solo la diferencia (nunca negativa: si bajó, no se repone
+// automáticamente, eso es una decisión manual de bodega).
+function _deltaQtys(newBom, prevBom) {
+  const prevQty = {};
+  for (const item of (prevBom || [])) {
+    const invId = BOM_INV_MAP[item.partNum];
+    if (invId) prevQty[invId] = (prevQty[invId] || 0) + item.qty;
+  }
+  const delta = {};
+  for (const item of newBom) {
+    const invId = BOM_INV_MAP[item.partNum];
+    if (!invId) continue;
+    const diff = item.qty - (prevQty[invId] || 0);
+    if (diff > 0) delta[invId] = (delta[invId] || 0) + diff;
+  }
+  return delta;
 }
 
 window.calcGuardar = async () => {
@@ -89,8 +124,10 @@ window.calcGuardar = async () => {
     }
     cfg.aplicadoPor = { id: SX.session?.id, nombre: SX.session?.nombre || SX.session?.username || '—' };
     const prevDeduction    = SX.project?.projectConfig?.inventoryDeducted;
+    const prevBom          = SX.project?.projectConfig?.inventoryDeductedBom || [];
     const bom              = cfg.computed?.bom || [];
     const bomWithMapping   = bom.filter(i => BOM_INV_MAP[i.partNum]);
+    const bomCompacto      = bomWithMapping.map(i => ({ partNum: i.partNum, name: i.name, qty: i.qty }));
 
     await projects.update(SX.projectId, { projectConfig: cfg });
 
@@ -102,18 +139,31 @@ window.calcGuardar = async () => {
     });
 
     if (bomWithMapping.length > 0 && isAdmin(SX.session)) {
+      const esMismoBom = prevDeduction && _bomSignature(bom) === _bomSignature(prevBom);
+
+      // Mismo BOM que el ya descontado — descontar de nuevo restaría el
+      // mismo material dos veces (doble clic, reintento offline, o volver a
+      // guardar sin cambios). No hay nada nuevo que descontar.
+      if (esMismoBom) {
+        toast('BOM guardado — es igual al ya descontado, el inventario no cambia');
+        navigate(`#proyecto/${SX.projectId}`);
+        return;
+      }
+
       const msg = prevDeduction
-        ? `Este BOM ya fue descontado del inventario el ${new Date(prevDeduction).toLocaleDateString('es-MX')}.\n\n¿Volver a descontar los materiales actuales?`
+        ? `Este BOM ya fue descontado del inventario el ${new Date(prevDeduction).toLocaleDateString('es-MX')} y cambió desde entonces.\n\n¿Descontar solo la diferencia de materiales respecto a lo ya descontado?`
         : `¿Descontar estos ${bomWithMapping.length} materiales del inventario de bodega?\n\n(Confirma solo si los materiales ya salieron físicamente)`;
 
       const deduct = await confirmDialog(msg);
 
       if (deduct) {
-        const result = await _deductBOMFromStock(bom);
+        const result = await _deductBOMFromStock(bom, prevDeduction ? _deltaQtys(bom, prevBom) : null);
         await projects.update(SX.projectId, {
-          projectConfig: { ...cfg, inventoryDeducted: isoNow() }
+          projectConfig: { ...cfg, inventoryDeducted: isoNow(), inventoryDeductedBom: bomCompacto }
         });
-        toast(`✅ BOM guardado — ${result.length} ítem${result.length !== 1 ? 's' : ''} descontado${result.length !== 1 ? 's' : ''} del inventario`);
+        toast(result.length
+          ? `✅ BOM guardado — ${result.length} ítem${result.length !== 1 ? 's' : ''} descontado${result.length !== 1 ? 's' : ''} del inventario`
+          : '✅ BOM guardado — sin materiales nuevos que descontar');
         navigate(`#proyecto/${SX.projectId}`);
         return;
       }
