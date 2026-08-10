@@ -252,6 +252,11 @@ const _COMPONENTE = {
   aislado:          { nombre: 'Inversor/regulador',   lugar: 'lugar protegido de la intemperie' },
   bombeo:           { nombre: 'Controlador de bomba', lugar: 'lugar protegido de lluvia' },
   sistema_pequeno:  { nombre: 'Controlador de carga', lugar: 'lugar ventilado' },
+  // 'otro' no tiene topología estándar — antes caía al fallback de
+  // 'interconectado' y el paso 2.2 decía "Inversor... protegido de la luz
+  // solar directa", una etiqueta incorrecta para un sistema sin inversor
+  // de red definido. Wording neutro en vez de asumir una topología.
+  otro:             { nombre: 'Equipo principal',     lugar: 'lugar ventilado y protegido de la intemperie' },
 };
 const _BATERIAS_NOTA = 'Colocar las baterías en su rack. Conectar los puentes en serie/paralelo, instalar el fusible de protección dedicado y canalizar el cable de fuerza y el de datos (BMS) hacia la médula espinal.';
 function _infraEquiposBlock(tipo) {
@@ -309,6 +314,10 @@ const _cableAcBlocks = {
     { id: 'eq-02', n: 'Controlador de carga conectado entre paneles y batería' },
     { id: 'eq-03', n: 'Batería conectada (si incluye)' },
     { id: 'eq-04', n: 'Carga / equipo (congelador, etc.) conectado' },
+  ],
+  otro: [
+    { id: 'cable-ac', n: 'Conexión eléctrica principal verificada' },
+    { id: 'cable-ac2', n: 'Cableado de salida tendido y protegido según el diseño del sistema' },
   ],
 };
 
@@ -389,6 +398,7 @@ const _ENERGIZADO_ITEMS = {
   bombeo:           [{ id: 'ctrl-04', n: 'Parámetros configurados (voltaje, frecuencia, protecciones)' },
                       { id: 'bom-04', n: 'Prueba de operación — flujo verificado' }],
   sistema_pequeno:  [{ id: 'eq-05', n: 'Sistema energizado — sin fallas' }],
+  otro:             [{ id: 'eq-05', n: 'Sistema energizado — sin fallas' }],
 };
 
 // Interconexión CFE en modo Zero Export — sin contrato de interconexión vigente.

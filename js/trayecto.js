@@ -81,8 +81,9 @@ function buildPasos(project, id) {
   });
 
   // ── Paso: Dimensionamiento eléctrico — memoria técnica preliminar ───────────
-  // No aplica a ampliación (no re-dimensiona un sistema ya existente) ni a
-  // "otro" (sin modelo eléctrico estándar) — omitir el paso en vez de dejarlo
+  // No aplica a ampliación (no re-dimensiona un sistema ya existente), "otro"
+  // (sin modelo eléctrico estándar) ni sistema_pequeño (instalación DC simple,
+  // sin cargas críticas que calcular) — omitir el paso en vez de dejarlo
   // permanentemente incompleto.
   if (!SIN_DIMENSIONAMIENTO.includes(project.tipoSistema)) {
     pasos.push({

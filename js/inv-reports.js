@@ -4,7 +4,7 @@ import { toast } from './utils.js';
 import { projects } from './db.js';
 import { S, SEM, avColor, avInitials } from './inv-state.js';
 import { CAT_C } from './inv-data.js';
-import { exportarHistorial } from './inv-captura.js';
+import { exportarHistorial, loadXLSX } from './inv-captura.js';
 
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -311,31 +311,27 @@ window._invGenConsumo = async function() {
   window._consumoExportData = { mes, anio, grupos, cerrados, proyectosSinBOM };
 };
 
-window._invExportConsumo = async function() {
+// Reusa loadXLSX de inv-captura.js — antes este archivo cargaba su propia
+// copia de la librería (ESM, cdn.sheetjs.com 0.20.1) mientras inv-captura.js
+// usaba otra (UMD, cdnjs 0.18.5): dos CDNs y versiones distintas para el
+// mismo propósito en el mismo módulo, duplicando la superficie de falla
+// offline. loadXLSX ya cachea window.XLSX y maneja timeout/offline/CDN-caído.
+window._invExportConsumo = function() {
   const d = window._consumoExportData;
   if (!d) { toast('Genera el reporte primero', 'error'); return; }
 
-  if (!navigator.onLine) { toast('Sin conexión — conéctate para generar el Excel', 'error', 6000); return; }
-  toast('Preparando Excel…', 'info', 3000);
-  let XLSX;
-  try {
-    const mod = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
-    XLSX = mod;
-  } catch (e) {
-    // Online pero el CDN no respondió (bloqueado/lento): distinguir del offline real
-    toast('No se pudo cargar el exportador (CDN inaccesible) — reintenta', 'error', 6000);
-    return;
-  }
+  loadXLSX(() => {
+    if (!window.XLSX) return;
+    const rows = [['Material','Parte #','Cantidad','Unidad','Categoría']];
+    Object.entries(d.grupos).forEach(([grp, items]) => {
+      items.forEach(it => rows.push([it.name, it.partNum, it.qty, it.unit, grp]));
+    });
 
-  const rows = [['Material','Parte #','Cantidad','Unidad','Categoría']];
-  Object.entries(d.grupos).forEach(([grp, items]) => {
-    items.forEach(it => rows.push([it.name, it.partNum, it.qty, it.unit, grp]));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:40},{wch:16},{wch:10},{wch:8},{wch:18}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `${MESES_ES[d.mes]} ${d.anio}`);
+    XLSX.writeFile(wb, `Consumo_${MESES_ES[d.mes]}_${d.anio}.xlsx`);
+    toast('✅ Excel exportado');
   });
-
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:40},{wch:16},{wch:10},{wch:8},{wch:18}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, `${MESES_ES[d.mes]} ${d.anio}`);
-  XLSX.writeFile(wb, `Consumo_${MESES_ES[d.mes]}_${d.anio}.xlsx`);
-  toast('✅ Excel exportado');
 };

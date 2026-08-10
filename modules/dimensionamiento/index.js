@@ -208,10 +208,17 @@ export function calcBombeo(lev) {
 }
 
 // Tipos sin memoria técnica propia: 'ampliacion' añade paneles a un sistema ya
-// dimensionado (no se re-dimensiona desde cero) y 'otro' no tiene un modelo
-// eléctrico estándar que calcular. No es un error de datos faltantes — el
-// módulo simplemente no aplica a estos tipos.
-export const SIN_DIMENSIONAMIENTO = ['ampliacion', 'otro'];
+// dimensionado (no se re-dimensiona desde cero), 'otro' no tiene un modelo
+// eléctrico estándar que calcular, y 'sistema_pequeno' captura una topología
+// DC simple (voltajeSistemaDC/arregloPaneles/arregloBaterias) que nunca
+// incluye cargasCriticas/cargasSecundarias — el dato que calcAislado()
+// necesita para dimensionar. Antes 'sistema_pequeno' se enrutaba a
+// calcAislado() y SIEMPRE devolvía error (estado irresoluble: ningún campo
+// del levantamiento de ese tipo puede satisfacer el requisito). No es un
+// error de datos faltantes — el módulo simplemente no aplica a estos tipos,
+// igual que Auditoría y Progreso de obra ya están ocultos para
+// 'sistema_pequeno' en el resto de la app.
+export const SIN_DIMENSIONAMIENTO = ['ampliacion', 'otro', 'sistema_pequeno'];
 
 // ── Dispatcher principal ──────────────────────────────────────────────────────
 export function calcDimensionamiento(project) {
@@ -219,7 +226,7 @@ export function calcDimensionamiento(project) {
   const tipo = project.tipoSistema;
   if (tipo === 'interconectado')                    return calcInterconectado(lev);
   if (tipo === 'hibrido' || tipo === 'hibrido_respaldo') return calcHibrido(lev);
-  if (tipo === 'aislado' || tipo === 'sistema_pequeno')  return calcAislado(lev);
+  if (tipo === 'aislado')                           return calcAislado(lev);
   if (tipo === 'bombeo')                            return calcBombeo(lev);
   if (SIN_DIMENSIONAMIENTO.includes(tipo))          return { noAplica: true };
   return { error: `Tipo de sistema "${tipo}" no reconocido.` };
@@ -250,7 +257,7 @@ export function detectarRiesgos(project) {
   if (lev.distInversorPaneles > 30)
     r.push({ nivel:'warn', msg:`Distancia inversor→paneles de ${lev.distInversorPaneles} m — verificar sección de cable DC para caída ≤ 1%.` });
 
-  if ((tipo === 'aislado' || tipo === 'sistema_pequeno') && !lev.autonomia)
+  if (tipo === 'aislado' && !lev.autonomia)
     r.push({ nivel:'warn', msg:'Días de autonomía no definidos en Levantamiento — se asumió 2 días para el cálculo del banco.' });
 
   if (tipo === 'bombeo' && !lev.profundidadPozo)

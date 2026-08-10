@@ -183,10 +183,28 @@ window.guardarLevantamiento = async function(e, projectId) {
     // Aviso no-bloqueante de campos marcados CRÍTICO que quedaron vacíos —
     // se guarda igual (a veces el dato no está disponible aún en campo),
     // pero se le avisa al técnico para que no se le pierda sin darse cuenta.
-    if (tipo === 'aislado') {
-      const faltantes = [];
-      if (!newLev.autonomia)       faltantes.push('Autonomía requerida');
-      if (!newLev.crecimientoFuturo) faltantes.push('Crecimiento futuro esperado');
+    // Antes solo existía para 'aislado'; extendido a bombeo e hibrido_respaldo
+    // porque calcBombeo()/calcHibrido() (modules/dimensionamiento/index.js)
+    // usan estos mismos campos con un valor por defecto SILENCIOSO cuando
+    // faltan (30m de pozo, 5 m³/h, 6h de bombeo, 4h de autonomía) — sin este
+    // aviso el técnico no se entera de que el sizing quedó calculado con un
+    // supuesto, no con el dato real del sitio.
+    const _CAMPOS_CRITICOS = {
+      aislado: [
+        ['autonomia', 'Autonomía requerida'],
+        ['crecimientoFuturo', 'Crecimiento futuro esperado'],
+      ],
+      bombeo: [
+        ['profundidadPozo', 'Profundidad del pozo'],
+        ['caudal', 'Caudal requerido'],
+        ['horasBombeo', 'Horas de bombeo/día'],
+      ],
+      hibrido_respaldo: [['autonomia', 'Autonomía requerida']],
+      hibrido:          [['autonomia', 'Autonomía requerida']],
+    };
+    const criticos = _CAMPOS_CRITICOS[tipo];
+    if (criticos) {
+      const faltantes = criticos.filter(([campo]) => !newLev[campo]).map(([, label]) => label);
       if (faltantes.length) {
         toast(`⚠ Faltan campos críticos: ${faltantes.join(', ')}`, 'error', 6000);
       }

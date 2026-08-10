@@ -50,6 +50,8 @@ export async function renderDimensionamiento(projectId, session) {
       <strong>No aplica para este tipo de proyecto</strong>
       <p>${project.tipoSistema === 'ampliacion'
         ? 'Una ampliación añade paneles a un sistema ya dimensionado — no requiere una memoria técnica propia. Consulta el dimensionamiento del proyecto origen si necesitas esos datos.'
+        : project.tipoSistema === 'sistema_pequeno'
+        ? 'Un sistema pequeño (congelador/refrigerador solar) es una instalación DC simple — no requiere una memoria técnica con cálculo de cargas críticas como los sistemas mayores.'
         : 'El tipo de sistema "Otro" no tiene un modelo eléctrico estándar para calcular automáticamente.'}</p>
     </div>
   </div>` : res.error ? `
