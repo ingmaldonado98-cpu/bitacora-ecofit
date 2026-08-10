@@ -15,6 +15,7 @@ const TIPOS_EQUIPO = [
   { value: '',              label: '— Seleccionar tipo —' },
   { value: 'inversor',      label: 'Inversor' },
   { value: 'microinversor', label: 'Microinversor' },
+  { value: 'vfd',           label: 'Variador de Frecuencia (VFD)' },
   { value: 'bateria',       label: 'Batería' },
   { value: 'controladora',  label: 'Controladora / MPPT' },
   { value: 'cargador',      label: 'Cargador' },
@@ -42,11 +43,17 @@ const _EQUIPOS_POR_SISTEMA = {
   hibrido:          ['inversor', 'bateria'],
   respaldo:         ['inversor', 'bateria'],
   aislado:          ['inversor', 'bateria', 'controladora'],
-  bombeo:           ['inversor'],
+  // Bombeo no tiene inversor de red — el equipo real es el variador de
+  // frecuencia (VFD), que toma DC directo de los paneles y acciona el
+  // motor de la bomba (ver modules/dimensionamiento/index.js calcBombeo).
+  // Sugerir 'inversor' aquí era un desajuste de vocabulario con el resto
+  // de la app.
+  bombeo:           ['vfd'],
   sistema_pequeno:  ['controladora', 'bateria', 'inversor'],
 };
 const _TIPO_LABEL_EQ = {
   inversor: 'Inversor', bateria: 'Batería', controladora: 'Controladora / MPPT',
+  vfd: 'Variador de Frecuencia (VFD)',
 };
 
 // Separa un texto libre ("Victron Phoenix 800VA") en {marca, modelo} best-effort:
