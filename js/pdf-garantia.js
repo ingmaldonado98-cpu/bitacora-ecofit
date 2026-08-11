@@ -5,7 +5,7 @@ import { projects } from './db.js';
 import { fmtFecha, toast, fotoToImageBuffer } from './utils.js';
 import { GARANTIAS_STD } from './garantia.js';
 import { newDoc, heading1, heading2, p, table, hr, imageBlock,
-         AlignmentType, saveDocx } from './word-helpers.js';
+         AlignmentType, saveDocx, ensureDocxLoaded } from './word-helpers.js';
 
 const VERDE = '16a34a';
 
@@ -18,6 +18,7 @@ const TIPOS_EQUIPO_LABEL = {
 export async function exportarCertificadoGarantia(projectId) {
   const project = await projects.getById(projectId);
   if (!project) { toast('Proyecto no encontrado', 'error'); return; }
+  await ensureDocxLoaded();
 
   const g  = project.garantia || {};
   const fi = g.fechaInstalacion || '';

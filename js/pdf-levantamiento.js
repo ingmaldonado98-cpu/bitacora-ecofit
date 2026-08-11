@@ -4,7 +4,7 @@
 import { projects } from './db.js';
 import { esc, fmtFecha, TIPOS_SISTEMA, fotoToImageBuffer } from './utils.js';
 import { newDoc, heading1, heading2, campo, p, table, chip, hr, imageBlock,
-         Paragraph, TextRun, AlignmentType, saveDocx } from './word-helpers.js';
+         Paragraph, TextRun, AlignmentType, saveDocx, ensureDocxLoaded } from './word-helpers.js';
 
 const VERDE = '16a34a';
 
@@ -12,6 +12,7 @@ window.exportarWordLevantamiento = async function(projectId) {
   const project = await projects.getById(projectId);
   const { toast } = await import('./utils.js');
   if (!project) { toast('Proyecto no encontrado', 'error'); return; }
+  await ensureDocxLoaded();
 
   const lev  = project.documentacion?.levantamiento || {};
   const tipo = TIPOS_SISTEMA[project.tipoSistema];

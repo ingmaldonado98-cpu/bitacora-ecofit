@@ -97,7 +97,6 @@ const APP_SHELL = [
   './js/vendor/firebase-auth.js',
   './js/vendor/firebase-firestore.js',
   './js/vendor/firebase-storage.js',
-  './js/vendor/zxing.min.js',
   './js/vendor/qrcode.min.js',
   './js/vendor/jspdf.umd.min.js',
   './js/vendor/docx.mjs',
@@ -156,6 +155,16 @@ self.addEventListener('fetch', e => {
   // Fotos de Firebase Storage → network-first con caché propia (ver offline)
   if (url.hostname === 'firebasestorage.googleapis.com') {
     e.respondWith(photoNetworkFirst(e.request));
+    return;
+  }
+
+  // Fuentes de Google (CSS + binarios) → casi nunca cambian; cache-first evita
+  // pagar una ida y vuelta de red en cada carga solo por la tipografía. Antes
+  // caían en el bucket networkFirst genérico de abajo (coincidían con los
+  // substring checks de 'googleapis.com'/'gstatic.com') igual que las llamadas
+  // dinámicas a Firestore/Auth, que sí necesitan estar siempre frescas.
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    e.respondWith(cacheFirst(e.request));
     return;
   }
 

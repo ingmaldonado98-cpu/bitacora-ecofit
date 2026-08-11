@@ -7,7 +7,7 @@ import { fmtFecha, toast, fotoToImageBuffer } from './utils.js';
 import { getExecBlocks, BLOQUE_LABELS, BLOQUE_DESC } from '../modules/checklist/index.js';
 import { computeBloqueStatus, SITIO_BLOQUE_PRIMARIA } from './doc-exec.js';
 import { newDoc, heading1, heading2, p, hr, imageBlock, saveDocx,
-         Paragraph, TextRun, AlignmentType } from './word-helpers.js';
+         Paragraph, TextRun, AlignmentType, ensureDocxLoaded } from './word-helpers.js';
 
 const VERDE = '16a34a';
 const SITIO_LABEL = { techo: 'Techo', centrosCarga: 'Centros de carga', zonaDelSistema: 'Zona del sistema' };
@@ -28,6 +28,7 @@ function _fotosDeSitio(project, sitio) {
 export async function exportarAvanceObra(projectId) {
   const project = await projects.getById(projectId);
   if (!project) { toast('Proyecto no encontrado', 'error'); return; }
+  await ensureDocxLoaded();
 
   const cl    = project.checklistData || {};
   const techo = project.projectConfig?.techo || cl.techo || 'cemento';

@@ -6,7 +6,7 @@ import { fmtFecha, toast } from './utils.js';
 import { cs, SX, getRowData } from './calc-state.js';
 import { calcBOM, buildDiagramSVG, buildGuiaData, buildTorqueTable } from '../modules/calculadora/index.js';
 import { newDoc, heading1, heading2, p, table, hr, ImageRun, Paragraph,
-         AlignmentType, saveDocx } from './word-helpers.js';
+         AlignmentType, saveDocx, ensureDocxLoaded } from './word-helpers.js';
 
 const VERDE = '16a34a';
 
@@ -54,6 +54,7 @@ export async function svgToPngDataUri(svgString, width, height) {
 
 export async function exportarBOMCalculadora() {
   if (!cs.estructura) { toast('No hay datos de la Calculadora para exportar', 'error'); return; }
+  await ensureDocxLoaded();
 
   const rd      = getRowData();
   const pW      = cs.pW || 1.134;

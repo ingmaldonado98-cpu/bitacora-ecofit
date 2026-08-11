@@ -7,7 +7,7 @@ import { fmtFecha, TIPOS_SISTEMA, ESTADOS, fotoToImageBuffer } from './utils.js'
 import { checklistRapidoPara, checklistFormalPara, MEDICIONES } from './aud-data.js';
 import { getSerialesFlat } from './gar-paneles.js';
 import { newDoc, heading1, heading2, campo, p, table, hr, imageBlock, pageBreak,
-         Paragraph, TextRun, ImageRun, AlignmentType, BorderStyle, saveDocx } from './word-helpers.js';
+         Paragraph, TextRun, ImageRun, AlignmentType, BorderStyle, saveDocx, ensureDocxLoaded } from './word-helpers.js';
 import { getExecBlocks, BLOQUE_LABELS } from '../modules/checklist/index.js';
 import { MESES_CORTO } from './lev-consumo.js';
 import { calcDimensionamiento, detectarRiesgos } from '../modules/dimensionamiento/index.js';
@@ -26,6 +26,7 @@ const ESTADOS_LABEL = Object.fromEntries(Object.entries(ESTADOS).map(([k, v]) =>
 window.exportarWordTecnico = async function(projectId) {
   const project = await projects.getById(projectId);
   if (!project) { const { toast } = await import('./utils.js'); toast('Proyecto no encontrado', 'error'); return; }
+  await ensureDocxLoaded();
 
   const sec   = (id) => document.getElementById(id)?.checked;
   const tipo  = TIPOS_SISTEMA[project.tipoSistema];

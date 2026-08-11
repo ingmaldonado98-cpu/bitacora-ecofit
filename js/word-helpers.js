@@ -8,11 +8,34 @@
 // con `Packer.toBlob`, produciendo un .docx real (formato ZIP/OOXML) que abre en cualquier
 // Word (escritorio, móvil, Word Online).
 
-import {
-  Document, Paragraph, TextRun, HeadingLevel, AlignmentType,
-  Table, TableRow, TableCell, WidthType, ShadingType, BorderStyle,
-  ImageRun, Packer, PageBreak,
-} from './vendor/docx.mjs';
+// docx.mjs pesa ~218 KB (el más pesado de toda la app) y antes se importaba
+// de forma estática — se descargaba en TODA carga de la app (vía garantia.js
+// → pdf-garantia.js → aquí, y documentacion.js → pdf-avance.js → aquí),
+// aunque la mayoría de las sesiones nunca exportan un Word. Ahora se carga
+// dinámicamente una sola vez, la primera vez que alguno de los 5
+// generadores realmente se usa. Las funciones de este archivo (heading1,
+// campo, p, table, etc.) se llaman de forma síncrona cientos de veces al
+// construir un documento — por eso quedan como variables de módulo
+// reasignadas por ensureDocxLoaded(), en vez de convertir cada helper en
+// async. Los 5 puntos de entrada (exportarWordLevantamiento,
+// exportarCertificadoGarantia, exportarAvanceObra, exportarBOMCalculadora,
+// exportarWordTecnico) deben hacer `await ensureDocxLoaded()` ANTES de
+// llamar a cualquier otro helper de este archivo.
+let Document, Paragraph, TextRun, HeadingLevel, AlignmentType,
+    Table, TableRow, TableCell, WidthType, ShadingType, BorderStyle,
+    ImageRun, Packer, PageBreak;
+
+let _docxLoaded = false;
+export async function ensureDocxLoaded() {
+  if (_docxLoaded) return;
+  const docx = await import('./vendor/docx.mjs');
+  ({
+    Document, Paragraph, TextRun, HeadingLevel, AlignmentType,
+    Table, TableRow, TableCell, WidthType, ShadingType, BorderStyle,
+    ImageRun, Packer, PageBreak,
+  } = docx);
+  _docxLoaded = true;
+}
 
 export {
   Document, Paragraph, TextRun, HeadingLevel, AlignmentType,
