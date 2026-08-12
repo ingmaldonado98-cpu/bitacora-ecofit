@@ -326,70 +326,51 @@ async function _processQueueImpl(silent) {
 
       switch (item.op) {
         case 'fotoSistema':
-          p.garantia = p.garantia || {};
-          p.garantia.fotoSistema = url;
-          await projects.update(item.projectId, { garantia: p.garantia });
+          await projects.setField(item.projectId, 'garantia.fotoSistema', url);
           break;
 
         case 'auditoriaDocFirmado':
-          p.auditoria = p.auditoria || {};
-          p.auditoria.docFirmado = url;
-          await projects.update(item.projectId, { auditoria: p.auditoria });
+          await projects.setField(item.projectId, 'auditoria.docFirmado', url);
           break;
 
         case 'estructuraFoto': {
           const { campo } = item.opArgs || {};
-          p.garantia = p.garantia || {};
-          p.garantia.estructura = p.garantia.estructura || {};
-          p.garantia.estructura[campo] = url;
-          await projects.update(item.projectId, { garantia: p.garantia });
+          await projects.setField(item.projectId, `garantia.estructura.${campo}`, url);
           break;
         }
 
         case 'fotoArregloPaneles': {
           const { tipo } = item.opArgs || {};
-          p.garantia = p.garantia || {};
-          p.garantia.paneles = p.garantia.paneles || {};
           const campo = tipo === 'frontal' ? 'fotoArregloFrontal' : 'fotoArregloPerfil';
-          p.garantia.paneles[campo] = url;
-          await projects.update(item.projectId, { garantia: p.garantia });
+          await projects.setField(item.projectId, `garantia.paneles.${campo}`, url);
           break;
         }
 
         case 'fotoTecnica': {
           const { key, itemId } = item.opArgs;
-          p.garantia = p.garantia || {};
-          p.garantia.fotosTecnicas = p.garantia.fotosTecnicas || {};
-          const arr = Array.isArray(p.garantia.fotosTecnicas[key])
-            ? p.garantia.fotosTecnicas[key]
-            : (p.garantia.fotosTecnicas[key] ? [{ url: p.garantia.fotosTecnicas[key] }] : []);
+          const raw = p.garantia?.fotosTecnicas?.[key];
+          const arr = Array.isArray(raw) ? raw : (raw ? [{ url: raw }] : []);
           const foto = arr.find(f => f.id === itemId);
           if (foto) { foto.url = url; delete foto.pending; delete foto.pendingId; }
-          p.garantia.fotosTecnicas[key] = arr;
-          await projects.update(item.projectId, { garantia: p.garantia });
+          await projects.setField(item.projectId, `garantia.fotosTecnicas.${key}`, arr);
           break;
         }
 
         case 'fotoAdicional': {
           const { itemId } = item.opArgs;
-          p.garantia = p.garantia || {};
-          const arr = p.garantia.fotosAdicionales || [];
+          const arr = p.garantia?.fotosAdicionales || [];
           const foto = arr.find(f => f.id === itemId);
           if (foto) { foto.data = url; delete foto.pending; delete foto.pendingId; }
-          p.garantia.fotosAdicionales = arr;
-          await projects.update(item.projectId, { garantia: p.garantia });
+          await projects.setField(item.projectId, 'garantia.fotosAdicionales', arr);
           break;
         }
 
         case 'fotoFase': {
           const { fase, itemId } = item.opArgs;
-          p.documentacion = p.documentacion || {};
-          p.documentacion.fases = p.documentacion.fases || {};
-          const arr = p.documentacion.fases[fase] || [];
+          const arr = p.documentacion?.fases?.[fase] || [];
           const foto = arr.find(f => f.id === itemId);
           if (foto) { foto.data = url; delete foto.pending; delete foto.pendingId; }
-          p.documentacion.fases[fase] = arr;
-          await projects.update(item.projectId, { documentacion: p.documentacion });
+          await projects.setField(item.projectId, `documentacion.fases.${fase}`, arr);
           break;
         }
 
@@ -398,85 +379,65 @@ async function _processQueueImpl(silent) {
           break;
 
         case 'sombraFoto':
-          p.documentacion = p.documentacion || {};
-          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-          p.documentacion.levantamiento.sombras = p.documentacion.levantamiento.sombras || {};
-          p.documentacion.levantamiento.sombras.foto = url;
-          await projects.update(item.projectId, { documentacion: p.documentacion });
+          await projects.setField(item.projectId, 'documentacion.levantamiento.sombras.foto', url);
           break;
 
         case 'fotoMedidor':
-          p.documentacion = p.documentacion || {};
-          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-          p.documentacion.levantamiento.fotoMedidor = url;
-          await projects.update(item.projectId, { documentacion: p.documentacion });
+          await projects.setField(item.projectId, 'documentacion.levantamiento.fotoMedidor', url);
           break;
 
         case 'fotoLev': {
           const { itemId: levItemId } = item.opArgs || {};
-          p.documentacion = p.documentacion || {};
-          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-          const fotosLev = p.documentacion.levantamiento.fotosLevantamiento || [];
+          const fotosLev = p.documentacion?.levantamiento?.fotosLevantamiento || [];
           const fLev = fotosLev.find(f => f.id === levItemId);
           if (fLev) { fLev.url = url; delete fLev.pending; delete fLev.pendingId; }
-          p.documentacion.levantamiento.fotosLevantamiento = fotosLev;
-          await projects.update(item.projectId, { documentacion: p.documentacion });
+          await projects.setField(item.projectId, 'documentacion.levantamiento.fotosLevantamiento', fotosLev);
           break;
         }
 
         case 'sunSeeker': {
           const { itemId } = item.opArgs || {};
-          p.documentacion = p.documentacion || {};
-          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-          const arr = p.documentacion.levantamiento.sunSeeker || [];
+          const arr = p.documentacion?.levantamiento?.sunSeeker || [];
           const f = arr.find(x => x.id === itemId);
           if (f) { f.url = url; delete f.pending; delete f.pendingId; }
-          p.documentacion.levantamiento.sunSeeker = arr;
-          await projects.update(item.projectId, { documentacion: p.documentacion });
+          await projects.setField(item.projectId, 'documentacion.levantamiento.sunSeeker', arr);
           break;
         }
 
         case 'dronFoto': {
           const { fase, itemId } = item.opArgs || {};
-          p.documentacion = p.documentacion || {};
-          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-          const dron = p.documentacion.levantamiento.dron;
+          const dron = p.documentacion?.levantamiento?.dron;
           const f = dron?.[fase]?.fotos?.find(x => x.id === itemId);
           if (f) { f.url = url; delete f.pending; delete f.pendingId; }
-          await projects.update(item.projectId, { documentacion: p.documentacion });
+          if (dron) await projects.setField(item.projectId, 'documentacion.levantamiento.dron', dron);
           break;
         }
 
         case 'fotoCierrePaso': {
           const { blockId, slotId } = item.opArgs || {};
-          p.checklistData = p.checklistData || {};
-          p.checklistData.fotosCierre = p.checklistData.fotosCierre || {};
-          const slot = p.checklistData.fotosCierre[blockId]?.[slotId];
-          if (slot && slot.pendingId === item.id) { slot.url = url; delete slot.pending; delete slot.pendingId; }
-          await projects.update(item.projectId, { checklistData: p.checklistData });
+          const slot = p.checklistData?.fotosCierre?.[blockId]?.[slotId];
+          if (slot && slot.pendingId === item.id) {
+            const updated = { ...slot, url, pending: undefined, pendingId: undefined };
+            delete updated.pending; delete updated.pendingId;
+            await projects.setField(item.projectId, `checklistData.fotosCierre.${blockId}.${slotId}`, updated);
+          }
           break;
         }
 
         case 'fotoArea': {
           const { areaIdx, itemId } = item.opArgs || {};
-          p.documentacion = p.documentacion || {};
-          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-          const areasQ = p.documentacion.levantamiento.areasTecho || [];
+          const areasQ = p.documentacion?.levantamiento?.areasTecho || [];
           const fotoArea = areasQ[areaIdx]?.fotos?.find(f => f.id === itemId);
           if (fotoArea) { fotoArea.url = url; delete fotoArea.pending; delete fotoArea.pendingId; }
-          p.documentacion.levantamiento.areasTecho = areasQ;
-          await projects.update(item.projectId, { documentacion: p.documentacion });
+          await projects.setField(item.projectId, 'documentacion.levantamiento.areasTecho', areasQ);
           break;
         }
 
         case 'reciboFoto': {
-          p.documentacion = p.documentacion || {};
-          p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-          const recibos = p.documentacion.levantamiento.recibos || [];
+          const recibos = p.documentacion?.levantamiento?.recibos || [];
           const recibo = recibos.find(r => r.foto?.pendingId === item.id);
           if (recibo) recibo.foto = url;
-          p.documentacion.levantamiento.recibos = recibos;
-          await projects.update(item.projectId, { documentacion: p.documentacion });
+          await projects.setField(item.projectId, 'documentacion.levantamiento.recibos', recibos);
           break;
         }
 

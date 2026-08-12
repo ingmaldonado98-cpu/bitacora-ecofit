@@ -376,7 +376,7 @@ window.guardarVoc = async function(projectId) {
   }
 
   const session = session0;
-  const data = { ...window._vocTemp, savedAt: isoNow(), savedBy: session?.uid || '' };
+  const data = { ...window._vocTemp, savedAt: isoNow(), savedBy: session?.id || '' };
   await projects.setField(projectId, 'garantia.validacionVoc', data);
   const resMsg = data.resultado === 'seguro' ? 'configuración segura'
                : data.resultado === 'excede' ? '⚠️ excede el límite (excepción de admin)'

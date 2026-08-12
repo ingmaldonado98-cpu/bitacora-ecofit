@@ -197,7 +197,7 @@ window.guardarEstructura = async function(e, projectId) {
   e.preventDefault();
   const fd = new FormData(e.target);
   const p = await projects.getById(projectId);
-  p.garantia.estructura = {
+  const estructura = {
     marca:             fd.get('marca'),
     sistemaEstructural:fd.get('sistemaEstructural'),
     modelo:            fd.get('modelo').trim(),
@@ -209,7 +209,9 @@ window.guardarEstructura = async function(e, projectId) {
     fotoAngulo:        _eqFotos.angulo   || p.garantia.estructura?.fotoAngulo   || null,
     notas:             fd.get('notas').trim(),
   };
-  await projects.update(projectId, { garantia: p.garantia });
+  // setField puntual — no pisa garantia.paneles/equipos/notas si otro técnico
+  // edita el mismo proyecto al mismo tiempo.
+  await projects.setField(projectId, 'garantia.estructura', estructura);
 
   // Reparchar items de cola con el projectId real y el campo correcto —
   // mismo fix que ya tiene gar-equipos.js::guardarEquipo (capEqFoto sube con
@@ -231,7 +233,7 @@ window.guardarEstructura = async function(e, projectId) {
 
   logChange(projectId, {
     modulo: 'Garantía', accion: 'estructura guardada',
-    detalle: `${p.garantia.estructura.marca} — ${p.garantia.estructura.sistemaEstructural}`,
+    detalle: `${estructura.marca} — ${estructura.sistemaEstructural}`,
     quien: await getSession(),
   });
 

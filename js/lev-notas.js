@@ -31,15 +31,15 @@ window._submitNotaDoc = async function(projectId) {
   const session = await getSession();
   const p = await projects.getById(projectId);
   const nota = { id: uuid(), texto, autorId: session?.id, autorNombre: session?.nombre || session?.username, createdAt: isoNow() };
-  p.documentacion.notas = [...(p.documentacion.notas || []), nota];
-  await projects.update(projectId, { documentacion: p.documentacion });
+  const notas = [...(p.documentacion.notas || []), nota];
+  await projects.setField(projectId, 'documentacion.notas', notas);
   logChange(projectId, { modulo: 'Documentación', accion: 'nota agregada', detalle: texto.slice(0, 60), quien: session });
-  document.getElementById('dnotas-list').innerHTML = renderNotasDoc(p.documentacion.notas, session, projectId);
+  document.getElementById('dnotas-list').innerHTML = renderNotasDoc(notas, session, projectId);
   document.getElementById('dnotas-form').style.display = 'none';
   document.getElementById('dnotas-texto').value = '';
   // Actualizar badge del tab
   const tabBtn = document.querySelector('[data-tab="d-notas"]');
-  if (tabBtn) tabBtn.innerHTML = `Notas<span class="tab-badge tab-ok">${p.documentacion.notas.length}</span>`;
+  if (tabBtn) tabBtn.innerHTML = `Notas<span class="tab-badge tab-ok">${notas.length}</span>`;
   toast('✅ Nota guardada');
 };
 
@@ -47,12 +47,12 @@ window._delNotaDoc = async function(projectId, idx) {
   if (!await confirmDialog('¿Eliminar esta nota?')) return;
   const session = await getSession();
   const p = await projects.getById(projectId);
-  p.documentacion.notas = (p.documentacion.notas || []).filter((_,i) => i !== idx);
-  await projects.update(projectId, { documentacion: p.documentacion });
+  const notas = (p.documentacion.notas || []).filter((_,i) => i !== idx);
+  await projects.setField(projectId, 'documentacion.notas', notas);
   logChange(projectId, { modulo: 'Documentación', accion: 'nota eliminada', quien: session });
-  document.getElementById('dnotas-list').innerHTML = renderNotasDoc(p.documentacion.notas, session, projectId);
+  document.getElementById('dnotas-list').innerHTML = renderNotasDoc(notas, session, projectId);
   const tabBtn = document.querySelector('[data-tab="d-notas"]');
-  if (tabBtn) tabBtn.innerHTML = p.documentacion.notas.length
-    ? `Notas<span class="tab-badge tab-ok">${p.documentacion.notas.length}</span>` : 'Notas';
+  if (tabBtn) tabBtn.innerHTML = notas.length
+    ? `Notas<span class="tab-badge tab-ok">${notas.length}</span>` : 'Notas';
   toast('Nota eliminada');
 };

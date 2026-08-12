@@ -328,14 +328,14 @@ window._submitNotaGarantia = async function(projectId) {
   const session = await getSession();
   const p = await projects.getById(projectId);
   const nota = { id: uuid(), texto, autorId: session?.id, autorNombre: session?.nombre || session?.username, createdAt: isoNow() };
-  p.garantia.notas = [...(p.garantia.notas || []), nota];
-  await projects.update(projectId, { garantia: p.garantia });
-  document.getElementById('gnotas-list').innerHTML = renderNotas(p.garantia.notas, session, 'garantia', projectId);
+  const notas = [...(p.garantia.notas || []), nota];
+  await projects.setField(projectId, 'garantia.notas', notas);
+  document.getElementById('gnotas-list').innerHTML = renderNotas(notas, session, 'garantia', projectId);
   document.getElementById('gnotas-form').style.display = 'none';
   document.getElementById('gnotas-texto').value = '';
   // Actualizar badge del tab
   const tabBtn = document.querySelector('[data-tab="g-notas"]');
-  if (tabBtn) tabBtn.innerHTML = `Notas<span class="tab-badge tab-ok">${p.garantia.notas.length}</span>`;
+  if (tabBtn) tabBtn.innerHTML = `Notas<span class="tab-badge tab-ok">${notas.length}</span>`;
   toast('✅ Nota guardada');
 };
 
@@ -344,12 +344,12 @@ window._delNota = async function(projectId, scope, idx) {
   const session = await getSession();
   const p = await projects.getById(projectId);
   if (scope === 'garantia') {
-    p.garantia.notas = (p.garantia.notas || []).filter((_,i) => i !== idx);
-    await projects.update(projectId, { garantia: p.garantia });
-    document.getElementById('gnotas-list').innerHTML = renderNotas(p.garantia.notas, session, 'garantia', projectId);
+    const notas = (p.garantia.notas || []).filter((_,i) => i !== idx);
+    await projects.setField(projectId, 'garantia.notas', notas);
+    document.getElementById('gnotas-list').innerHTML = renderNotas(notas, session, 'garantia', projectId);
     const tabBtn = document.querySelector('[data-tab="g-notas"]');
-    if (tabBtn) tabBtn.innerHTML = p.garantia.notas.length
-      ? `Notas<span class="tab-badge tab-ok">${p.garantia.notas.length}</span>` : 'Notas';
+    if (tabBtn) tabBtn.innerHTML = notas.length
+      ? `Notas<span class="tab-badge tab-ok">${notas.length}</span>` : 'Notas';
   }
   toast('Nota eliminada');
 };

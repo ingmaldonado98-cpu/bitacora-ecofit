@@ -46,16 +46,19 @@ const CALIDAD_LOSA = ['Buena','Regular','Pobre'];
 window._setFotoCategoria = async function(pid, areaIdx, fotoId, categoria) {
   const { projects } = await import('./db.js');
   const p = await projects.getById(pid);
-  const areas = p.documentacion?.levantamiento?.areasTecho || [];
-  let foto;
   if (areaIdx != null) {
-    foto = areas[areaIdx]?.fotos?.find(f => f.id === fotoId);
+    const areas = p.documentacion?.levantamiento?.areasTecho || [];
+    const foto = areas[areaIdx]?.fotos?.find(f => f.id === fotoId);
+    if (!foto) return;
+    foto.categoria = categoria || null;
+    await projects.setField(pid, 'documentacion.levantamiento.areasTecho', areas);
   } else {
-    foto = (p.documentacion?.levantamiento?.fotosLevantamiento || []).find(f => f.id === fotoId);
+    const fotos = p.documentacion?.levantamiento?.fotosLevantamiento || [];
+    const foto = fotos.find(f => f.id === fotoId);
+    if (!foto) return;
+    foto.categoria = categoria || null;
+    await projects.setField(pid, 'documentacion.levantamiento.fotosLevantamiento', fotos);
   }
-  if (!foto) return;
-  foto.categoria = categoria || null;
-  await projects.update(pid, { documentacion: p.documentacion });
 };
 
 // ── Mostrar/ocultar bloque estructural (madera/PTR/losa) y badge de sujeción por área ──

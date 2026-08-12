@@ -159,21 +159,24 @@ window.guardarLevantamiento = async function(e, projectId) {
     newLev.breakerPolo    = fd.get('breakerPolo')?.trim()   || null;
   }
 
-  p.documentacion = p.documentacion || {};
-  p.documentacion.levantamiento = newLev;
+  // setField puntual sobre documentacion.levantamiento — no pisa
+  // documentacion.notas/fases/etc. si otro técnico edita el mismo proyecto
+  // al mismo tiempo (mismo patrón que doc-sitio.js).
+  await projects.setField(projectId, 'documentacion.levantamiento', newLev);
 
-  const rootUpdate = { documentacion: p.documentacion };
   const newClientName = fd.get('lev_clientName')?.trim();
   const newNombreProyecto = fd.get('lev_nombreProyecto')?.trim() || null;
   if (newClientName && newClientName !== p.clientName) {
-    rootUpdate.clientName = newClientName;
     // Regenerar displayId para que la "carpeta" refleje el nombre actual
     const all = await projects.getAll();
     const otherIds = all.filter(x => x.id !== projectId).map(x => x.displayId).filter(Boolean);
-    rootUpdate.displayId = genDisplayId(newClientName, p.createdAt, p.tipoSistema, otherIds);
+    const newDisplayId = genDisplayId(newClientName, p.createdAt, p.tipoSistema, otherIds);
+    await projects.setField(projectId, 'clientName', newClientName);
+    await projects.setField(projectId, 'displayId', newDisplayId);
   }
-  if (newNombreProyecto !== (p.nombreProyecto || null)) rootUpdate.nombreProyecto = newNombreProyecto;
-  await projects.update(projectId, rootUpdate);
+  if (newNombreProyecto !== (p.nombreProyecto || null)) {
+    await projects.setField(projectId, 'nombreProyecto', newNombreProyecto);
+  }
   // Actualizar indicador de auto-guardado
   const ind = document.getElementById('lev-autosave');
   if (ind) { ind.textContent = '✓ Guardado'; ind.className = 'autosave-indicator saved'; }
@@ -294,21 +297,15 @@ window.capSombraFoto = function(pid) {
   capturePhoto(async b64 => {
     toast('Subiendo foto de sombra…');
     const result = await uploadPhotoQueued(b64, buildFotoPath(pid, 'sombra.jpg'), pid, 'sombraFoto');
-    const p = await projects.getById(pid);
-    p.documentacion = p.documentacion || {};
-    p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-    p.documentacion.levantamiento.sombras = p.documentacion.levantamiento.sombras || {};
-    p.documentacion.levantamiento.sombras.foto = result.url
-      || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
-    await projects.update(pid, { documentacion: p.documentacion });
+    const val = result.url || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
+    await projects.setField(pid, 'documentacion.levantamiento.sombras.foto', val);
+    logChange(pid, { modulo: 'Documentación', accion: 'foto de sombra', detalle: '', quien: await getSession() });
     await _saveLevFormNow(pid);
     navigate(`#proyecto/${pid}/documentacion`);
   }, { preview: true });
 };
 window.delSombraFoto = async function(pid) {
-  const p = await projects.getById(pid);
-  p.documentacion.levantamiento.sombras.foto = null;
-  await projects.update(pid, { documentacion: p.documentacion });
+  await projects.setField(pid, 'documentacion.levantamiento.sombras.foto', null);
   await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/documentacion`);
 };
@@ -317,20 +314,15 @@ window.capFotoMedidor = function(pid) {
   capturePhoto(async b64 => {
     toast('Subiendo foto del medidor…');
     const result = await uploadPhotoQueued(b64, buildFotoPath(pid, 'medidor.jpg'), pid, 'fotoMedidor');
-    const p = await projects.getById(pid);
-    p.documentacion = p.documentacion || {};
-    p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-    p.documentacion.levantamiento.fotoMedidor = result.url
-      || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
-    await projects.update(pid, { documentacion: p.documentacion });
+    const val = result.url || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
+    await projects.setField(pid, 'documentacion.levantamiento.fotoMedidor', val);
+    logChange(pid, { modulo: 'Documentación', accion: 'foto de medidor', detalle: '', quien: await getSession() });
     await _saveLevFormNow(pid);
     navigate(`#proyecto/${pid}/levantamiento`);
   }, { preview: true });
 };
 window.delFotoMedidor = async function(pid) {
-  const p = await projects.getById(pid);
-  p.documentacion.levantamiento.fotoMedidor = null;
-  await projects.update(pid, { documentacion: p.documentacion });
+  await projects.setField(pid, 'documentacion.levantamiento.fotoMedidor', null);
   await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/levantamiento`);
 };
@@ -370,15 +362,13 @@ window.capFotoLev = function(pid) {
     const fid = uuid();
     const result = await uploadPhotoQueued(b64, buildFotoPath(pid, `lev_${fid}.jpg`), pid, 'fotoLev', { itemId: fid });
     const p = await projects.getById(pid);
-    p.documentacion = p.documentacion || {};
-    p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-    const fotos = p.documentacion.levantamiento.fotosLevantamiento || [];
+    const fotos = p.documentacion?.levantamiento?.fotosLevantamiento || [];
     fotos.push({
       url: result.url || null, id: fid, ts: isoNow(),
       ...(result.pending && { pending: true, pendingId: result.pendingId }),
     });
-    p.documentacion.levantamiento.fotosLevantamiento = fotos;
-    await projects.update(pid, { documentacion: p.documentacion });
+    await projects.setField(pid, 'documentacion.levantamiento.fotosLevantamiento', fotos);
+    logChange(pid, { modulo: 'Documentación', accion: 'foto de levantamiento', detalle: '', quien: await getSession() });
     await _saveLevFormNow(pid);
     navigate(`#proyecto/${pid}/levantamiento`);
   }, { preview: true });
@@ -388,8 +378,7 @@ window.delFotoLev = async function(pid, idx) {
   const p = await projects.getById(pid);
   const fotos = p.documentacion?.levantamiento?.fotosLevantamiento || [];
   fotos.splice(idx, 1);
-  p.documentacion.levantamiento.fotosLevantamiento = fotos;
-  await projects.update(pid, { documentacion: p.documentacion });
+  await projects.setField(pid, 'documentacion.levantamiento.fotosLevantamiento', fotos);
   await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/levantamiento`);
 };
@@ -401,15 +390,13 @@ window.capSunSeeker = function(pid, etiqueta) {
     const fid = uuid();
     const result = await uploadPhotoQueued(b64, buildFotoPath(pid, `sunseeker_${fid}.jpg`), pid, 'sunSeeker', { itemId: fid });
     const p = await projects.getById(pid);
-    p.documentacion = p.documentacion || {};
-    p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-    const arr = p.documentacion.levantamiento.sunSeeker || [];
+    const arr = p.documentacion?.levantamiento?.sunSeeker || [];
     arr.push({
       url: result.url || null, id: fid, etiqueta: etiqueta || 'General', createdAt: isoNow(),
       ...(result.pending && { pending: true, pendingId: result.pendingId }),
     });
-    p.documentacion.levantamiento.sunSeeker = arr;
-    await projects.update(pid, { documentacion: p.documentacion });
+    await projects.setField(pid, 'documentacion.levantamiento.sunSeeker', arr);
+    logChange(pid, { modulo: 'Documentación', accion: 'captura Sun Seeker', detalle: etiqueta || 'General', quien: await getSession() });
     await _saveLevFormNow(pid);
     navigate(`#proyecto/${pid}/levantamiento`);
   }, { preview: true });
@@ -418,8 +405,7 @@ window.delSunSeeker = async function(pid, idx) {
   const p = await projects.getById(pid);
   const arr = p.documentacion?.levantamiento?.sunSeeker || [];
   arr.splice(idx, 1);
-  p.documentacion.levantamiento.sunSeeker = arr;
-  await projects.update(pid, { documentacion: p.documentacion });
+  await projects.setField(pid, 'documentacion.levantamiento.sunSeeker', arr);
   await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/levantamiento`);
 };
@@ -441,14 +427,13 @@ window.capDronFoto = function(pid, fase) {
     const fid = uuid();
     const result = await uploadPhotoQueued(b64, buildFotoPath(pid, `dron_${fase}_${fid}.jpg`), pid, 'dronFoto', { fase, itemId: fid });
     const p = await projects.getById(pid);
-    p.documentacion = p.documentacion || {};
-    p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-    const dron = _ensureDron(p.documentacion.levantamiento);
+    const dron = _ensureDron(p.documentacion?.levantamiento || {});
     dron[fase].fotos.push({
       url: result.url || null, id: fid, createdAt: isoNow(),
       ...(result.pending && { pending: true, pendingId: result.pendingId }),
     });
-    await projects.update(pid, { documentacion: p.documentacion });
+    await projects.setField(pid, 'documentacion.levantamiento.dron', dron);
+    logChange(pid, { modulo: 'Documentación', accion: `foto de dron (${fase})`, detalle: '', quien: await getSession() });
     await _saveLevFormNow(pid);
     navigate(`#proyecto/${pid}/levantamiento`);
   }, { preview: true });
@@ -463,11 +448,10 @@ window.capDronVideo = function(pid, fase) {
       const fid = uuid();
       const url = await uploadVideo(file, `projects/${pid}/dron_${fase}_${fid}.mp4`);
       const p = await projects.getById(pid);
-      p.documentacion = p.documentacion || {};
-      p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-      const dron = _ensureDron(p.documentacion.levantamiento);
+      const dron = _ensureDron(p.documentacion?.levantamiento || {});
       dron[fase].videos.push({ url, id: fid, createdAt: isoNow() });
-      await projects.update(pid, { documentacion: p.documentacion });
+      await projects.setField(pid, 'documentacion.levantamiento.dron', dron);
+      logChange(pid, { modulo: 'Documentación', accion: `video de dron (${fase})`, detalle: '', quien: await getSession() });
       await _saveLevFormNow(pid);
       prog.done();
       toast('✅ Video de dron subido');
@@ -482,9 +466,9 @@ window.capDronVideo = function(pid, fase) {
 window.delDronMedia = async function(pid, fase, tipo, idx) {
   if (!await confirmDialog('¿Eliminar este archivo de dron?')) return;
   const p = await projects.getById(pid);
-  const dron = _ensureDron(p.documentacion?.levantamiento || (p.documentacion = p.documentacion || {}, p.documentacion.levantamiento = p.documentacion.levantamiento || {}));
+  const dron = _ensureDron(p.documentacion?.levantamiento || {});
   (dron[fase]?.[tipo] || []).splice(idx, 1);
-  await projects.update(pid, { documentacion: p.documentacion });
+  await projects.setField(pid, 'documentacion.levantamiento.dron', dron);
   await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/levantamiento`);
 };
@@ -522,8 +506,8 @@ window.capFotoArea = function(pid, areaIdx) {
     } finally {
       prog.done();
     }
-    p.documentacion.levantamiento.areasTecho = areas;
-    await projects.update(pid, { documentacion: p.documentacion });
+    await projects.setField(pid, 'documentacion.levantamiento.areasTecho', areas);
+    logChange(pid, { modulo: 'Documentación', accion: 'foto de área', detalle: `área ${areaIdx+1}`, quien: await getSession() });
     await _saveLevFormNow(pid);
     if (fallo) {
       toast(`⚠ Se guardaron ${subidas} de ${total} foto${total>1?'s':''}. Revisa tu conexión e intenta de nuevo con las que faltan.`, 'error', 6000);
@@ -542,8 +526,7 @@ window.delFotoArea = async function(pid, areaIdx, fotoIdx) {
   if (!Array.isArray(areas[areaIdx]?.fotos)) return;
   areas[areaIdx].fotos.splice(fotoIdx, 1);
   if (window._lev.areasTecho[areaIdx]?.fotos) window._lev.areasTecho[areaIdx].fotos.splice(fotoIdx, 1);
-  p.documentacion.levantamiento.areasTecho = areas;
-  await projects.update(pid, { documentacion: p.documentacion });
+  await projects.setField(pid, 'documentacion.levantamiento.areasTecho', areas);
   await _saveLevFormNow(pid);
   navigate(`#proyecto/${pid}/levantamiento`);
 };

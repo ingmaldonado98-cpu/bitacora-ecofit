@@ -11,12 +11,8 @@ window._captureGps = function(projectId) {
     async (pos) => {
       const lat = parseFloat(pos.coords.latitude.toFixed(6));
       const lng = parseFloat(pos.coords.longitude.toFixed(6));
-      const p   = await projects.getById(projectId);
-      p.documentacion = p.documentacion || {};
-      p.documentacion.levantamiento = p.documentacion.levantamiento || {};
-      p.documentacion.levantamiento.gpsLat = lat;
-      p.documentacion.levantamiento.gpsLng = lng;
-      await projects.update(projectId, { documentacion: p.documentacion });
+      await projects.setField(projectId, 'documentacion.levantamiento.gpsLat', lat);
+      await projects.setField(projectId, 'documentacion.levantamiento.gpsLng', lng);
       toast(`📍 GPS guardado: ${lat}, ${lng}`, 'success');
       navigate(window.location.hash);
     },
@@ -28,8 +24,7 @@ window._captureGps = function(projectId) {
 window._clearGps = async function(projectId) {
   const p = await projects.getById(projectId);
   if (!p.documentacion?.levantamiento) return;
-  p.documentacion.levantamiento.gpsLat = null;
-  p.documentacion.levantamiento.gpsLng = null;
-  await projects.update(projectId, { documentacion: p.documentacion });
+  await projects.setField(projectId, 'documentacion.levantamiento.gpsLat', null);
+  await projects.setField(projectId, 'documentacion.levantamiento.gpsLng', null);
   navigate(window.location.hash);
 };

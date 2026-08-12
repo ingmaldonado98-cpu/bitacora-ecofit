@@ -177,14 +177,19 @@ function renderEvidenciaArreglo(paneles, projectId, edit) {
 }
 
 window.guardarInfoPanel = async function(projectId) {
-  const p = await projects.getById(projectId);
-  p.garantia.paneles.marca  = document.getElementById('panel-marca').value.trim();
-  p.garantia.paneles.modelo = document.getElementById('panel-modelo').value.trim();
-  p.garantia.paneles.wp     = parseFloat(document.getElementById('panel-wp').value)  || 0;
-  p.garantia.paneles.voc    = parseFloat(document.getElementById('panel-voc').value)  || null;
-  p.garantia.paneles.imp    = parseFloat(document.getElementById('panel-imp').value)  || null;
-  await projects.update(projectId, { garantia: p.garantia });
-  logChange(projectId, { modulo: 'Garantía', accion: 'info de panel guardada', detalle: `${p.garantia.paneles.marca} ${p.garantia.paneles.modelo}`, quien: await getSession() });
+  const marca  = document.getElementById('panel-marca').value.trim();
+  const modelo = document.getElementById('panel-modelo').value.trim();
+  const wp     = parseFloat(document.getElementById('panel-wp').value)  || 0;
+  const voc    = parseFloat(document.getElementById('panel-voc').value)  || null;
+  const imp    = parseFloat(document.getElementById('panel-imp').value)  || null;
+  // setField puntual por subcampo — no pisa garantia.equipos/notas/estructura
+  // si otro técnico edita el mismo proyecto al mismo tiempo.
+  await projects.setField(projectId, 'garantia.paneles.marca',  marca);
+  await projects.setField(projectId, 'garantia.paneles.modelo', modelo);
+  await projects.setField(projectId, 'garantia.paneles.wp',     wp);
+  await projects.setField(projectId, 'garantia.paneles.voc',    voc);
+  await projects.setField(projectId, 'garantia.paneles.imp',    imp);
+  logChange(projectId, { modulo: 'Garantía', accion: 'info de panel guardada', detalle: `${marca} ${modelo}`, quien: await getSession() });
   toast('✅ Info del panel guardada');
 };
 
@@ -220,25 +225,22 @@ window.distribuirSerialesMasivo = async function(projectId) {
   if (!seriales.length) { toast('Pega o escanea al menos un serial', 'error'); return; }
 
   const p = await projects.getById(projectId);
-  p.garantia = p.garantia || {};
-  p.garantia.paneles = p.garantia.paneles || {};
-  const actuales = getSerialesFlat(p.garantia);
+  const gar = p.garantia || {};
+  const actuales = getSerialesFlat(gar);
   if (actuales.length) {
     const ok = await confirmDialog(`Ya hay ${actuales.length} seriales registrados — la carga masiva los va a reemplazar por completo. ¿Continuar?`);
     if (!ok) return;
   }
 
   const nuevos = seriales.map(serial => {
-    const dup = (p.garantia.equipos||[]).some(eq => eq.serial === serial);
+    const dup = (gar.equipos||[]).some(eq => eq.serial === serial);
     return {
       serial, fotoRespaldo: null, createdAt: isoNow(),
       ...(dup ? { duplicadoEnEquipos: true } : {}),
     };
   });
 
-  p.garantia.paneles.seriales = nuevos;
-  delete p.garantia.paneles.strings;
-  await projects.update(projectId, { garantia: p.garantia });
+  await projects.setField(projectId, 'garantia.paneles.seriales', nuevos);
   logChange(projectId, {
     modulo: 'Garantía', accion: 'carga masiva de paneles',
     detalle: `${seriales.length} seriales`,
@@ -256,12 +258,10 @@ window.capFotoArreglo = function(projectId, tipo) {
     const fid = uuid();
     const result = await uploadPhotoQueued(b64, buildFotoPath(projectId, `arreglo_${tipo}_${fid}.jpg`),
       projectId, 'fotoArregloPaneles', { tipo, itemId: fid });
-    const p = await projects.getById(projectId);
-    p.garantia = p.garantia || {};
-    p.garantia.paneles = p.garantia.paneles || {};
     const campo = tipo === 'frontal' ? 'fotoArregloFrontal' : 'fotoArregloPerfil';
-    p.garantia.paneles[campo] = result.url || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
-    await projects.update(projectId, { garantia: p.garantia });
+    const val = result.url || (result.pending ? { pending: true, pendingId: result.pendingId } : null);
+    await projects.setField(projectId, `garantia.paneles.${campo}`, val);
+    logChange(projectId, { modulo: 'Garantía', accion: `foto de arreglo (${tipo})`, detalle: '', quien: await getSession() });
     sessionStorage.setItem('garantia-tab-target', 'g-paneles');
     navigate(`#proyecto/${projectId}/garantia`);
     if (result.url) toast('✅ Foto guardada');
@@ -277,13 +277,9 @@ window.scanSerialPanel = function(projectId) {
       if (dup) { toast(`⚠ Serial ya registrado en ${dup}: ${serial}`, 'warning', 3500); return; }
 
       const p = await projects.getById(projectId);
-      p.garantia = p.garantia || {};
-      p.garantia.paneles = p.garantia.paneles || {};
       const seriales = getSerialesFlat(p.garantia);
       seriales.push({ serial, fotoRespaldo: null, createdAt: isoNow() });
-      p.garantia.paneles.seriales = seriales;
-      delete p.garantia.paneles.strings;
-      await projects.update(projectId, { garantia: p.garantia });
+      await projects.setField(projectId, 'garantia.paneles.seriales', seriales);
       logChange(projectId, { modulo: 'Garantía', accion: 'panel escaneado', detalle: serial, quien: await getSession() });
       sessionStorage.setItem('garantia-tab-target', 'g-paneles');
       navigate(`#proyecto/${projectId}/garantia`);
@@ -331,13 +327,9 @@ window.addSerialManual = async function(projectId) {
   const p = await projects.getById(projectId);
   const dup = _serialUbicacion(p, serial);
   if (dup) { toast(`⚠ Serial ya registrado en ${dup}: ${serial.trim()}`, 'warning', 3500); return; }
-  p.garantia = p.garantia || {};
-  p.garantia.paneles = p.garantia.paneles || {};
   const seriales = getSerialesFlat(p.garantia);
   seriales.push({ serial: serial.trim(), fotoRespaldo: null, createdAt: isoNow() });
-  p.garantia.paneles.seriales = seriales;
-  delete p.garantia.paneles.strings;
-  await projects.update(projectId, { garantia: p.garantia });
+  await projects.setField(projectId, 'garantia.paneles.seriales', seriales);
   logChange(projectId, { modulo: 'Garantía', accion: 'panel agregado (manual)', detalle: serial.trim(), quien: await getSession() });
   sessionStorage.setItem('garantia-tab-target', 'g-paneles');
   navigate(`#proyecto/${projectId}/garantia`);
@@ -350,10 +342,7 @@ window.delSerialPanel = async function(projectId, idx) {
   const seriales = getSerialesFlat(p.garantia);
   const pan = seriales[idx];
   seriales.splice(idx,1);
-  p.garantia.paneles = p.garantia.paneles || {};
-  p.garantia.paneles.seriales = seriales;
-  delete p.garantia.paneles.strings;
-  await projects.update(projectId, { garantia: p.garantia });
+  await projects.setField(projectId, 'garantia.paneles.seriales', seriales);
   logChange(projectId, { modulo: 'Garantía', accion: 'panel eliminado', detalle: pan?.serial||'', quien: await getSession() });
   sessionStorage.setItem('garantia-tab-target', 'g-paneles');
   navigate(`#proyecto/${projectId}/garantia`);
