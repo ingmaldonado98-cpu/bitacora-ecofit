@@ -146,8 +146,11 @@ async function render(html, skeleton = '') {
 })();
 
 // ── Router ────────────────────────────────────────────────────────────────────
+let _lastRoutedHash = null;
 async function route() {
   const hash = window.location.hash || '#dashboard';
+  const isSameHashRefresh = hash === _lastRoutedHash;
+  _lastRoutedHash = hash;
   const parts = hash.replace('#', '').split('/');
   const view  = parts[0];
   const id    = parts[1];
@@ -313,7 +316,7 @@ async function route() {
     </div>`;
   }
 
-  window.scrollTo(0, 0);
+  if (!isSameHashRefresh) window.scrollTo(0, 0);
 
   // Actualizar badge en segundo plano para rutas que no son dashboard
   if (view !== 'dashboard' && view !== '' && session?.rol === 'admin') {

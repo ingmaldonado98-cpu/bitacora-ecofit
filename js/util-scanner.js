@@ -170,6 +170,9 @@ async function _openNativeScannerOverlay(onResult, { continuous, title, onClose 
 
   let listener;
   let scanCount = 0;
+  let handled = false;
+  let lastCode = null;
+  let lastTime = 0;
 
   const cleanup = async () => {
     document.body.classList.remove('scanner-native-active');
@@ -196,7 +199,14 @@ async function _openNativeScannerOverlay(onResult, { continuous, title, onClose 
   listener = await BarcodeScanner.addListener('barcodeScanned', async ev => {
     const code = ev.barcode?.rawValue;
     if (!code) return;
+    if (!continuous && handled) return; // ya se procesó este escaneo, ignora frames repetidos del mismo hold
+    // ML Kit dispara el evento varias veces por cada lectura física mientras
+    // la cámara sigue enfocando el mismo código — deduplicar como en la ruta web.
+    const now = Date.now();
+    if (code === lastCode && now - lastTime < 2500) return;
+    lastCode = code; lastTime = now;
     if (!continuous) {
+      handled = true;
       await cleanup();
     } else {
       scanCount++;
