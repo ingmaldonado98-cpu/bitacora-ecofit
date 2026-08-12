@@ -120,8 +120,13 @@ export function bindCatalogo(){
       const id=e.target.dataset.id;
       const m=S.materials.find(x=>x.id===id);
       if(m){
-        m.stockMin=+e.target.value||0;
-        e.target.style.color=+m.stockMin===0?'var(--text-muted)':'var(--yellow)';
+        // Un stockMin negativo rompia getSem(): mv*0.2 se vuelve negativo y
+        // av<=mv*0.2 practicamente nunca es cierto, asi que el semaforo dejaba
+        // de marcar CRITICO/ALERTA para ese material para siempre, sin aviso.
+        const val=Math.max(0,+e.target.value||0);
+        m.stockMin=val;
+        e.target.value=val;
+        e.target.style.color=val===0?'var(--text-muted)':'var(--yellow)';
       }
       try{await invSave();toast('Stock mínimo actualizado');}
       catch(er){toast(er.message,'error');}
@@ -147,15 +152,27 @@ export function bindCatalogo(){
     const cats=getCats();
     const nuevaCat=await inputDialog('Editar categoría:',mat.categoria||'General',cats.join(' | '));
     if(nuevaCat===null)return;
+    // Antes, si el texto no coincidia exactamente con una categoria existente,
+    // se descartaba en silencio (se quedaba con la categoria vieja) pero igual
+    // se mostraba "Material actualizado" — el admin creia que el cambio de
+    // categoria aplico cuando no. Match insensible a mayusculas/espacios; si
+    // aun asi no hay coincidencia, se aborta TODO el edit (nombre y unidad
+    // incluidos) con un error claro, en vez de aplicar solo una parte.
+    const catMatch=cats.find(c=>c.trim().toLowerCase()===nuevaCat.trim().toLowerCase());
+    if(!catMatch){
+      toast(`Categoría "${nuevaCat.trim()}" no existe — usa una de: ${cats.join(', ')}`,'error',6000);
+      return;
+    }
     mat.material=nuevoNombre.trim();
     mat.unidad=nuevaUnidad.trim()||'pzas';
-    mat.categoria=cats.includes(nuevaCat.trim())?nuevaCat.trim():(mat.categoria||'General');
-    invSave().then(()=>toast('Material actualizado: '+mat.material)).catch(e=>toast(e.message,'error'));
+    mat.categoria=catMatch;
+    try{await invSave();toast('Material actualizado: '+mat.material);}
+    catch(e){toast(e.message,'error');}
     window._invRender();
   });
   document.getElementById('btn-addmat')?.addEventListener('click',async()=>{
     const mat=document.getElementById('nm-mat').value.trim();
-    const min=+document.getElementById('nm-min').value||0;
+    const min=Math.max(0,+document.getElementById('nm-min').value||0);
     const uni=document.getElementById('nm-uni').value.trim()||'pzas';
     const cat=document.getElementById('nm-cat').value||'General';
     if(!mat){toast('El nombre del material es obligatorio','error');return;}

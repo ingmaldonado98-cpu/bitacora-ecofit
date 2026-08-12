@@ -211,20 +211,52 @@ export function bindHistorial(){
 window._invGenConsumo = async function() {
   const mes  = parseInt(document.getElementById('cons-mes').value);
   const anio = parseInt(document.getElementById('cons-anio').value);
+  const el = document.getElementById('cons-resultado');
+
+  // Antes un anio vacio/invalido (NaN) simplemente no matcheaba ningun
+  // proyecto y mostraba "Sin proyectos cerrados en [Mes] NaN" — parecia un
+  // resultado valido en vez de un error de captura.
+  if (!mes && mes !== 0 || isNaN(anio) || anio < 2000 || anio > 2100) {
+    el.innerHTML = `<div class="card" style="margin-top:8px">
+      <p style="color:#f87171;font-size:.85rem;text-align:center;padding:16px 0">
+        Ingresa un mes y año válidos.
+      </p>
+    </div>`;
+    return;
+  }
+
   S.consumoMes  = mes;
   S.consumoAnio = anio;
 
-  const todos = await projects.getAll();
+  el.innerHTML = `<div class="card" style="margin-top:8px">
+    <p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:16px 0">Generando reporte…</p>
+  </div>`;
+
+  let todos;
+  try {
+    todos = await projects.getAll();
+  } catch (e) {
+    el.innerHTML = `<div class="card" style="margin-top:8px">
+      <p style="color:#f87171;font-size:.85rem;text-align:center;padding:16px 0">
+        No se pudo cargar la lista de proyectos — revisa tu conexión e intenta de nuevo.
+      </p>
+    </div>`;
+    return;
+  }
 
   const cerrados = todos.filter(p => {
     if (p.estado !== 'cerrado') return false;
-    const entrada = (p.statusLog || []).find(e => e.to === 'cerrado');
-    if (!entrada) return false;
+    // Un proyecto puede cerrarse, reabrirse y volver a cerrarse — antes
+    // .find() tomaba la PRIMERA transicion a 'cerrado', atribuyendo el
+    // consumo al mes del primer cierre en vez del cierre real/vigente.
+    // Tomamos la mas reciente.
+    const cierres = (p.statusLog || []).filter(e => e.to === 'cerrado');
+    if (!cierres.length) return false;
+    const entrada = cierres.reduce((a, b) => new Date(b.at) > new Date(a.at) ? b : a);
     const d = new Date(entrada.at);
     return d.getMonth() === mes && d.getFullYear() === anio;
   });
 
-  const el = document.getElementById('cons-resultado');
   if (!cerrados.length) {
     el.innerHTML = `<div class="card" style="margin-top:8px">
       <p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:16px 0">
