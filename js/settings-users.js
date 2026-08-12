@@ -125,19 +125,46 @@ window.crearUsuario = async function() {
     return;
   }
 
+  // 1. Crear en Firebase Auth (sin cerrar sesión actual)
+  // Si se proporcionó email real, se usa como email de Firebase Auth (permite reset real)
+  let uid, authEmail;
   try {
-    // 1. Crear en Firebase Auth (sin cerrar sesión actual)
-    // Si se proporcionó email real, se usa como email de Firebase Auth (permite reset real)
-    const { uid, authEmail } = await createFbUser(username, pass, email);
-    // 2. Crear perfil en Firestore
-    await fbUsers.add({ id: uid, nombre, username, rol, activo: true,
-      authEmail, ...(email ? { email } : {}), createdAt: isoNow() });
-    toast(`✅ Usuario @${username} creado`);
-    navigate('#settings');
+    ({ uid, authEmail } = await createFbUser(username, pass, email));
   } catch(err) {
     if (btn) { btn.disabled = false; btn.textContent = 'Crear'; }
     toast('Error: ' + (err.message || 'usuario ya existe'), 'error');
+    return;
   }
+
+  // 2. Crear perfil en Firestore — separado del paso 1 a propósito. Si la
+  // cuenta de Auth ya se creó pero este paso falla (hipo de red, etc.), el
+  // usuario queda con login válido pero SIN perfil — cualquier lectura
+  // posterior (incluida la de su propio perfil, por cómo isActive() se
+  // evalúa en las reglas) truena con "Missing or insufficient permissions"
+  // sin ninguna pista de la causa real. Reintentamos un par de veces antes
+  // de rendirnos, y si aun así falla, el error explica exactamente qué
+  // quedó a medias y cómo recuperarlo — en vez de un mensaje genérico.
+  const profileData = { id: uid, nombre, username, rol, activo: true,
+    authEmail, ...(email ? { email } : {}), createdAt: isoNow() };
+  let profileErr = null;
+  for (let intento = 1; intento <= 3; intento++) {
+    try { await fbUsers.add(profileData); profileErr = null; break; }
+    catch (err) { profileErr = err; if (intento < 3) await new Promise(r => setTimeout(r, 800 * intento)); }
+  }
+
+  if (profileErr) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Crear'; }
+    toast(
+      `⚠️ La cuenta @${username} se creó en Firebase Auth, pero el perfil no se pudo guardar ` +
+      `(${profileErr.message || 'error desconocido'}). El usuario NO podrá entrar hasta arreglar esto: ` +
+      `borra la cuenta @${username} en Firebase Console → Authentication y créala de nuevo aquí.`,
+      'error', 10000
+    );
+    return;
+  }
+
+  toast(`✅ Usuario @${username} creado`);
+  navigate('#settings');
 };
 
 window.toggleUser = async function(id, activo) {
