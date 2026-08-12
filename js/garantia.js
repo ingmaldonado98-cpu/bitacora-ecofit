@@ -61,7 +61,7 @@ export async function renderGarantia(projectId, session) {
   </div>
 
   <!-- Puesta en marcha + vencimientos -->
-  ${renderVencimientos(g, projectId, edit)}
+  ${renderVencimientos(g, projectId, edit, project.tipoSistema)}
   ${_renderOrigenCtx(proyectoOrigen, projectId)}
 
   <div class="tab-bar" id="garantia-tabs" role="tablist" aria-label="Secciones de garantía">
@@ -238,10 +238,19 @@ export const GARANTIAS_STD = [
   { key: 'manoObra',   label: 'Mano de obra',          anios:  1 },
 ];
 
-function renderVencimientos(g, projectId, edit) {
+// Ampliación no instala inversor nuevo (usa el del sistema origen, con su
+// propia garantía) — listar "Inversor" aquí implicaría una garantía que este
+// proyecto no vendió ni instaló.
+export function garantiasAplicables(tipoSistema) {
+  return tipoSistema === 'ampliacion'
+    ? GARANTIAS_STD.filter(gar => gar.key !== 'inversor')
+    : GARANTIAS_STD;
+}
+
+function renderVencimientos(g, projectId, edit, tipoSistema) {
   const fi = g.fechaInstalacion || '';
 
-  const chips = fi ? GARANTIAS_STD.map(gar => {
+  const chips = fi ? garantiasAplicables(tipoSistema).map(gar => {
     const base   = new Date(fi);
     const vence  = new Date(base);
     vence.setFullYear(vence.getFullYear() + gar.anios);

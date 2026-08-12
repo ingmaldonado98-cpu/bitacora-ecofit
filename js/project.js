@@ -303,7 +303,7 @@ function renderModulosProgreso(project, id, session, admin) {
   const audPct  = Math.round(audDone / audItems.length * 100);
 
   const esPequeno      = esPequenoTipo;
-  const puedeAuditoria = !esPequeno;
+  const puedeAuditoria = !esPequeno && !esAmpliacion;
   const estado         = calcFaseEstado(project);
   const generalPct     = esPequeno
     ? Math.round((levPct + garPct) / 2)

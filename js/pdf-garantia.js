@@ -3,7 +3,7 @@
 
 import { projects } from './db.js';
 import { fmtFecha, toast, fotoToImageBuffer } from './utils.js';
-import { GARANTIAS_STD } from './garantia.js';
+import { garantiasAplicables } from './garantia.js';
 import { newDoc, heading1, heading2, p, table, hr, imageBlock,
          AlignmentType, saveDocx, ensureDocxLoaded } from './word-helpers.js';
 
@@ -37,7 +37,7 @@ export async function exportarCertificadoGarantia(projectId) {
   // ── Vigencias ────────────────────────────────────────────────────────────
   addSec('Vigencia de garantías');
   if (fi) {
-    const rows = GARANTIAS_STD.map(gar => {
+    const rows = garantiasAplicables(project.tipoSistema).map(gar => {
       const base  = new Date(fi);
       const vence = new Date(base);
       vence.setFullYear(vence.getFullYear() + gar.anios);
