@@ -593,18 +593,25 @@ function renderStatusLog(log) {
 // ── Validación requisitos para revisión ───────────────────────────────────────
 function _getFaltantes(project) {
   const faltantes = [];
-  const esPequeno = project.tipoSistema === 'sistema_pequeno';
+  const esPequeno    = project.tipoSistema === 'sistema_pequeno';
+  const esAmpliacion = project.tipoSistema === 'ampliacion';
   if (!project.garantia?.fotoSistema) faltantes.push('Foto general del sistema');
   const totalPaneles = getSerialesFlat(project.garantia).length;
   if (totalPaneles === 0) faltantes.push('Al menos un panel registrado con número de serie');
   if (!esPequeno) {
     // Progreso de obra: exigir que los 3 bloques estén completos (checklist +
     // evidencias de cierre obligatorias) — esquema nuevo, no las fotos por sitio.
+    // calcObraStatus ya excluye el Bloque 2 para ampliación (getExecBlocks).
     const obra = calcObraStatus(project);
     obra.bloques.filter(b => b.total > 0 && !b.completo)
       .forEach(b => faltantes.push(`${b.label} de obra incompleto`));
-    if (!project.garantia?.fotosTecnicas?.tableroAC) faltantes.push('Foto del tablero AC terminado');
-    if (!project.garantia?.fotosTecnicas?.inversorEnergizado) faltantes.push('Foto del inversor energizado');
+    // Tablero AC / inversor energizado son de equipo NUEVO (inversor de red) —
+    // en ampliación no se instala inversor ni tablero nuevo, esos slots de foto
+    // ni siquiera están disponibles en la UI (Bloque 2 y pestaña Equipos ocultos).
+    if (!esAmpliacion) {
+      if (!project.garantia?.fotosTecnicas?.tableroAC) faltantes.push('Foto del tablero AC terminado');
+      if (!project.garantia?.fotosTecnicas?.inversorEnergizado) faltantes.push('Foto del inversor energizado');
+    }
   }
   return faltantes;
 }
