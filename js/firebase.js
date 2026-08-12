@@ -487,6 +487,12 @@ export const fbErrors = {
   },
 };
 
+// Version del esquema de backup — subir cuando cambie la forma de los datos
+// exportados/importados. importBackup() la usa para avisar si el archivo es
+// de una version distinta a la actual, en vez de asumir que siempre es
+// compatible.
+export const BACKUP_VERSION = 6;
+
 // ── Backup completo ────────────────────────────────────────────────────────
 export async function exportFbBackup() {
   const [projs, usrs, cfgSnap, kvSnap] = await Promise.all([
@@ -502,7 +508,7 @@ export async function exportFbBackup() {
     if (d.id !== 'onedrive_folder_handle') kv[d.id] = d.data().value;
   });
   return {
-    version: 6, exportedAt: new Date().toISOString(),
+    version: BACKUP_VERSION, exportedAt: new Date().toISOString(),
     projects: projs, users: usrs, config: cfg, kv,
   };
 }

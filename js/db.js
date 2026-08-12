@@ -493,6 +493,20 @@ export async function importBackup(data) {
   for (const [k, v] of Object.entries(data.kv || {}))         await fbKV.set(k, v);
 }
 
+// Resumen de lo que un backup realmente sobrescribiría, para mostrar antes
+// de importar — el diálogo antes solo mencionaba "proyectos" pero el
+// import toca usuarios/config/inventario por igual, sin avisar.
+export function summarizeBackup(data) {
+  return {
+    version:   data?.version ?? null,
+    proyectos: (data?.projects || []).length,
+    usuarios:  (data?.users || []).length,
+    config:    Object.keys(data?.config || {}).length,
+    kv:        Object.keys(data?.kv || {}).length,
+    exportedAt: data?.exportedAt || null,
+  };
+}
+
 export { seedAdminIfEmpty as seedIfEmpty } from './firebase.js';
 
 // ── Change log ─────────────────────────────────────────────────────────────

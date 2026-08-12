@@ -252,6 +252,45 @@ async function cacheStatusCard() {
 }
 
 export async function renderSettings(session) {
+  // Por-dispositivo (localStorage, no toca Firestore) — antes solo aparecía
+  // en la vista admin, aunque lider/apoyo también usan sus propios celulares
+  // y no tenían forma de programarlo en el suyo.
+  const schedRaw    = localStorage.getItem('ecofit-theme-sched');
+  const schedParts  = schedRaw ? schedRaw.split('-') : null;
+  const schedFrom   = schedParts?.[0] || '19:00';
+  const schedTo     = schedParts?.[1] || '07:00';
+  const schedActive = !!schedRaw;
+  const _schedCard = `
+  <!-- Modo oscuro programado -->
+  <div class="card">
+    <div class="card-title-row">
+      <h3 class="card-title">Modo oscuro programado</h3>
+      <label class="toggle-switch">
+        <input type="checkbox" id="sched-enabled" ${schedActive ? 'checked' : ''}
+               onchange="toggleSchedMode(this.checked)" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <p class="hint-text">El tema cambia a oscuro automáticamente en el horario configurado (por dispositivo).</p>
+    <div id="sched-config" class="sched-config${schedActive ? '' : ' sched-disabled'}">
+      <div class="form-row" style="margin-top:10px">
+        <div class="form-group">
+          <label>Oscuro desde</label>
+          <input type="time" id="sched-from" class="input-field" value="${schedFrom}"
+                 onchange="saveSched()" />
+        </div>
+        <div class="form-group">
+          <label>Oscuro hasta</label>
+          <input type="time" id="sched-to" class="input-field" value="${schedTo}"
+                 onchange="saveSched()" />
+        </div>
+      </div>
+      <p class="hint-text" style="margin-top:6px">
+        Ejemplo: 19:00 – 07:00 activa el modo oscuro de noche hasta la mañana siguiente.
+      </p>
+    </div>
+  </div>`;
+
   if (!isAdmin(session)) {
     return `
     <div class="view-header">
@@ -289,6 +328,8 @@ export async function renderSettings(session) {
       </div>
     </div>
 
+    ${_schedCard}
+
     ${await deadLetterCard()}
     ${await pendingQueueCard()}
     ${await fotosPendientesCard()}
@@ -323,12 +364,6 @@ export async function renderSettings(session) {
     config.get('contactoEcofit'),
     kv.get('panel_presets_custom'),
   ]);
-
-  const schedRaw    = localStorage.getItem('ecofit-theme-sched');
-  const schedParts  = schedRaw ? schedRaw.split('-') : null;
-  const schedFrom   = schedParts?.[0] || '19:00';
-  const schedTo     = schedParts?.[1] || '07:00';
-  const schedActive = !!schedRaw;
 
   return `
   <div class="view-header">
@@ -386,35 +421,7 @@ export async function renderSettings(session) {
     <button class="btn-primary btn-sm" onclick="guardarContacto(this)">Guardar contacto</button>
   </div>
 
-  <!-- Modo oscuro programado -->
-  <div class="card">
-    <div class="card-title-row">
-      <h3 class="card-title">Modo oscuro programado</h3>
-      <label class="toggle-switch">
-        <input type="checkbox" id="sched-enabled" ${schedActive ? 'checked' : ''}
-               onchange="toggleSchedMode(this.checked)" />
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <p class="hint-text">El tema cambia a oscuro automáticamente en el horario configurado (por dispositivo).</p>
-    <div id="sched-config" class="sched-config${schedActive ? '' : ' sched-disabled'}">
-      <div class="form-row" style="margin-top:10px">
-        <div class="form-group">
-          <label>Oscuro desde</label>
-          <input type="time" id="sched-from" class="input-field" value="${schedFrom}"
-                 onchange="saveSched()" />
-        </div>
-        <div class="form-group">
-          <label>Oscuro hasta</label>
-          <input type="time" id="sched-to" class="input-field" value="${schedTo}"
-                 onchange="saveSched()" />
-        </div>
-      </div>
-      <p class="hint-text" style="margin-top:6px">
-        Ejemplo: 19:00 – 07:00 activa el modo oscuro de noche hasta la mañana siguiente.
-      </p>
-    </div>
-  </div>
+  ${_schedCard}
 
   <!-- OneDrive — solo web (File System Access API no disponible en Android) -->
   ${!isNative() ? `

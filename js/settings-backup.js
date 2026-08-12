@@ -1,10 +1,11 @@
 // settings-backup.js — OneDrive, exportar/importar backup y borrado local
 // Extraído de settings.js — registra los handlers window.* de respaldo de datos.
 
-import { exportBackup, importBackup } from './db.js';
+import { exportBackup, importBackup, summarizeBackup } from './db.js';
 import { toast, confirmDialog } from './utils.js';
 import { pickFolder, requestPermission, testAccess } from './onedrive.js';
 import { getPlugin } from './platform.js';
+import { BACKUP_VERSION } from './firebase.js';
 
 // ── OneDrive ───────────────────────────────────────────────────────────────────
 window.seleccionarCarpetaOneDrive = async function() {
@@ -51,10 +52,38 @@ window.exportarDatos = async function() {
 
 window.importarDatos = async function(e) {
   const file = e.target.files[0]; if (!file) return;
-  if (!await confirmDialog('¿Importar backup? Se reemplazarán todos los proyectos actuales.')) return;
+  let data;
   try {
-    const text = await file.text();
-    const data = JSON.parse(text);
+    data = JSON.parse(await file.text());
+  } catch (err) {
+    toast('El archivo no es un backup JSON válido: ' + err.message, 'error');
+    e.target.value = '';
+    return;
+  }
+
+  // El dialogo antes solo decia "se reemplazaran los proyectos actuales" —
+  // el import toca usuarios, configuracion e inventario/catalogo por igual,
+  // sobrescribiendo cualquier cambio hecho DESPUES de la fecha del backup
+  // (ej. un cambio de rol o desactivacion de usuario se revertiria en
+  // silencio). Mostramos el conteo real y avisamos si la version no
+  // coincide con la actual, en vez de asumir que siempre es compatible.
+  const r = summarizeBackup(data);
+  const fecha = r.exportedAt ? new Date(r.exportedAt).toLocaleString('es-MX') : 'desconocida';
+  const avisoVersion = r.version !== BACKUP_VERSION
+    ? `\n\n⚠️ Este backup es de la versión ${r.version ?? '?'} — la app espera la versión ${BACKUP_VERSION}. Podría no ser totalmente compatible.`
+    : '';
+  const ok = await confirmDialog(
+    `Este backup (del ${fecha}) contiene:\n` +
+    `• ${r.proyectos} proyecto(s)\n` +
+    `• ${r.usuarios} usuario(s)\n` +
+    `• ${r.config} valor(es) de configuración\n` +
+    `• ${r.kv} entrada(s) de inventario/catálogo\n\n` +
+    `Todo esto SOBREESCRIBIRÁ los datos actuales con el mismo ID — incluyendo cambios hechos ` +
+    `después de esta fecha (roles de usuario, stock, etc.).${avisoVersion}\n\n¿Importar de todas formas?`
+  );
+  if (!ok) { e.target.value = ''; return; }
+
+  try {
     await importBackup(data);
     toast('✅ Datos importados');
     navigate('#dashboard');
