@@ -2,7 +2,7 @@
 
 import { toast } from './utils.js';
 import { projects } from './db.js';
-import { S, SEM, avColor, avInitials } from './inv-state.js';
+import { S, SEM, avColor, avInitials, getSem } from './inv-state.js';
 import { CAT_C } from './inv-data.js';
 import { exportarHistorial, loadXLSX } from './inv-captura.js';
 
@@ -18,11 +18,13 @@ export function renderEstado(){
       <p style="font-size:.8rem">Ve a ⚙️ Catálogo y define los valores mínimos.</p>
     </div>`;
 
+  // Antes reimplementaba la clasificacion rojo/amarillo/verde en linea, en
+  // vez de usar getSem() (la misma funcion que usa Captura) — una segunda
+  // copia de la misma regla de negocio que podia desincronizarse si alguien
+  // corregia getSem() sin acordarse de este archivo.
   const grupos={rojo:[],amarillo:[],verde:[],none:[]};
   conMin.forEach(m=>{
-    const s=S.stock[m.id]===''||S.stock[m.id]==null?'none'
-      :(+S.stock[m.id]<=+m.stockMin*0.2?'rojo':+S.stock[m.id]<+m.stockMin?'amarillo':'verde');
-    grupos[s].push(m);
+    grupos[getSem(S.stock[m.id],m.stockMin)].push(m);
   });
   const sinCapturar=conMin.filter(m=>S.stock[m.id]===''||S.stock[m.id]==null).length;
 

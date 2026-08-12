@@ -1,7 +1,10 @@
 // inv-admin.js — Tabs Catálogo y Áreas: render y bind
 
 import { toast, confirmDialog, inputDialog } from './utils.js';
-import { S, getCats, catColor, isAdmin, invSave } from './inv-state.js';
+import { S, getCats, catColor, isAdmin,
+         invSaveCatalogItem, invDeleteCatalogItem,
+         invSaveAreas, invDeleteStockKey,
+         invRenameCategoriaEnCatalogo, invRenameCategoriaEnHistorial } from './inv-state.js';
 import { CAT_C, CATS_DEFAULT } from './inv-data.js';
 
 export function renderCatalogo(){
@@ -119,26 +122,26 @@ export function bindCatalogo(){
     inp.onchange=async e=>{
       const id=e.target.dataset.id;
       const m=S.materials.find(x=>x.id===id);
-      if(m){
-        // Un stockMin negativo rompia getSem(): mv*0.2 se vuelve negativo y
-        // av<=mv*0.2 practicamente nunca es cierto, asi que el semaforo dejaba
-        // de marcar CRITICO/ALERTA para ese material para siempre, sin aviso.
-        const val=Math.max(0,+e.target.value||0);
-        m.stockMin=val;
-        e.target.value=val;
-        e.target.style.color=val===0?'var(--text-muted)':'var(--yellow)';
-      }
-      try{await invSave();toast('Stock mínimo actualizado');}
+      if(!m)return;
+      // Un stockMin negativo rompia getSem(): mv*0.2 se vuelve negativo y
+      // av<=mv*0.2 practicamente nunca es cierto, asi que el semaforo dejaba
+      // de marcar CRITICO/ALERTA para ese material para siempre, sin aviso.
+      const val=Math.max(0,+e.target.value||0);
+      m.stockMin=val;
+      e.target.value=val;
+      e.target.style.color=val===0?'var(--text-muted)':'var(--yellow)';
+      try{await invSaveCatalogItem(m);toast('Stock mínimo actualizado');}
       catch(er){toast(er.message,'error');}
     };
   });
   document.querySelectorAll('.del-mat').forEach(b=>b.onclick=async()=>{
     if(!await confirmDialog('¿Eliminar este material?'))return;
     const id=b.dataset.id;
-    S.materials=S.materials.filter(m=>m.id!==id);
-    delete S.stock[id];
-    try{await invSave();toast('Material eliminado');}
-    catch(e){toast(e.message,'error');}
+    try{
+      await invDeleteCatalogItem(id);
+      await invDeleteStockKey(id);
+      toast('Material eliminado');
+    }catch(e){toast(e.message,'error');}
     window._invRender();
   });
   document.querySelectorAll('.edit-mat').forEach(b=>b.onclick=async()=>{
@@ -166,7 +169,7 @@ export function bindCatalogo(){
     mat.material=nuevoNombre.trim();
     mat.unidad=nuevaUnidad.trim()||'pzas';
     mat.categoria=catMatch;
-    try{await invSave();toast('Material actualizado: '+mat.material);}
+    try{await invSaveCatalogItem(mat);toast('Material actualizado: '+mat.material);}
     catch(e){toast(e.message,'error');}
     window._invRender();
   });
@@ -176,9 +179,12 @@ export function bindCatalogo(){
     const uni=document.getElementById('nm-uni').value.trim()||'pzas';
     const cat=document.getElementById('nm-cat').value||'General';
     if(!mat){toast('El nombre del material es obligatorio','error');return;}
-    const id=autoGenId(cat,S.materials);
-    S.materials.push({id,material:mat,stockMin:min,unidad:uni,categoria:cat});
-    try{await invSave();toast('"'+mat+'" agregado con ID: '+id);}
+    // Escanea catalogo E historial para el siguiente numero — un material
+    // eliminado y luego re-agregado en la misma categoria ya no reutiliza
+    // el ID del que se borro (mezclaria su historial con el nuevo material).
+    const id=autoGenId(cat,S.materials,S.history);
+    const nuevo={id,material:mat,stockMin:min,unidad:uni,categoria:cat};
+    try{await invSaveCatalogItem(nuevo);toast('"'+mat+'" agregado con ID: '+id);}
     catch(e){toast(e.message,'error');}
     window._invRender();
   });
@@ -191,10 +197,10 @@ export function bindAreas(){
     if(!nombre){toast('Ingresa el nombre del área','error');return;}
     const cats=getCats();
     if(cats.find(c=>c.toLowerCase()===nombre.toLowerCase())){toast('Esa área ya existe','error');return;}
-    if(!S.areas)S.areas=[...CATS_DEFAULT];
-    S.areas.push(nombre);
-    try{await invSave();toast('"'+nombre+'" agregada ✓');}
-    catch(e){toast(e.message,'error');}
+    try{
+      await invSaveAreas(a=>({ list:[...(a.list||CATS_DEFAULT),nombre], colors:a.colors }));
+      toast('"'+nombre+'" agregada ✓');
+    }catch(e){toast(e.message,'error');}
     window._invRender();
   };
   document.querySelectorAll('.edit-area').forEach(b=>b.onclick=async()=>{
@@ -204,13 +210,17 @@ export function bindAreas(){
     const nuevo=nuevoNombre.trim();
     const cats=getCats();
     if(cats.find(c=>c.toLowerCase()===nuevo.toLowerCase()&&c!==cat)){toast('Ese nombre ya existe','error');return;}
-    if(!S.areas)S.areas=[...CATS_DEFAULT];
-    const idx=S.areas.indexOf(cat);
-    if(idx!==-1)S.areas[idx]=nuevo;
-    S.materials.forEach(m=>{if(m.categoria===cat)m.categoria=nuevo;});
-    S.history.forEach(h=>{h.records.forEach(r=>{if(r.categoria===cat)r.categoria=nuevo;});});
-    try{await invSave();toast('Área actualizada a "'+nuevo+'"');}
-    catch(e){toast(e.message,'error');}
+    try{
+      await invSaveAreas(a=>{
+        const list=[...(a.list||CATS_DEFAULT)];
+        const idx=list.indexOf(cat);
+        if(idx!==-1)list[idx]=nuevo;
+        return { list, colors:a.colors };
+      });
+      await invRenameCategoriaEnCatalogo(cat,nuevo);
+      await invRenameCategoriaEnHistorial(cat,nuevo);
+      toast('Área actualizada a "'+nuevo+'"');
+    }catch(e){toast(e.message,'error');}
     window._invRender();
   });
   document.querySelectorAll('.del-area').forEach(b=>b.onclick=async()=>{
@@ -220,23 +230,32 @@ export function bindAreas(){
       ?'El área "'+cat+'" tiene '+count+' material(es).\nEstos pasarán a "General".\n\n¿Continuar?'
       :'¿Eliminar el área "'+cat+'"?';
     if(!await confirmDialog(msg))return;
-    if(!S.areas)S.areas=[...CATS_DEFAULT];
-    S.areas=S.areas.filter(c=>c!==cat);
-    S.materials.forEach(m=>{if(m.categoria===cat)m.categoria='General';});
-    try{await invSave();toast('Área "'+cat+'" eliminada');}
-    catch(e){toast(e.message,'error');}
+    try{
+      await invSaveAreas(a=>({ list:(a.list||CATS_DEFAULT).filter(c=>c!==cat), colors:a.colors }));
+      await invRenameCategoriaEnCatalogo(cat,'General');
+      // Antes editar-area SI reescribia el historial retroactivamente pero
+      // eliminar-area NO — el Historial podia mostrar un area que ya no
+      // existia en ningun lado de Catalogo/Areas. Mismo tratamiento ahora.
+      await invRenameCategoriaEnHistorial(cat,'General');
+      toast('Área "'+cat+'" eliminada');
+    }catch(e){toast(e.message,'error');}
     window._invRender();
   });
 }
 
-export function autoGenId(cat,materials){
+export function autoGenId(cat,materials,history){
   const MAP={'Estante A2':'A2','Estante A3':'A3','Estante A4':'A4','Estante A5':'A5',
     'Estante A6':'A6','Estante B':'EB','Estante B3':'B3','Estante B5':'B5',
     'Estante B6':'B6','Estante B7':'B7','Estante C2':'C2','Cableado':'CAB',
     'Eléctrica':'ELE','Estructura':'EST','Tornillería':'TOR','K2 Systems':'K2','General':'GEN'};
   const prefix=MAP[cat]||cat.replace(/[^A-Z0-9]/gi,'').slice(0,4).toUpperCase()||'MAT';
-  const existing=materials.filter(m=>m.id.startsWith(prefix+'-'))
-    .map(m=>parseInt(m.id.split('-')[1]||0)).filter(n=>!isNaN(n));
+  const nums=id=>id&&id.startsWith(prefix+'-')?parseInt(id.split('-')[1]||0):NaN;
+  const fromCatalog=materials.map(m=>nums(m.id)).filter(n=>!isNaN(n));
+  // Un material eliminado ya no esta en `materials`, pero su ID puede seguir
+  // en Historial — sin esto, autoGenId reutilizaba el mismo ID para un
+  // material nuevo, mezclando su historial con el del material borrado.
+  const fromHistory=(history||[]).flatMap(h=>(h.records||[]).map(r=>nums(r.id))).filter(n=>!isNaN(n));
+  const existing=[...fromCatalog,...fromHistory];
   const next=(existing.length?Math.max(...existing):0)+1;
   return prefix+'-'+String(next).padStart(3,'0');
 }

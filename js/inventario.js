@@ -93,13 +93,16 @@ export async function renderInventario(session) {
 
   S.materials  = (catalog || MATS_DEFAULT.map(m=>({...m}))).map(m=>({...m,categoria:normCat(m.categoria)}));
 
-  // Migración: agregar K2 items que no existan aún en el catálogo
+  // Migración: agregar K2 items que no existan aún en el catálogo.
+  // Solo lider/admin puede escribir 'catalog' (regla de Firestore) — antes
+  // esto se intentaba en CADA carga de Inventario para CUALQUIER rol,
+  // fallando en silencio (.catch(()=>{})) para apoyo en cada visita.
   const K2_SEED = MATS_DEFAULT.filter(m => m.id.startsWith('K2-'));
   const existingIds = new Set(S.materials.map(m => m.id));
   const missing = K2_SEED.filter(m => !existingIds.has(m.id));
   if (missing.length) {
     S.materials = [...S.materials, ...missing];
-    invStore.set('catalog', S.materials).catch(() => {});
+    if (isAdmin()) invStore.set('catalog', S.materials).catch(() => {});
   }
 
   S.areas      = areasData?.list ?? null;

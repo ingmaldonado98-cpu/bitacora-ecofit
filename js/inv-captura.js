@@ -1,7 +1,8 @@
 // inv-captura.js — Tab Captura: render, bind y exportación Excel
 
 import { toast, confirmDialog, inputDialog } from './utils.js';
-import { S, getSem, SEM, getCats, isAdmin, whoami, invSave, nowLabel } from './inv-state.js';
+import { S, getSem, SEM, getCats, isAdmin, whoami, nowLabel,
+         invSaveStock, invResetStock, invSaveHistoryEntry } from './inv-state.js';
 import { CAT_C } from './inv-data.js';
 
 export function renderCaptura(){
@@ -107,12 +108,26 @@ export function renderCaptura(){
   </div>`;
 }
 
+// Cambios sin guardar en Captura — avisa antes de salir de la app y endurece
+// el mensaje de "Nuevo mes" si hay algo sin guardar.
+let _stockDirty=false;
+window.addEventListener('beforeunload',e=>{
+  if(!_stockDirty)return;
+  e.preventDefault();
+  e.returnValue='';
+});
+
 export function bindCaptura(){
   document.querySelectorAll('.inv-stock-inp').forEach(inp=>{
     inp.oninput=e=>{
       const id=e.target.dataset.id;
-      const val=e.target.value;
+      // Antes se guardaba el string tal cual, sin validar — un tecnico
+      // tecleando "-50" quedaba clasificado como CRITICO por getSem() en vez
+      // de rechazarse como dato invalido.
+      let val=e.target.value;
+      if(val!==''&&+val<0){ val='0'; e.target.value='0'; }
       S.stock[id]=val===''?null:val;
+      _stockDirty=true;
       const mat=S.materials.find(m=>m.id===id);
       if(!mat)return;
       const s=getSem(val,mat.stockMin);
@@ -146,13 +161,14 @@ export function bindCaptura(){
         estado:getSem(S.stock[m.id],m.stockMin)
       }));
       const entry={fecha:mesGuardado,capturadoPor:whoami(),savedAt:new Date().toISOString(),nota:nota.trim()||null,records};
-      S.history=[entry,...S.history.filter(h=>h.fecha!==mesGuardado)];
-      await invSave();
+      await invSaveStock();
+      await invSaveHistoryEntry(entry);
+      _stockDirty=false;
       S.saving=false;
       const iniciar=await confirmDialog('✅ Mes "'+mesGuardado+'" guardado.\n\n¿Deseas limpiar Stock Actual e iniciar el nuevo mes?');
       if(iniciar){
-        S.stock={};S.month=nowLabel();
-        await invSave();
+        S.month=nowLabel();
+        await invResetStock();
         toast('Nuevo mes iniciado: '+S.month);
       } else {
         toast('Mes "'+mesGuardado+'" guardado ✓');
@@ -163,9 +179,16 @@ export function bindCaptura(){
 
   const bn=document.getElementById('inv-btn-nuevo');
   if(bn) bn.onclick=async()=>{
-    if(!await confirmDialog('¿Iniciar nuevo mes?\nSe borrará el Stock Actual.\nAsegúrate de haber guardado "'+S.month+'" primero.'))return;
-    S.stock={};S.month=nowLabel();
-    try{await invSave();toast('Inventario limpiado. Listo para '+S.month);}
+    // Antes el mensaje era el mismo sin importar si habia algo sin guardar
+    // o no — "Nuevo mes" podia borrar una captura completa con un solo
+    // confirm generico. Ahora avisa explicitamente si hay cambios sin
+    // guardar en esta sesion.
+    const msg=_stockDirty
+      ?'⚠️ Tienes capturas SIN GUARDAR en "'+S.month+'".\n\nSi continúas se perderán — no hay forma de recuperarlas.\n\n¿Iniciar nuevo mes de todas formas?'
+      :'¿Iniciar nuevo mes?\nSe borrará el Stock Actual.\nAsegúrate de haber guardado "'+S.month+'" primero.';
+    if(!await confirmDialog(msg))return;
+    S.month=nowLabel();
+    try{await invResetStock();_stockDirty=false;toast('Inventario limpiado. Listo para '+S.month);}
     catch(e){toast(e.message,'error');}
     window._invRender();
   };
