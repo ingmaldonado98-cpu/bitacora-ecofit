@@ -4,7 +4,7 @@
 
 import { users, config } from './db.js';
 import { isoNow, toast, confirmDialog } from './utils.js';
-import { createFbUser, fbUsers, resetPassword } from './firebase.js';
+import { createFbUser, fbUsers, fbUsernameIndex, resetPassword } from './firebase.js';
 
 // El input es type='email' pero el guardado se dispara por onclick (no submit de
 // <form>), así que la validación HTML5 nunca corre. Un email mal formado se
@@ -46,7 +46,18 @@ window.guardarMiPerfil = async function(id) {
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
 
   try {
+    const before = await users.getById(id);
     await users.update(id, { nombre, username });
+
+    // Si cambió el username, login() lo resuelve via fbUsernameIndex (username
+    // → authEmail) — sin actualizar esa entrada, el próximo login con el
+    // username nuevo no encuentra mapeo, cae al correo sintético adivinado
+    // (que no coincide con el authEmail real), y falla con "Usuario o
+    // contraseña incorrectos" aunque la contraseña esté bien. El correo real
+    // de acceso en Firebase Auth NO cambia — solo se agrega el nuevo alias.
+    if (before?.username && before.username !== username && before.authEmail) {
+      await fbUsernameIndex.set(username, before.authEmail).catch(() => {});
+    }
 
     // Cambiar contraseña en Firebase Auth (solo disponible para el usuario actual)
     if (pass) {
@@ -85,6 +96,22 @@ window.guardarEditUser = async function(id) {
   if (email && !_emailOk(email)) { toast('Email inválido — revisa el formato', 'error'); return; }
 
   try {
+    const before = await users.getById(id);
+    // authEmail es lo que "Restablecer contraseña" usa para enviar el link —
+    // pero editarlo aquí SOLO cambia el dato en Firestore, nunca el correo
+    // real de acceso en Firebase Auth (eso requeriría el SDK de Admin, que
+    // esta app no tiene). Si el admin escribe un correo que no coincide con
+    // el real de esa cuenta, "Restablecer contraseña" seguirá mostrando
+    // "✅ enviado" (Firebase no avisa de direcciones no vinculadas, por
+    // diseño anti-enumeración) pero el link nunca llega a nadie.
+    if (email && before?.authEmail && email !== before.authEmail) {
+      const ok = await confirmDialog(
+        `⚠️ Este correo NO actualiza el acceso real del usuario en Firebase Auth — solo cambia el dato guardado aquí.\n\n` +
+        `Si no coincide con el correo real de la cuenta, "Restablecer contraseña" dirá "enviado" pero el link no llegará a nadie.\n\n` +
+        `¿Guardar de todas formas?`
+      );
+      if (!ok) return;
+    }
     const update = { rol, email: email || null, authEmail: email || null };
     await users.update(id, update);
     toast('✅ Usuario actualizado');
@@ -167,13 +194,41 @@ window.crearUsuario = async function() {
   navigate('#settings');
 };
 
+// Bloquea desactivar/eliminar al último admin activo — sin esto un admin
+// podía dejar a todo el equipo sin nadie que pueda gestionar usuarios,
+// recuperable solo entrando directo a Firebase Console.
+async function _esUltimoAdminActivo(id) {
+  const all = await users.getAll();
+  const target = all.find(u => u.id === id);
+  if (target?.rol !== 'admin' || !target.activo) return false;
+  const otrosAdminsActivos = all.filter(u => u.id !== id && u.rol === 'admin' && u.activo);
+  return otrosAdminsActivos.length === 0;
+}
+
 window.toggleUser = async function(id, activo) {
+  if (activo && await _esUltimoAdminActivo(id)) {
+    toast('No puedes desactivar al único administrador activo — el equipo quedaría sin nadie que gestione usuarios.', 'error', 6000);
+    return;
+  }
   await users.update(id, { activo: !activo });
   navigate('#settings');
 };
 
 window.eliminarUser = async function(id) {
-  if (!await confirmDialog('¿Eliminar este usuario? Esta acción es irreversible.')) return;
+  if (await _esUltimoAdminActivo(id)) {
+    toast('No puedes eliminar al único administrador activo — el equipo quedaría sin nadie que gestione usuarios.', 'error', 6000);
+    return;
+  }
+  // Esto solo borra el perfil de Firestore — la cuenta de acceso en Firebase
+  // Auth NO se elimina (esta app no tiene el SDK de Admin para hacerlo desde
+  // el cliente). "Irreversible" se refería solo al perfil; las credenciales
+  // siguen vivas hasta borrarlas manualmente en Firebase Console →
+  // Authentication.
+  if (!await confirmDialog(
+    '¿Eliminar este usuario?\n\nEsto borra su perfil y acceso a la app — pero su cuenta de acceso ' +
+    '(usuario/contraseña) sigue existiendo en Firebase hasta que la borres manualmente en ' +
+    'Firebase Console → Authentication.\n\nEsta acción es irreversible.'
+  )) return;
   await users.delete(id);
   toast('Usuario eliminado');
   navigate('#settings');
@@ -193,6 +248,14 @@ window.guardarContacto = async function(btn) {
 };
 
 window.resetPassUser = async function(id, authEmail) {
+  // "usuario@ecofit.app" es el correo sintetico interno que se usa cuando el
+  // usuario se creo solo con username/contraseña, sin correo real — nadie
+  // puede leer ese buzon. Antes el boton mostraba "enviado" igual que con un
+  // correo real, dando una falsa sensacion de que el link llego a alguien.
+  if (authEmail?.endsWith('@ecofit.app')) {
+    toast('Este usuario no tiene un correo real configurado — no hay adónde enviar el link. Agrégale un correo real en "Editar" primero.', 'error', 7000);
+    return;
+  }
   const ok = await confirmDialog(
     `¿Enviar link de restablecimiento de contraseña a:\n${authEmail}?`
   );

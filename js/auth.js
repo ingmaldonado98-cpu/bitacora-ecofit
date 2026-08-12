@@ -124,9 +124,23 @@ export async function login(username, password) {
     const cred = await signInWithEmailAndPassword(fbAuth, authEmail, password);
     const uid  = cred.user.uid;
 
-    // Ya autenticados — ahora sí se puede leer el perfil completo.
-    let profile = await fbUsers.getById(uid);
-    if (!profile) profile = await fbUsers.getByUsername(raw);
+    // Ya autenticados — ahora sí se puede leer el perfil completo. Si el
+    // perfil no existe (cuenta borrada desde Ajustes, o huérfana por un
+    // fallo a medias al crearla), la propia LECTURA truena con
+    // "Missing or insufficient permissions" — la regla de Firestore evalúa
+    // isActive() leyendo este mismo documento, y falla en vez de devolver
+    // "no existe" limpiamente. Sin este catch el usuario veía el error crudo
+    // de Firebase sin ninguna pista real.
+    let profile;
+    try {
+      profile = await fbUsers.getById(uid);
+      if (!profile) profile = await fbUsers.getByUsername(raw);
+    } catch (readErr) {
+      if (readErr.code === 'permission-denied') {
+        throw new Error('Tu cuenta de acceso existe pero no tiene perfil en el sistema — contacta a un administrador.');
+      }
+      throw readErr;
+    }
     if (!profile) throw new Error('Perfil de usuario no encontrado en Firestore.');
     if (!profile.activo) throw new Error('Usuario desactivado. Contacta al administrador.');
 
