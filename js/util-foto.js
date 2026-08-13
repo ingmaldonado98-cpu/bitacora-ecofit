@@ -63,7 +63,7 @@ export async function fotoToImageBuffer(foto, maxDimPx = 350) {
 }
 
 // ── Compresión de imagen ───────────────────────────────────────────────────────
-export function compressImage(file, maxDim = 1920, quality = 0.80) {
+export function compressImage(file, maxDim = 1920, quality = 0.75) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {

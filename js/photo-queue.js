@@ -5,7 +5,8 @@
 //   id           — UUID del item en la cola
 //   projectId    — ID del proyecto
 //   storagePath  — Ruta en Firebase Storage donde subir
-//   base64       — Imagen comprimida en data URL
+//   blob         — Imagen comprimida como Blob (~25% menos espacio que base64 en IndexedDB)
+//   base64       — Formato legado; items encolados antes de esta versión aún lo usan
 //   createdAt    — ISO timestamp
 //   op           — Operación Firestore al completar (ver OPERACIONES abajo)
 //   opArgs       — Argumentos específicos de la operación
@@ -146,17 +147,25 @@ function _openDB() {
 
 // ── Agregar a la cola ─────────────────────────────────────────────────────────
 export async function enqueuePhoto(item) {
+  // Se persiste como Blob (más compacto en IndexedDB que el string base64);
+  // item.base64 sigue disponible en memoria para el backup local (ver abajo).
+  const blob = await (await fetch(item.base64)).blob();
+  const record = { ...item, blob };
+  delete record.base64;
+
   const db = await _openDB();
   await new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(item);
+    tx.objectStore(STORE).put(record);
     tx.oncomplete = resolve;
     tx.onerror    = e => reject(e.target.error);
   });
-  // Guardar en mapa de memoria para renderizado inmediato
-  window._pendingPhotoMap[item.id] = item.base64;
+  // Guardar en mapa de memoria para renderizado inmediato (URL de objeto,
+  // se revoca en dequeuePhoto cuando la foto ya se subió)
+  window._pendingPhotoMap[item.id] = URL.createObjectURL(blob);
   _updatePendingBadge();
   // Guardar copia física en Filesystem (backup accesible en explorador/OneDrive)
+  // — usa el item original (con base64) sin tocar su lógica de escritura nativa
   _savePhotoLocalAsync(item);
   // Registrar Background Sync para subir cuando vuelva la conexión,
   // incluso si la app está en background o el tab está dormido
@@ -192,6 +201,9 @@ export async function dequeuePhoto(id) {
     tx.oncomplete = resolve;
     tx.onerror    = e => reject(e.target.error);
   });
+  // Liberar la URL de objeto antes de olvidar la entrada (evita fuga de memoria)
+  const pendingUrl = window._pendingPhotoMap[id];
+  if (pendingUrl?.startsWith?.('blob:')) URL.revokeObjectURL(pendingUrl);
   delete window._pendingPhotoMap[id];
   _updatePendingBadge();
   // Eliminar el archivo local ahora que la foto ya está en Firebase Storage
@@ -220,7 +232,8 @@ export async function initPendingMap() {
   try {
     const items = await getAllQueued();
     for (const item of items) {
-      window._pendingPhotoMap[item.id] = item.base64;
+      // Items nuevos (blob) → URL de objeto; items legados (base64) → tal cual
+      window._pendingPhotoMap[item.id] = item.blob ? URL.createObjectURL(item.blob) : item.base64;
     }
     _updatePendingBadge();
   } catch { /* silencioso */ }
@@ -303,7 +316,7 @@ async function _processQueueImpl(silent) {
   const items = await getAllQueued();
   if (!items.length) return { synced: 0, stuck: 0, remaining: 0, lastError: null };
 
-  const { uploadPhoto } = await import('./firebase.js');
+  const { uploadPhoto, uploadPhotoBlob } = await import('./firebase.js');
   const { projects }    = await import('./db.js');
 
   let synced = 0;
@@ -317,8 +330,10 @@ async function _processQueueImpl(silent) {
       await new Promise(r => setTimeout(r, backoff));
     }
     try {
-      // Subir a Firebase Storage
-      const url = await uploadPhoto(item.base64, item.storagePath);
+      // Subir a Firebase Storage (blob = formato nuevo; base64 = items legados en cola)
+      const url = item.blob
+        ? await uploadPhotoBlob(item.blob, item.storagePath)
+        : await uploadPhoto(item.base64, item.storagePath);
 
       // Actualizar Firestore según la operación
       const p = await projects.getById(item.projectId);

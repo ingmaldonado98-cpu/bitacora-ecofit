@@ -11,7 +11,7 @@ import { getFirestore, initializeFirestore,
          getDoc, getDocs, setDoc, updateDoc,
          deleteDoc, query, orderBy }              from './vendor/firebase-firestore.js';
 import { getStorage, ref as storageRef,
-         uploadString, uploadBytes, getDownloadURL } from './vendor/firebase-storage.js';
+         uploadBytes, getDownloadURL }             from './vendor/firebase-storage.js';
 
 // ── Configuración ──────────────────────────────────────────────────────────
 const FB_CONFIG = {
@@ -26,13 +26,16 @@ const FB_CONFIG = {
 const _app = initializeApp(FB_CONFIG);
 export const fbAuth = getAuth(_app);
 export const fbDB   = initializeFirestore(_app, {
-  cache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
 const _storage = getStorage(_app);
 
-// ── Generar miniatura (400px, quality 0.55) desde data URL ────────────────
-function _makeThumb(dataUrl, maxDim = 400, quality = 0.55) {
+// ── Generar miniatura (400px, quality 0.55) — retorna Blob JPG ────────────
+// source puede ser un data URL (string) o un Blob ya comprimido.
+function _makeThumb(source, maxDim = 400, quality = 0.55) {
   return new Promise(resolve => {
+    const isBlob = source instanceof Blob;
+    const objUrl = isBlob ? URL.createObjectURL(source) : null;
     const img = new Image();
     img.onload = () => {
       let { width, height } = img;
@@ -43,10 +46,10 @@ function _makeThumb(dataUrl, maxDim = 400, quality = 0.55) {
       const canvas = document.createElement('canvas');
       canvas.width = width; canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      canvas.toBlob(blob => { if (objUrl) URL.revokeObjectURL(objUrl); resolve(blob); }, 'image/jpeg', quality);
     };
-    img.onerror = () => resolve(null);
-    img.src = dataUrl;
+    img.onerror = () => { if (objUrl) URL.revokeObjectURL(objUrl); resolve(null); };
+    img.src = objUrl || source;
   });
 }
 
@@ -65,26 +68,43 @@ function _withTimeout(promise, ms, label) {
   });
 }
 
-// ── Subir foto a Firebase Storage ─────────────────────────────────────────
+// ── Subir Blob de foto a Firebase Storage (uso interno) ───────────────────
+async function _uploadPhotoBlob(blob, path) {
+  const sRef = storageRef(_storage, path);
+  await _withTimeout(uploadBytes(sRef, blob, { contentType: 'image/jpeg' }), UPLOAD_TIMEOUT_MS, 'Subida de foto');
+  const url = await _withTimeout(getDownloadURL(sRef), UPLOAD_TIMEOUT_MS, 'Obtener URL de foto');
+
+  // Subir miniatura fire-and-forget (no bloquea el flujo principal)
+  _makeThumb(blob).then(async thumbBlob => {
+    if (!thumbBlob) return;
+    const thumbPath = path.replace(/(\.\w{2,5})$/, '_t$1');
+    const tRef = storageRef(_storage, thumbPath);
+    await uploadBytes(tRef, thumbBlob, { contentType: 'image/jpeg' });
+  }).catch(() => {});
+
+  return url;
+}
+
+// ── Subir foto (data URL base64) a Firebase Storage ────────────────────────
 export async function uploadPhoto(base64DataUrl, path) {
   if (!navigator.onLine) {
     const err = new Error('Sin conexión — conéctate a internet e intenta de nuevo');
     err.code = 'offline';
     throw err;
   }
-  const sRef = storageRef(_storage, path);
-  await _withTimeout(uploadString(sRef, base64DataUrl, 'data_url'), UPLOAD_TIMEOUT_MS, 'Subida de foto');
-  const url = await _withTimeout(getDownloadURL(sRef), UPLOAD_TIMEOUT_MS, 'Obtener URL de foto');
+  const blob = await (await fetch(base64DataUrl)).blob();
+  return _uploadPhotoBlob(blob, path);
+}
 
-  // Subir miniatura fire-and-forget (no bloquea el flujo principal)
-  _makeThumb(base64DataUrl).then(async thumbB64 => {
-    if (!thumbB64) return;
-    const thumbPath = path.replace(/(\.\w{2,5})$/, '_t$1');
-    const tRef = storageRef(_storage, thumbPath);
-    await uploadString(tRef, thumbB64, 'data_url');
-  }).catch(() => {});
-
-  return url;
+// ── Subir foto ya comprimida como Blob — usada por la cola offline para
+// reintentar un item leído directo de IndexedDB sin el round-trip por base64 ─
+export async function uploadPhotoBlob(blob, path) {
+  if (!navigator.onLine) {
+    const err = new Error('Sin conexión — conéctate a internet e intenta de nuevo');
+    err.code = 'offline';
+    throw err;
+  }
+  return _uploadPhotoBlob(blob, path);
 }
 
 // ── Subir video a Firebase Storage (directo, sin cola offline) ────────────────
