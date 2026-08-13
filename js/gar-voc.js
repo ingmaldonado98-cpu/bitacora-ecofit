@@ -67,6 +67,12 @@ export function renderVocTab(project, projectId, edit) {
   // en Levantamiento si aún no se ha elegido aquí, para no pedir el dato dos veces.
   const arreglo = vd.arreglo || lev.arregloPaneles || '';
 
+  // Strings en paralelo: igual que paneles-en-serie, es un campo manual — no
+  // afecta el cálculo de Voc (en paralelo el voltaje no cambia, solo suma
+  // corriente), pero sirve para ver el total de paneles del arreglo completo
+  // (paneles-en-serie × strings) y contrastarlo contra el total registrado.
+  const numStrings = vd.numStrings ?? 1;
+
   const resultado = vd.resultado;
 
   // Detectar si el resultado guardado está desactualizado respecto a los datos actuales
@@ -179,6 +185,18 @@ export function renderVocTab(project, projectId, edit) {
       </select>
     </div>
 
+    <!-- Strings en paralelo — descriptivo, tampoco afecta el cálculo de Voc -->
+    <div class="form-group" style="margin-top:8px">
+      <label>${icon('path', 14)} Strings en paralelo
+        <span class="form-hint">cuántos strings de "paneles en serie" hay conectados en paralelo — el total del arreglo es paneles-en-serie × strings</span>
+      </label>
+      <input type="number" id="voc-strings" value="${numStrings}" min="1" step="1" ${!edit?'disabled':''}
+             onchange="calcVoc()" style="max-width:120px" />
+      <span id="voc-total-arreglo" class="form-hint" style="display:block;margin-top:4px">
+        ${panelesSerie ? `Total del arreglo: ${panelesSerie * numStrings} panel${panelesSerie*numStrings===1?'':'es'}` : ''}
+      </span>
+    </div>
+
     <!-- Coeficiente de temperatura — editable según ficha técnica del fabricante -->
     <div class="form-group" style="margin-top:8px">
       <label>Coeficiente de temperatura Voc (%/°C)
@@ -209,6 +227,8 @@ export function renderVocTab(project, projectId, edit) {
       <div class="voc-res-row"><span>Voc string completo</span><strong id="voc-r-str">${vd.vocString?.toFixed(2) || '—'} V</strong></div>
       <div class="voc-res-row"><span>Margen de seguridad</span><strong id="voc-r-margen">${vd.margen != null ? vd.margen.toFixed(1) + '%' : '—'}</strong></div>
       <div class="voc-res-row"><span>Arreglo</span><strong id="voc-r-arreglo">${vd.arreglo || arreglo || '—'}</strong></div>
+      <div class="voc-res-row"><span>Strings en paralelo</span><strong id="voc-r-strings">${vd.numStrings ?? numStrings}</strong></div>
+      <div class="voc-res-row"><span>Total del arreglo</span><strong id="voc-r-total">${(vd.panelesSerie && (vd.numStrings ?? numStrings)) ? vd.panelesSerie * (vd.numStrings ?? numStrings) : '—'} paneles</strong></div>
       <div id="voc-r-msg" class="voc-res-msg ${semaforo?.cls || ''}">${semaforo ? semaforo.ico + ' ' + (vd.mensaje || semaforo.txt) : ''}</div>
     </div>
 
@@ -314,10 +334,11 @@ function _calcVocData() {
   const tMinZona = document.getElementById('voc-tmin-zona')?.value || 'valle';
   const coef   = parseFloat(document.getElementById('voc-coef')?.value);
   const arreglo = document.getElementById('voc-arreglo')?.value || '';
+  const numStrings = parseInt(document.getElementById('voc-strings')?.value) || 1;
 
   const result = calcVocPuro({ vocPanel: vocP, panelesSerie: serie, vocMaxInversor: vocMax, tMin, coefVoc: isNaN(coef) ? VOC_COEF : coef });
   if (!result) return null;
-  return { ...result, tMinZona, arreglo };
+  return { ...result, tMinZona, arreglo, numStrings };
 }
 
 // Botones [−]/[+] del coeficiente de temperatura (paso 0.01)
@@ -339,9 +360,18 @@ window.calcVoc = function() {
     document.getElementById('voc-r-str').textContent    = d.vocString.toFixed(2)    + ' V';
     document.getElementById('voc-r-margen').textContent = d.margen.toFixed(1)       + '%';
     document.getElementById('voc-r-arreglo').textContent = d.arreglo || '—';
+    document.getElementById('voc-r-strings').textContent = d.numStrings;
+    document.getElementById('voc-r-total').textContent   = (d.panelesSerie * d.numStrings) + ' paneles';
     const msg = document.getElementById('voc-r-msg');
     msg.textContent = d.mensaje;
     msg.className   = `voc-res-msg ${d.resultado==='seguro'?'voc-ok':d.resultado==='limite'?'voc-warn':'voc-err'}`;
+  }
+  // Total del arreglo bajo el campo "Strings en paralelo" (fuera del bloque
+  // de resultado, que solo se muestra cuando el cálculo completo es válido)
+  const totalEl = document.getElementById('voc-total-arreglo');
+  if (totalEl && d.panelesSerie) {
+    const total = d.panelesSerie * d.numStrings;
+    totalEl.textContent = `Total del arreglo: ${total} panel${total===1?'':'es'}`;
   }
   window._vocTemp = d;
 };
