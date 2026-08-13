@@ -62,6 +62,11 @@ export function renderVocTab(project, projectId, edit) {
   // calculado, con el total de paneles de la Calculadora como sugerencia.
   const panelesSerie  = vd.panelesSerie ?? getTotalPanels(project.projectConfig) ?? null;
 
+  // Arreglo eléctrico — descriptivo (no participa en el cálculo de Voc, que
+  // solo depende de paneles-en-serie por string). Se siembra con lo capturado
+  // en Levantamiento si aún no se ha elegido aquí, para no pedir el dato dos veces.
+  const arreglo = vd.arreglo || lev.arregloPaneles || '';
+
   const resultado = vd.resultado;
 
   // Detectar si el resultado guardado está desactualizado respecto a los datos actuales
@@ -162,6 +167,18 @@ export function renderVocTab(project, projectId, edit) {
              onchange="calcVoc()" style="max-width:120px" />
     </div>
 
+    <!-- Arreglo eléctrico — descriptivo, no afecta el cálculo de Voc -->
+    <div class="form-group" style="margin-top:8px">
+      <label>${icon('path', 14)} Arreglo de paneles
+        <span class="form-hint">cómo están conectados eléctricamente — no afecta el cálculo de Voc, que ya asume paneles-en-serie por string</span>
+      </label>
+      <select id="voc-arreglo" ${!edit?'disabled':''} onchange="calcVoc()">
+        <option value="">— Seleccionar —</option>
+        ${['Serie','Paralelo','Serie-Paralelo'].map(t =>
+          `<option value="${t}" ${arreglo===t?'selected':''}>${t}</option>`).join('')}
+      </select>
+    </div>
+
     <!-- Coeficiente de temperatura — editable según ficha técnica del fabricante -->
     <div class="form-group" style="margin-top:8px">
       <label>Coeficiente de temperatura Voc (%/°C)
@@ -191,6 +208,7 @@ export function renderVocTab(project, projectId, edit) {
       <div class="voc-res-row"><span>Voc corregido (${tMin}°C)</span><strong id="voc-r-corr">${vd.vocCorregido?.toFixed(2) || '—'} V</strong></div>
       <div class="voc-res-row"><span>Voc string completo</span><strong id="voc-r-str">${vd.vocString?.toFixed(2) || '—'} V</strong></div>
       <div class="voc-res-row"><span>Margen de seguridad</span><strong id="voc-r-margen">${vd.margen != null ? vd.margen.toFixed(1) + '%' : '—'}</strong></div>
+      <div class="voc-res-row"><span>Arreglo</span><strong id="voc-r-arreglo">${vd.arreglo || arreglo || '—'}</strong></div>
       <div id="voc-r-msg" class="voc-res-msg ${semaforo?.cls || ''}">${semaforo ? semaforo.ico + ' ' + (vd.mensaje || semaforo.txt) : ''}</div>
     </div>
 
@@ -295,10 +313,11 @@ function _calcVocData() {
   const tMin   = parseFloat(document.getElementById('voc-tmin')?.value || '') || VOC_T_MIN;
   const tMinZona = document.getElementById('voc-tmin-zona')?.value || 'valle';
   const coef   = parseFloat(document.getElementById('voc-coef')?.value);
+  const arreglo = document.getElementById('voc-arreglo')?.value || '';
 
   const result = calcVocPuro({ vocPanel: vocP, panelesSerie: serie, vocMaxInversor: vocMax, tMin, coefVoc: isNaN(coef) ? VOC_COEF : coef });
   if (!result) return null;
-  return { ...result, tMinZona };
+  return { ...result, tMinZona, arreglo };
 }
 
 // Botones [−]/[+] del coeficiente de temperatura (paso 0.01)
@@ -319,6 +338,7 @@ window.calcVoc = function() {
     document.getElementById('voc-r-corr').textContent   = d.vocCorregido.toFixed(2) + ' V';
     document.getElementById('voc-r-str').textContent    = d.vocString.toFixed(2)    + ' V';
     document.getElementById('voc-r-margen').textContent = d.margen.toFixed(1)       + '%';
+    document.getElementById('voc-r-arreglo').textContent = d.arreglo || '—';
     const msg = document.getElementById('voc-r-msg');
     msg.textContent = d.mensaje;
     msg.className   = `voc-res-msg ${d.resultado==='seguro'?'voc-ok':d.resultado==='limite'?'voc-warn':'voc-err'}`;
