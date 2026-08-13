@@ -207,14 +207,19 @@ export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null
              value="${modeloVal}"
              oninput="toggleVocMaxField()" />
     </div>
-    <!-- vocMax / potenciaNominalAC: solo para inversores -->
-    <div class="form-row" id="eq-vocmax-wrap" style="${(isEdit ? eq.tipo : '') === 'inversor' ? '' : 'display:none'}">
+    <!-- Voc máx entrada CD: inversor (grid-tie, el arreglo entra directo) o
+         controladora/MPPT (sistemas con batería — el arreglo entra ahí, no
+         al inversor, que solo ve el voltaje de la batería). Potencia nominal
+         CA es exclusiva del inversor (no aplica a una controladora). -->
+    <div class="form-row" id="eq-vocmax-wrap" style="${['inversor','controladora'].includes(isEdit ? eq.tipo : '') ? '' : 'display:none'}">
       <div class="form-group">
-        <label>Voc máx. entrada CD (V) <span class="form-hint">Del datasheet del inversor</span></label>
+        <label>Voc máx. entrada CD (V)
+          <span class="form-hint">Del datasheet del ${(isEdit ? eq.tipo : '') === 'controladora' ? 'controlador/MPPT' : 'inversor'}</span>
+        </label>
         <input type="number" id="eq-vocmax" placeholder="Ej: 600" step="1" min="0"
                value="${isEdit ? esc(eq.vocMax || '') : ''}" />
       </div>
-      <div class="form-group">
+      <div class="form-group" id="eq-potencia-ac-wrap" style="${(isEdit ? eq.tipo : '') === 'inversor' ? '' : 'display:none'}">
         <label>Potencia nominal CA (kW) <span class="form-hint">Para chequeo de sobresaturación DC/AC</span></label>
         <input type="number" id="eq-potencia-ac" placeholder="Ej: 5" step="0.1" min="0"
                value="${isEdit ? esc(eq.potenciaNominalAC || '') : ''}" />
@@ -286,7 +291,9 @@ window.capEqFoto = function(tipo, slotId) {
 window.toggleVocMaxField = function() {
   const tipo = document.getElementById('eq-tipo')?.value;
   const wrap = document.getElementById('eq-vocmax-wrap');
-  if (wrap) wrap.style.display = tipo === 'inversor' ? '' : 'none';
+  if (wrap) wrap.style.display = (tipo === 'inversor' || tipo === 'controladora') ? '' : 'none';
+  const acWrap = document.getElementById('eq-potencia-ac-wrap');
+  if (acWrap) acWrap.style.display = tipo === 'inversor' ? '' : 'none';
   const batWrap = document.getElementById('eq-bateria-wrap');
   if (batWrap) batWrap.style.display = tipo === 'bateria' ? '' : 'none';
 };
@@ -392,7 +399,7 @@ window.guardarEquipo = async function(projectId) {
   const equipo = {
     id:          isEdit ? (p.garantia.equipos[editIdx]?.id || uuid()) : uuid(),
     tipo, marca, modelo,
-    ...(tipo === 'inversor' && vocMaxRaw     ? { vocMax: parseFloat(vocMaxRaw) } : {}),
+    ...(['inversor','controladora'].includes(tipo) && vocMaxRaw ? { vocMax: parseFloat(vocMaxRaw) } : {}),
     ...(tipo === 'inversor' && potenciaAcRaw ? { potenciaNominalAC: parseFloat(potenciaAcRaw) } : {}),
     ...(tipo === 'bateria'  && bateriaKwhRaw ? { capacidadKwh: parseFloat(bateriaKwhRaw) } : {}),
     serial:      document.getElementById('eq-serial').value.trim(),

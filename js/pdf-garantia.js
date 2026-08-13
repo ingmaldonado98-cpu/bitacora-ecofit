@@ -79,7 +79,7 @@ export async function exportarCertificadoGarantia(projectId) {
       ['Temperatura mínima histórica', `${vd.tMin ?? '—'} °C`],
       ['Coeficiente de temperatura', `${vd.coefVoc ?? '—'} %/°C`],
       ['Voc corregido por string', `${vd.vocString?.toFixed(2) ?? '—'} V`],
-      ['Voc máx. del inversor', `${vd.vocMaxInversor ?? '—'} V`],
+      [`Voc máx. del ${vd.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vd.vocMaxInversor ?? '—'} V`],
     ], { headerShading: 'f3f4f6', headerColor: '111827' }));
   } else {
     children.push(p('Validación de Voc no realizada todavía.', { size: 18, color: 'dc2626' }));

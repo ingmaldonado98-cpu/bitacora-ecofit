@@ -13,20 +13,32 @@ import { getSerialesFlat } from './gar-paneles.js';
 const VOC_T_MIN  = 3;    // °C — La Paz, BCS (valor por defecto)
 const VOC_COEF   = -0.29; // %/°C  coeficiente típico monocristalino
 
+// El arreglo entra eléctricamente al primer equipo aguas abajo: en sistemas
+// con controladora/MPPT (aislado, sistema_pequeño) es la controladora la que
+// ve el Voc del string — el inversor ahí solo ve el voltaje de la batería.
+// En sistemas interconectados (sin controladora) el arreglo va directo al
+// inversor, como antes. Se resuelve por equipo registrado, no por tipoSistema,
+// para no duplicar esa lista y quedar sincronizado si cambia _EQUIPOS_POR_SISTEMA.
+function _getVocLimitador(g) {
+  const controladora = (g.equipos || []).find(e => e.tipo === 'controladora');
+  const inversor     = (g.equipos || []).find(e => e.tipo === 'inversor');
+  return controladora || inversor || null;
+}
+
 // ¿El Voc guardado quedó desactualizado respecto a los datos actuales del
-// proyecto (panel, inversor, T mín)? Compartido entre el render de esta
-// pestaña y el candado de firma de Garantía (garantia.js).
+// proyecto (panel, equipo limitante, T mín)? Compartido entre el render de
+// esta pestaña y el candado de firma de Garantía (garantia.js).
 export function vocEstaDesactualizado(project) {
   const g   = project.garantia || {};
   const vd  = g.validacionVoc || {};
   if (!vd.resultado) return false;
-  const inversor = (g.equipos || []).find(e => e.tipo === 'inversor');
+  const limitador = _getVocLimitador(g);
   const lev = project.documentacion?.levantamiento || {};
 
   const tMin     = (lev.tMin != null) ? lev.tMin : VOC_T_MIN;
   const tMinZona = lev.tMinZona || 'valle';
   const vocPanel = g.paneles?.voc || vd.vocPanel || null;
-  const vocMax   = inversor?.vocMax || vd.vocMaxInversor || null;
+  const vocMax   = limitador?.vocMax || vd.vocMaxInversor || null;
 
   // "Paneles en serie" ya no se deriva de strings — es un campo manual
   // (ver renderVocTab); no hay un valor "vivo" contra el cual compararlo,
@@ -42,6 +54,9 @@ export function vocEstaDesactualizado(project) {
 export function renderVocTab(project, projectId, edit) {
   const g        = project.garantia || {};
   const inversor = (g.equipos || []).find(e => e.tipo === 'inversor');
+  // Equipo que realmente limita el Voc del arreglo — la controladora/MPPT si
+  // existe (sistemas con batería), si no el inversor (interconectado directo).
+  const limitador = _getVocLimitador(g);
   const vd       = g.validacionVoc || {};
   const lev      = project.documentacion?.levantamiento || {};
 
@@ -54,7 +69,8 @@ export function renderVocTab(project, projectId, edit) {
 
   // Datos tomados directo de los registros — sin campos manuales
   const vocPanel     = g.paneles?.voc || vd.vocPanel || null;
-  const vocMax       = inversor?.vocMax || vd.vocMaxInversor || null;
+  const vocMax       = limitador?.vocMax || vd.vocMaxInversor || null;
+  const limitadorLabel = limitador?.tipo === 'controladora' ? 'controladora' : 'inversor';
 
   // Paneles en serie: campo manual — lo declara el admin/técnico según el
   // diseño eléctrico real, ya que ya no se deriva de un agrupamiento de
@@ -91,9 +107,9 @@ export function renderVocTab(project, projectId, edit) {
   const alertas = [
     missingVoc   && `Voc del panel — registra el panel en la pestaña <em>Paneles</em>`,
     missingSerie && `Paneles en serie — guarda el BOM en la Calculadora`,
-    missingInv   && (inversor
-      ? `Voc máx del inversor — edita el equipo en <em>Equipos</em>`
-      : `Inversor — registra el inversor en <em>Equipos</em>`),
+    missingInv   && (limitador
+      ? `Voc máx del ${limitadorLabel} — edita el equipo en <em>Equipos</em>`
+      : `Inversor o controladora/MPPT — registra el equipo en <em>Equipos</em>`),
   ].filter(Boolean);
 
   // Coeficiente de temperatura — editable por ficha técnica del fabricante,
@@ -130,7 +146,7 @@ export function renderVocTab(project, projectId, edit) {
         <span class="vda-val ${vocPanel ? '' : 'vda-missing'}">${vocPanel ? vocPanel + ' V' : '—'}</span>
       </div>
       <div class="vda-item">
-        <span class="vda-lbl">${icon('cpu', 14)} Voc máx inversor</span>
+        <span class="vda-lbl">${icon('cpu', 14)} Voc máx ${limitadorLabel}</span>
         <span class="vda-val ${vocMax ? '' : 'vda-missing'}">${vocMax ? vocMax + ' V' : '—'}</span>
       </div>
       <div class="vda-item">
@@ -163,6 +179,7 @@ export function renderVocTab(project, projectId, edit) {
     <input type="hidden" id="voc-max-inv" value="${vocMax      || ''}" />
     <input type="hidden" id="voc-tmin"     value="${tMin}" />
     <input type="hidden" id="voc-tmin-zona" value="${tMinZona}" />
+    <input type="hidden" id="voc-limitador-tipo" value="${limitador?.tipo || ''}" />
 
     <!-- Paneles en serie — campo manual, ya no se agrupa por string -->
     <div class="form-group" style="margin-top:8px">
@@ -335,10 +352,11 @@ function _calcVocData() {
   const coef   = parseFloat(document.getElementById('voc-coef')?.value);
   const arreglo = document.getElementById('voc-arreglo')?.value || '';
   const numStrings = parseInt(document.getElementById('voc-strings')?.value) || 1;
+  const limitadorTipo = document.getElementById('voc-limitador-tipo')?.value || 'inversor';
 
   const result = calcVocPuro({ vocPanel: vocP, panelesSerie: serie, vocMaxInversor: vocMax, tMin, coefVoc: isNaN(coef) ? VOC_COEF : coef });
   if (!result) return null;
-  return { ...result, tMinZona, arreglo, numStrings };
+  return { ...result, tMinZona, arreglo, numStrings, limitadorTipo };
 }
 
 // Botones [−]/[+] del coeficiente de temperatura (paso 0.01)
@@ -386,41 +404,44 @@ window.calcVocYGuardar = async function(projectId) {
 window.guardarVoc = async function(projectId) {
   if (!window._vocTemp) { toast('Primero calcula el Voc', 'warn'); return; }
 
-  // ── Critical #3: Validar consistencia con el inversor registrado ───────────
-  const proj     = await projects.getById(projectId);
-  const inversor = (proj?.garantia?.equipos || []).find(e => e.tipo === 'inversor');
+  // ── Critical #3: Validar consistencia con el equipo limitante registrado ───
+  // Controladora/MPPT si existe (sistemas con batería), si no el inversor
+  // (interconectado directo) — mismo criterio que renderVocTab/_getVocLimitador.
+  const proj      = await projects.getById(projectId);
+  const limitador = _getVocLimitador(proj?.garantia || {});
+  const limitadorLabel = limitador?.tipo === 'controladora' ? 'controladora' : 'inversor';
   const savedVocMax = window._vocTemp.vocMaxInversor;
   const session0 = await getSession();
 
-  // Candado: si el Voc del string excede el límite del inversor, solo un admin
+  // Candado: si el Voc del string excede el límite del equipo, solo un admin
   // puede guardar de todas formas — y queda como excepción registrada en el
   // historial, igual que otros candados de la app (ej. bloque del checklist).
   if (window._vocTemp.resultado === 'excede') {
     if (!isAdmin(session0)) {
-      toast('🚨 El Voc excede el límite del inversor. Solo un administrador puede autorizar guardar esta configuración.', 'error', 7000);
+      toast(`🚨 El Voc excede el límite del ${limitadorLabel}. Solo un administrador puede autorizar guardar esta configuración.`, 'error', 7000);
       return;
     }
     const ok = await confirmDialog(
-      `🚨 El Voc del string (${window._vocTemp.vocString.toFixed(1)} V) excede el límite del inversor (${savedVocMax} V). ` +
+      `🚨 El Voc del string (${window._vocTemp.vocString.toFixed(1)} V) excede el límite del ${limitadorLabel} (${savedVocMax} V). ` +
       'Esto es una excepción que quedará registrada en el historial. ¿Guardar de todas formas?'
     );
     if (!ok) return;
   }
 
-  if (!inversor) {
-    // No hay inversor — advertir y pedir confirmación
+  if (!limitador) {
+    // Sin inversor ni controladora registrados — advertir y pedir confirmación
     const ok = await confirmDialog(
-      '⚠️ Sin inversor registrado. El Voc máximo fue ingresado manualmente y no quedará vinculado a ningún equipo real. ¿Guardar de todas formas?'
+      '⚠️ Sin inversor ni controladora/MPPT registrados. El Voc máximo fue ingresado manualmente y no quedará vinculado a ningún equipo real. ¿Guardar de todas formas?'
     );
     if (!ok) return;
-  } else if (!inversor.vocMax || inversor.vocMax === 0) {
-    // Hay inversor pero sin vocMax — bloquear
-    toast('El inversor no tiene Voc máx registrado. Edítalo en la pestaña Equipos antes de guardar.', 'warn', 6000);
+  } else if (!limitador.vocMax || limitador.vocMax === 0) {
+    // Hay equipo pero sin vocMax — bloquear
+    toast(`El ${limitadorLabel} no tiene Voc máx registrado. Edítalo en la pestaña Equipos antes de guardar.`, 'warn', 6000);
     return;
-  } else if (Math.abs(inversor.vocMax - savedVocMax) > 0.5) {
+  } else if (Math.abs(limitador.vocMax - savedVocMax) > 0.5) {
     // El valor ingresado difiere del registrado en el equipo
     const ok = await confirmDialog(
-      `⚠️ El inversor registrado tiene Voc máx = ${inversor.vocMax} V, pero se calculó con ${savedVocMax} V. ¿Guardar con el valor ingresado manualmente?`
+      `⚠️ El ${limitadorLabel} registrado tiene Voc máx = ${limitador.vocMax} V, pero se calculó con ${savedVocMax} V. ¿Guardar con el valor ingresado manualmente?`
     );
     if (!ok) return;
   }

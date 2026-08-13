@@ -409,7 +409,7 @@ window.exportarPDFTecnico = async function(projectId, btnEl) {
       y=campo(doc,'Coef. temp. Voc',`${vocData.coefVoc}%/°C`,110,y-12);
       y=campo(doc,'Voc corregido por temp.',`${vocData.vocCorregido?.toFixed(2)} V`,14,y);
       y=campo(doc,'Voc total del string',`${vocData.vocString?.toFixed(2)} V`,110,y-12);
-      y=campo(doc,'Voc máx. inversor',`${vocData.vocMaxInversor} V`,14,y);
+      y=campo(doc,`Voc máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`,`${vocData.vocMaxInversor} V`,14,y);
       y=campo(doc,'Margen de seguridad',`${vocData.margen?.toFixed(1)}%`,110,y-12);
       if (vocData.mensaje) {
         const lineas = doc.splitTextToSize(vocData.mensaje, 170);

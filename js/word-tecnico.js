@@ -344,7 +344,7 @@ window.exportarWordTecnico = async function(projectId) {
       addCampo('Coef. temp. Voc', `${vocData.coefVoc}%/°C`);
       addCampo('Voc corregido por temp.', `${vocData.vocCorregido?.toFixed(2)} V`);
       addCampo('Voc total del string', `${vocData.vocString?.toFixed(2)} V`);
-      addCampo('Voc máx. inversor', `${vocData.vocMaxInversor} V`);
+      addCampo(`Voc máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vocData.vocMaxInversor} V`);
       addCampo('Margen de seguridad', `${vocData.margen?.toFixed(1)}%`);
       if (vocData.mensaje) children.push(p(vocData.mensaje, { italic: true, color: resColor }));
     }
