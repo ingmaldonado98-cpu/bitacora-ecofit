@@ -201,9 +201,10 @@ function _renderVocCard(project, projectId, edit, equipo) {
       </div>
     </div>
 
-    <!-- Alertas si faltan datos -->
-    ${alertas.length ? `
-    <div class="voc-no-inversor" role="status" aria-live="polite" style="margin-top:10px">
+    <!-- Alertas si faltan datos — id fijo para que calcVoc() la oculte/muestre
+         en vivo al llenar "Paneles en serie" sin necesitar recargar la página -->
+    <div id="voc-alertas-${eid}" class="voc-no-inversor" role="status" aria-live="polite"
+         style="margin-top:10px; ${alertas.length ? '' : 'display:none'}">
       ${icon('warning-circle', 16)}
       <div>
         <strong>Falta registrar para continuar:</strong>
@@ -211,7 +212,7 @@ function _renderVocCard(project, projectId, edit, equipo) {
           ${alertas.map(a=>`<li>${a}</li>`).join('')}
         </ul>
       </div>
-    </div>` : ''}
+    </div>
 
     <!-- Inputs ocultos para la lógica de calcVoc -->
     <input type="hidden" id="voc-panel-${eid}"        value="${vocPanel    || ''}" />
@@ -299,8 +300,8 @@ function _renderVocCard(project, projectId, edit, equipo) {
       ${!iscDisponible ? `<p class="form-hint" style="margin:8px 0 0">${icon('info',13)} Registra Isc del panel (pestaña Paneles) y la corriente máx. del equipo (pestaña Equipos) para validar también el amperaje.</p>` : ''}
     </div>
 
-    ${edit && !alertas.length && !stale ? `
-    <div class="form-actions" style="margin-top:12px">
+    ${edit ? `
+    <div id="voc-actions-${eid}" class="form-actions" style="margin-top:12px; ${(!alertas.length && !stale) ? '' : 'display:none'}">
       <button class="btn-primary btn-sm" onclick="calcVocYGuardar('${projectId}','${eid}')">
         ${icon('check', 14)} Calcular y guardar
       </button>
@@ -467,7 +468,19 @@ window._stepVocCoef = function(eqId, delta) {
 
 window.calcVoc = function(eqId) {
   const d = _calcVocData(eqId);
-  if (!d) return;
+  // Banner de "falta registrar" y botón de guardar: antes quedaban fijos con
+  // lo que había al cargar la página — si el técnico llenaba "Paneles en
+  // serie" recién ahí, el resultado se calculaba en vivo pero el botón para
+  // guardarlo no aparecía hasta recargar. Ahora reaccionan en cada cálculo.
+  const alertasEl = document.getElementById(`voc-alertas-${eqId}`);
+  const actionsEl = document.getElementById(`voc-actions-${eqId}`);
+  if (!d) {
+    if (alertasEl) alertasEl.style.display = '';
+    if (actionsEl) actionsEl.style.display = 'none';
+    return;
+  }
+  if (alertasEl) alertasEl.style.display = 'none';
+  if (actionsEl) actionsEl.style.display = '';
   const wrap = document.getElementById(`voc-resultado-${eqId}`);
   if (wrap) {
     wrap.style.display = '';
