@@ -453,7 +453,11 @@ function _calcVocData(eqId) {
   const serie  = parseInt(document.getElementById(`voc-serie-${eqId}`)?.value)       || 0;
   const vocMax = parseFloat(document.getElementById(`voc-max-inv-${eqId}`)?.value)   || 0;
   const imax   = parseFloat(document.getElementById(`voc-imax-${eqId}`)?.value)      || 0;
-  const tMin   = parseFloat(document.getElementById(`voc-tmin-${eqId}`)?.value || '') || VOC_T_MIN;
+  // "|| VOC_T_MIN" trataría un T mín real de 0°C (Sonora, Hidalgo, Nuevo León,
+  // Puebla...) como si faltara el dato, por ser 0 falsy en JS, y lo pisaría con
+  // el default de 3°C sin avisar. isNaN es el chequeo correcto aquí.
+  const tMinRaw = parseFloat(document.getElementById(`voc-tmin-${eqId}`)?.value);
+  const tMin    = isNaN(tMinRaw) ? VOC_T_MIN : tMinRaw;
   const tMinZona = document.getElementById(`voc-tmin-zona-${eqId}`)?.value || 'valle';
   const coef   = parseFloat(document.getElementById(`voc-coef-${eqId}`)?.value);
   const arreglo = document.getElementById(`voc-arreglo-${eqId}`)?.value || '';
