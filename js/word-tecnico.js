@@ -13,6 +13,7 @@ import { MESES_CORTO } from './lev-consumo.js';
 import { calcDimensionamiento, detectarRiesgos } from '../modules/dimensionamiento/index.js';
 import { buildDimRows, MOD_LABELS } from './dimensionamiento.js';
 import { getRowsData, getPanelWidth, getPanelHeight, buildDiagramSVG } from '../modules/calculadora/index.js';
+import { getLimitadorEquipos } from './gar-voc.js';
 import { withExplicitSize, svgToPngBuffer } from './pdf-calculadora.js';
 
 const VERDE_OSC = '1B4332';
@@ -332,7 +333,7 @@ window.exportarWordTecnico = async function(projectId) {
 
   // Validación de arreglo (Voc / corriente) — una por equipo (inversor/controladora)
   if (sec('sec-voc')) {
-    const equiposLimitadoresVoc = (project.garantia?.equipos || []).filter(e => e.tipo === 'inversor' || e.tipo === 'controladora');
+    const equiposLimitadoresVoc = getLimitadorEquipos(project.garantia || {});
     const validacionesVoc = project.garantia?.arregloValidaciones || {};
     for (const eqLim of equiposLimitadoresVoc) {
       const vocData = validacionesVoc[eqLim.id];

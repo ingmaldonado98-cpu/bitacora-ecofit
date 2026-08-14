@@ -6,7 +6,7 @@ import { esc, fmtFechaHora, toast, calcFaseEstado, uuid, isoNow, confirmDialog }
 import { canEdit, isAdmin, getSession } from './auth.js';
 import { icon } from './icons.js';
 import { renderFirmaBlock } from './project.js';
-import { renderVocTab, vocEstaDesactualizado } from './gar-voc.js';
+import { renderVocTab, vocEstaDesactualizado, getLimitadorEquipos } from './gar-voc.js';
 import { renderEquipos, formEquipo, _clearEqFotos, renderEquiposSugeridos } from './gar-equipos.js';
 import { renderEstructura } from './gar-estructura.js';
 import { renderPaneles } from './gar-paneles.js';
@@ -71,7 +71,7 @@ export async function renderGarantia(projectId, session) {
       Voc${(() => {
         // Peor caso entre todos los equipos: cualquier 'excede' domina; solo
         // es 'ok' si TODOS los que tienen resultado son 'seguro'.
-        const equipos = (g.equipos||[]).filter(e=>e.tipo==='controladora'||e.tipo==='inversor');
+        const equipos = getLimitadorEquipos(g);
         const validaciones = g.arregloValidaciones || {};
         const resultados = equipos.map(e => validaciones[e.id]?.resultado).filter(Boolean);
         if (!resultados.length) return '';

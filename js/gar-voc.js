@@ -14,12 +14,18 @@ const VOC_T_MIN  = 3;    // °C — La Paz, BCS (valor por defecto)
 const VOC_COEF   = -0.29; // %/°C  coeficiente típico monocristalino
 
 // Equipos que reciben el arreglo eléctricamente y por tanto necesitan su
-// propia validación de Voc/corriente: controladora/MPPT o inversor. En
-// sistemas Victron-style puede haber MÁS DE UNO, cada uno con su propio
-// arreglo independiente — por eso esto es un filtro (todos), no un .find()
-// del primero. Antes solo se validaba el primero encontrado.
-function _getLimitadorEquipos(g) {
-  return (g.equipos || []).filter(e => e.tipo === 'controladora' || e.tipo === 'inversor');
+// propia validación de Voc/corriente. Si hay controladora(s)/MPPT (sistemas
+// con batería), el arreglo entra AHÍ — el/los inversor(es) quedan aguas
+// abajo de la batería (batería → inversor → cargas CA) y nunca ven el
+// string de paneles, así que quedan excluidos. Solo se valida el inversor
+// cuando NO hay ninguna controladora (interconectado directo, el arreglo va
+// al inversor). En sistemas Victron-style puede haber MÁS DE UNA
+// controladora, cada una con su propio arreglo independiente — por eso esto
+// es un filtro (todas), no un .find() de la primera.
+export function getLimitadorEquipos(g) {
+  const equipos = g.equipos || [];
+  const controladoras = equipos.filter(e => e.tipo === 'controladora');
+  return controladoras.length ? controladoras : equipos.filter(e => e.tipo === 'inversor');
 }
 
 function _validacionDesactualizada(vd, equipo, g, lev) {
@@ -48,12 +54,12 @@ export function vocEstaDesactualizado(project) {
   const g   = project.garantia || {};
   const lev = project.documentacion?.levantamiento || {};
   const validaciones = g.arregloValidaciones || {};
-  return _getLimitadorEquipos(g).some(eq => _validacionDesactualizada(validaciones[eq.id] || {}, eq, g, lev));
+  return getLimitadorEquipos(g).some(eq => _validacionDesactualizada(validaciones[eq.id] || {}, eq, g, lev));
 }
 
 export function renderVocTab(project, projectId, edit) {
   const g       = project.garantia || {};
-  const equipos = _getLimitadorEquipos(g);
+  const equipos = getLimitadorEquipos(g);
 
   if (!equipos.length) {
     return `
@@ -306,7 +312,7 @@ function _renderVocCard(project, projectId, edit, equipo) {
 // caso tiene sentido sugerir "paneles en serie" desde el total global de la
 // Calculadora (con más de un equipo no hay forma de saber cómo se reparten).
 function equipos1(g) {
-  return _getLimitadorEquipos(g).length === 1;
+  return getLimitadorEquipos(g).length === 1;
 }
 
 // Rellena los campos de panel al seleccionar del catálogo

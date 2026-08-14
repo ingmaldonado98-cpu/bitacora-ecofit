@@ -17,6 +17,7 @@ import { calcDimensionamiento, detectarRiesgos } from '../modules/dimensionamien
 import { buildDimRows, MOD_LABELS } from './dimensionamiento.js';
 import { getRowsData, getPanelWidth, getPanelHeight, buildDiagramSVG } from '../modules/calculadora/index.js';
 import { withExplicitSize, svgToPngDataUri } from './pdf-calculadora.js';
+import { getLimitadorEquipos } from './gar-voc.js';
 
 const ESTADOS_LABEL = Object.fromEntries(Object.entries(ESTADOS).map(([k,v]) => [k, v.label]));
 
@@ -392,7 +393,7 @@ window.exportarPDFTecnico = async function(projectId, btnEl) {
     }
 
     // Validación de arreglo (Voc / corriente) — una por equipo (inversor/controladora)
-    const equiposLimitadoresVoc = (project.garantia?.equipos || []).filter(e => e.tipo === 'inversor' || e.tipo === 'controladora');
+    const equiposLimitadoresVoc = getLimitadorEquipos(project.garantia || {});
     const validacionesVoc = project.garantia?.arregloValidaciones || {};
     if (sec('sec-voc') && equiposLimitadoresVoc.length) {
       for (const eqLim of equiposLimitadoresVoc) {

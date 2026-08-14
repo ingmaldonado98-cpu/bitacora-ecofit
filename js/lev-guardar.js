@@ -5,6 +5,7 @@ import { projects, logChange } from './db.js';
 import { toast, isoNow, genDisplayId, capturePhoto, captureVideo, uuid, uploadProgressBar, confirmDialog } from './utils.js';
 import { getSession } from './auth.js';
 import { calcVocPuro, calcIscPuro } from './garantia.js';
+import { getLimitadorEquipos } from './gar-voc.js';
 import { uploadPhotoQueued, uploadVideo, buildFotoPath } from './firebase.js';
 import { _sujecionPorTecho } from './lev-areas.js';
 import { getTotalPanels } from '../modules/calculadora/index.js';
@@ -227,7 +228,7 @@ async function _autoRecalcVocSilent(projectId, newTMin, newTMinZona) {
   try {
     const p       = await projects.getById(projectId);
     const g       = p?.garantia || {};
-    const equipos = (g.equipos || []).filter(e => e.tipo === 'controladora' || e.tipo === 'inversor');
+    const equipos = getLimitadorEquipos(g);
     if (!equipos.length) return;
 
     const vocPanel = g.paneles?.voc || null;

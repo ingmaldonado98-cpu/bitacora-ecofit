@@ -4,6 +4,7 @@
 import { projects } from './db.js';
 import { fmtFecha, toast, fotoToImageBuffer } from './utils.js';
 import { garantiasAplicables } from './garantia.js';
+import { getLimitadorEquipos } from './gar-voc.js';
 import { newDoc, heading1, heading2, p, table, hr, imageBlock,
          AlignmentType, saveDocx, ensureDocxLoaded } from './word-helpers.js';
 
@@ -69,7 +70,7 @@ export async function exportarCertificadoGarantia(projectId) {
 
   // ── Resultado de Voc / corriente — una tabla por equipo (inversor/controladora) ──
   addSec('Validación de arreglo (Voc / corriente)');
-  const equiposLimitadores = equipos.filter(e => e.tipo === 'inversor' || e.tipo === 'controladora');
+  const equiposLimitadores = getLimitadorEquipos(g);
   const validaciones = g.arregloValidaciones || {};
   if (!equiposLimitadores.length) {
     children.push(p('Sin inversor ni controladora/MPPT registrados.', { size: 18, color: 'dc2626' }));
