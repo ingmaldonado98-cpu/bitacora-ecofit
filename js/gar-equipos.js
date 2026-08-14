@@ -207,10 +207,10 @@ export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null
              value="${modeloVal}"
              oninput="toggleVocMaxField()" />
     </div>
-    <!-- Voc máx entrada CD: inversor (grid-tie, el arreglo entra directo) o
-         controladora/MPPT (sistemas con batería — el arreglo entra ahí, no
-         al inversor, que solo ve el voltaje de la batería). Potencia nominal
-         CA es exclusiva del inversor (no aplica a una controladora). -->
+    <!-- Voc máx / Imax entrada CD: inversor (grid-tie, el arreglo entra
+         directo) o controladora/MPPT (sistemas con batería — el arreglo
+         entra ahí, no al inversor, que solo ve el voltaje/corriente de la
+         batería). Potencia nominal CA es exclusiva del inversor. -->
     <div class="form-row" id="eq-vocmax-wrap" style="${['inversor','controladora'].includes(isEdit ? eq.tipo : '') ? '' : 'display:none'}">
       <div class="form-group">
         <label>Voc máx. entrada CD (V)
@@ -219,7 +219,16 @@ export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null
         <input type="number" id="eq-vocmax" placeholder="Ej: 600" step="1" min="0"
                value="${isEdit ? esc(eq.vocMax || '') : ''}" />
       </div>
-      <div class="form-group" id="eq-potencia-ac-wrap" style="${(isEdit ? eq.tipo : '') === 'inversor' ? '' : 'display:none'}">
+      <div class="form-group">
+        <label>Corriente máx. entrada CD (A)
+          <span class="form-hint">Del datasheet del ${(isEdit ? eq.tipo : '') === 'controladora' ? 'controlador/MPPT' : 'inversor'}</span>
+        </label>
+        <input type="number" id="eq-imax" placeholder="Ej: 45" step="0.1" min="0"
+               value="${isEdit ? esc(eq.imax || '') : ''}" />
+      </div>
+    </div>
+    <div class="form-row" id="eq-potencia-ac-wrap" style="${(isEdit ? eq.tipo : '') === 'inversor' ? '' : 'display:none'}">
+      <div class="form-group">
         <label>Potencia nominal CA (kW) <span class="form-hint">Para chequeo de sobresaturación DC/AC</span></label>
         <input type="number" id="eq-potencia-ac" placeholder="Ej: 5" step="0.1" min="0"
                value="${isEdit ? esc(eq.potenciaNominalAC || '') : ''}" />
@@ -394,12 +403,14 @@ window.guardarEquipo = async function(projectId) {
   }
 
   const vocMaxRaw      = document.getElementById('eq-vocmax')?.value?.trim();
+  const imaxRaw        = document.getElementById('eq-imax')?.value?.trim();
   const potenciaAcRaw  = document.getElementById('eq-potencia-ac')?.value?.trim();
   const bateriaKwhRaw  = document.getElementById('eq-bateria-kwh')?.value?.trim();
   const equipo = {
     id:          isEdit ? (p.garantia.equipos[editIdx]?.id || uuid()) : uuid(),
     tipo, marca, modelo,
     ...(['inversor','controladora'].includes(tipo) && vocMaxRaw ? { vocMax: parseFloat(vocMaxRaw) } : {}),
+    ...(['inversor','controladora'].includes(tipo) && imaxRaw   ? { imax: parseFloat(imaxRaw) } : {}),
     ...(tipo === 'inversor' && potenciaAcRaw ? { potenciaNominalAC: parseFloat(potenciaAcRaw) } : {}),
     ...(tipo === 'bateria'  && bateriaKwhRaw ? { capacidadKwh: parseFloat(bateriaKwhRaw) } : {}),
     serial:      document.getElementById('eq-serial').value.trim(),

@@ -16,6 +16,7 @@ window.crearPanel = async function() {
   const pH    = parseFloat(document.getElementById('np-ph').value);
   const voc   = parseFloat(document.getElementById('np-voc').value) || null;
   const imp   = parseFloat(document.getElementById('np-imp').value) || null;
+  const isc   = parseFloat(document.getElementById('np-isc').value) || null;
 
   if (!label)             { toast('Ingresa la marca/modelo','error'); return; }
   if (!wp || wp < 1)      { toast('Potencia inválida','error'); return; }
@@ -30,6 +31,7 @@ window.crearPanel = async function() {
     pW, pH, wp,
     ...(voc ? { voc } : {}),
     ...(imp ? { imp } : {}),
+    ...(isc ? { isc } : {}),
     isCustom: true,
   };
   await kv.set('panel_presets_custom', [...existing, nuevo]);
@@ -50,6 +52,7 @@ window.guardarEditPanel = async function(id) {
   const pH    = parseFloat(document.getElementById('ep-ph-' + id).value);
   const voc   = parseFloat(document.getElementById('ep-voc-' + id).value) || null;
   const imp   = parseFloat(document.getElementById('ep-imp-' + id).value) || null;
+  const isc   = parseFloat(document.getElementById('ep-isc-' + id).value) || null;
 
   if (!label)          { toast('Ingresa la marca/modelo','error'); return; }
   if (!wp || wp < 1)   { toast('Potencia inválida','error'); return; }
@@ -59,7 +62,8 @@ window.guardarEditPanel = async function(id) {
   const existing = (await kv.get('panel_presets_custom')) || [];
   const updated = existing.map(p => p.id === id
     ? { ...p, label, sub: `${wp}W · ${pW}×${pH}m`, wp, pW, pH,
-        ...(voc ? { voc } : { voc: null }), ...(imp ? { imp } : { imp: null }) }
+        ...(voc ? { voc } : { voc: null }), ...(imp ? { imp } : { imp: null }),
+        ...(isc ? { isc } : { isc: null }) }
     : p
   );
   await kv.set('panel_presets_custom', updated);

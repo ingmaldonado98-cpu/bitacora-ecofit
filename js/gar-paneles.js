@@ -84,11 +84,16 @@ export function renderPaneles(paneles, projectId, edit, catalog = [], fuenteCalc
         <label>Imp — Corriente punto máximo (A)</label>
         <input type="number" id="panel-imp" value="${paneles.imp||''}" min="0" step="0.01" placeholder="Ej: 13.95" ${!edit?'disabled':''} />
       </div>
+      <div class="form-group">
+        <label>Isc — Corriente cortocircuito (A)</label>
+        <input type="number" id="panel-isc" value="${paneles.isc||''}" min="0" step="0.01" placeholder="Ej: 14.35" ${!edit?'disabled':''} />
+      </div>
     </div>
-    ${!edit && (paneles.voc || paneles.imp) ? `
+    ${!edit && (paneles.voc || paneles.imp || paneles.isc) ? `
     <div class="panel-elec-vals">
       ${paneles.voc ? `<span class="pe-val">Voc <strong>${paneles.voc} V</strong></span>` : ''}
       ${paneles.imp ? `<span class="pe-val">Imp <strong>${paneles.imp} A</strong></span>` : ''}
+      ${paneles.isc ? `<span class="pe-val">Isc <strong>${paneles.isc} A</strong></span>` : ''}
     </div>` : ''}
     ${edit ? `<button class="btn-outline btn-sm" onclick="guardarInfoPanel('${projectId}')">Guardar info del panel</button>` : ''}
     ${cierreSugerencia}
@@ -182,6 +187,7 @@ window.guardarInfoPanel = async function(projectId) {
   const wp     = parseFloat(document.getElementById('panel-wp').value)  || 0;
   const voc    = parseFloat(document.getElementById('panel-voc').value)  || null;
   const imp    = parseFloat(document.getElementById('panel-imp').value)  || null;
+  const isc    = parseFloat(document.getElementById('panel-isc').value)  || null;
   // setField puntual por subcampo — no pisa garantia.equipos/notas/estructura
   // si otro técnico edita el mismo proyecto al mismo tiempo.
   await projects.setField(projectId, 'garantia.paneles.marca',  marca);
@@ -189,6 +195,7 @@ window.guardarInfoPanel = async function(projectId) {
   await projects.setField(projectId, 'garantia.paneles.wp',     wp);
   await projects.setField(projectId, 'garantia.paneles.voc',    voc);
   await projects.setField(projectId, 'garantia.paneles.imp',    imp);
+  await projects.setField(projectId, 'garantia.paneles.isc',    isc);
   logChange(projectId, { modulo: 'Garantía', accion: 'info de panel guardada', detalle: `${marca} ${modelo}`, quien: await getSession() });
   toast('✅ Info del panel guardada');
 };

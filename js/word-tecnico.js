@@ -330,22 +330,32 @@ window.exportarWordTecnico = async function(projectId) {
     }
   }
 
-  // Validación Voc
+  // Validación de arreglo (Voc / corriente) — una por equipo (inversor/controladora)
   if (sec('sec-voc')) {
-    const vocData = project.garantia?.validacionVoc;
-    if (vocData?.resultado) {
-      addSec('Validación Voc de string');
+    const equiposLimitadoresVoc = (project.garantia?.equipos || []).filter(e => e.tipo === 'inversor' || e.tipo === 'controladora');
+    const validacionesVoc = project.garantia?.arregloValidaciones || {};
+    for (const eqLim of equiposLimitadoresVoc) {
+      const vocData = validacionesVoc[eqLim.id];
+      if (!vocData?.resultado) continue;
+      const tituloEq = `${eqLim.marca || ''} ${eqLim.modelo || ''}`.trim() || (eqLim.tipo === 'controladora' ? 'Controladora/MPPT' : 'Inversor');
+      addSec(`Validación de arreglo — ${tituloEq}`);
       const resLabel = vocData.resultado === 'seguro' ? 'SEGURO ✓' : vocData.resultado === 'limite' ? 'EN EL LÍMITE ⚠' : 'EXCEDE EL LÍMITE ✗';
       const resColor = vocData.resultado === 'seguro' ? '1e7840' : vocData.resultado === 'limite' ? 'b48c00' : 'c82828';
       children.push(p(resLabel, { bold: true, size: 26, color: resColor }));
       addCampo('Voc del panel', `${vocData.vocPanel} V`);
       addCampo('Paneles en serie', `${vocData.panelesSerie}`);
+      addCampo('Strings en paralelo', `${vocData.numStrings ?? '—'}`);
       addCampo('Temp. mínima sitio', `${vocData.tMin}°C`);
       addCampo('Coef. temp. Voc', `${vocData.coefVoc}%/°C`);
       addCampo('Voc corregido por temp.', `${vocData.vocCorregido?.toFixed(2)} V`);
       addCampo('Voc total del string', `${vocData.vocString?.toFixed(2)} V`);
       addCampo(`Voc máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vocData.vocMaxInversor} V`);
-      addCampo('Margen de seguridad', `${vocData.margen?.toFixed(1)}%`);
+      addCampo('Margen de seguridad (Voc)', `${vocData.margen?.toFixed(1)}%`);
+      if (vocData.iscArreglo != null) {
+        addCampo('Corriente del arreglo', `${vocData.iscArreglo.toFixed(2)} A`);
+        addCampo(`Corriente máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vocData.imaxEquipo ?? '—'} A`);
+        addCampo('Margen de seguridad (corriente)', `${vocData.margenIsc?.toFixed(1)}%`);
+      }
       if (vocData.mensaje) children.push(p(vocData.mensaje, { italic: true, color: resColor }));
     }
   }

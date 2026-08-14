@@ -67,22 +67,40 @@ export async function exportarCertificadoGarantia(projectId) {
     children.push(p('Sin equipos registrados.', { size: 18, color: '6b7280' }));
   }
 
-  // ── Resultado de Voc ─────────────────────────────────────────────────────
-  addSec('Validación de tensión en circuito abierto (Voc)');
-  const vd = g.validacionVoc;
-  if (vd?.resultado) {
-    const color = vd.resultado === 'seguro' ? '16a34a' : vd.resultado === 'excede' ? 'dc2626' : 'd97706';
-    children.push(p(vd.mensaje || vd.resultado, { bold: true, color, size: 18 }));
-    children.push(table(['Medición', 'Valor'], [
-      ['Voc panel (STC)', `${vd.vocPanel ?? '—'} V`],
-      ['Paneles en serie', `${vd.panelesSerie ?? '—'}`],
-      ['Temperatura mínima histórica', `${vd.tMin ?? '—'} °C`],
-      ['Coeficiente de temperatura', `${vd.coefVoc ?? '—'} %/°C`],
-      ['Voc corregido por string', `${vd.vocString?.toFixed(2) ?? '—'} V`],
-      [`Voc máx. del ${vd.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vd.vocMaxInversor ?? '—'} V`],
-    ], { headerShading: 'f3f4f6', headerColor: '111827' }));
+  // ── Resultado de Voc / corriente — una tabla por equipo (inversor/controladora) ──
+  addSec('Validación de arreglo (Voc / corriente)');
+  const equiposLimitadores = equipos.filter(e => e.tipo === 'inversor' || e.tipo === 'controladora');
+  const validaciones = g.arregloValidaciones || {};
+  if (!equiposLimitadores.length) {
+    children.push(p('Sin inversor ni controladora/MPPT registrados.', { size: 18, color: 'dc2626' }));
   } else {
-    children.push(p('Validación de Voc no realizada todavía.', { size: 18, color: 'dc2626' }));
+    for (const eq of equiposLimitadores) {
+      const vd = validaciones[eq.id];
+      const tituloEq = `${eq.marca || ''} ${eq.modelo || ''}`.trim() || (eq.tipo === 'controladora' ? 'Controladora/MPPT' : 'Inversor');
+      children.push(p(tituloEq, { bold: true, size: 20, color: '111827' }));
+      if (!vd?.resultado) {
+        children.push(p('Validación de Voc no realizada todavía.', { size: 18, color: 'dc2626' }));
+        continue;
+      }
+      const color = vd.resultado === 'seguro' ? '16a34a' : vd.resultado === 'excede' ? 'dc2626' : 'd97706';
+      children.push(p(vd.mensaje || vd.resultado, { bold: true, color, size: 18 }));
+      const rows = [
+        ['Voc panel (STC)', `${vd.vocPanel ?? '—'} V`],
+        ['Paneles en serie', `${vd.panelesSerie ?? '—'}`],
+        ['Strings en paralelo', `${vd.numStrings ?? '—'}`],
+        ['Temperatura mínima histórica', `${vd.tMin ?? '—'} °C`],
+        ['Coeficiente de temperatura', `${vd.coefVoc ?? '—'} %/°C`],
+        ['Voc corregido por string', `${vd.vocString?.toFixed(2) ?? '—'} V`],
+        [`Voc máx. del ${vd.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vd.vocMaxInversor ?? '—'} V`],
+      ];
+      if (vd.iscArreglo != null) {
+        rows.push(
+          ['Corriente del arreglo (Isc)', `${vd.iscArreglo.toFixed(2)} A`],
+          [`Corriente máx. del ${vd.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vd.imaxEquipo ?? '—'} A`],
+        );
+      }
+      children.push(table(['Medición', 'Valor'], rows, { headerShading: 'f3f4f6', headerColor: '111827' }));
+    }
   }
 
   // ── Evidencia fotográfica del arreglo ───────────────────────────────────

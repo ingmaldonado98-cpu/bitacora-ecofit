@@ -484,6 +484,8 @@ export async function renderSettings(session) {
           <input type="number" id="np-voc" placeholder="Ej: 49.8" step="0.1" min="0" /></div>
         <div class="form-group"><label>Imp (A) <span class="hint-opt">opcional</span></label>
           <input type="number" id="np-imp" placeholder="Ej: 13.95" step="0.01" min="0" /></div>
+        <div class="form-group"><label>Isc (A) <span class="hint-opt">opcional</span></label>
+          <input type="number" id="np-isc" placeholder="Ej: 14.35" step="0.01" min="0" /></div>
       </div>
       <div class="form-actions">
         <button class="btn-outline btn-sm" onclick="document.getElementById('form-nuevo-panel').style.display='none'">Cancelar</button>
@@ -498,7 +500,7 @@ export async function renderSettings(session) {
             <div class="panel-info">
               <span class="panel-label">${esc(p.label)}</span>
               <span class="panel-sub">${esc(p.sub||'')}</span>
-              <span class="panel-dims">${p.pW}m × ${p.pH}m${p.voc?` · Voc ${p.voc}V`:''}${p.imp?` · Imp ${p.imp}A`:''}</span>
+              <span class="panel-dims">${p.pW}m × ${p.pH}m${p.voc?` · Voc ${p.voc}V`:''}${p.imp?` · Imp ${p.imp}A`:''}${p.isc?` · Isc ${p.isc}A`:''}</span>
             </div>
             <div class="panel-row-actions">
               <button class="btn-icon-sm" onclick="editarPanel('${esc(p.id)}')" title="Editar">✎</button>
@@ -523,6 +525,8 @@ export async function renderSettings(session) {
                 <input type="number" id="ep-voc-${p.id}" value="${p.voc||''}" step="0.1" min="0" /></div>
               <div class="form-group"><label>Imp (A) <span class="hint-opt">opcional</span></label>
                 <input type="number" id="ep-imp-${p.id}" value="${p.imp||''}" step="0.01" min="0" /></div>
+              <div class="form-group"><label>Isc (A) <span class="hint-opt">opcional</span></label>
+                <input type="number" id="ep-isc-${p.id}" value="${p.isc||''}" step="0.01" min="0" /></div>
             </div>
             <div class="form-actions">
               <button class="btn-outline btn-sm" onclick="document.getElementById('panel-edit-${p.id}').style.display='none';document.getElementById('panel-row-${p.id}').style.display=''">Cancelar</button>

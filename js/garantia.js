@@ -12,8 +12,8 @@ import { renderEstructura } from './gar-estructura.js';
 import { renderPaneles } from './gar-paneles.js';
 import './pdf-garantia.js'; // registra window.exportarCertificadoGarantia
 
-// Re-exportar calcVocPuro para que lev-guardar.js no necesite cambiar su import
-export { calcVocPuro } from './gar-voc.js';
+// Re-exportar calcVocPuro/calcIscPuro para que lev-guardar.js no necesite cambiar su import
+export { calcVocPuro, calcIscPuro } from './gar-voc.js';
 
 // Re-exportar renderEstructuraForm para app.js (sub-ruta #proyecto/*/garantia/estructura)
 export { renderEstructuraForm } from './gar-estructura.js';
@@ -68,7 +68,17 @@ export async function renderGarantia(projectId, session) {
     ${!esAmpliacion ? `
     <button class="tab-btn ${tabDefault==='g-equipos'?'tab-active':''}" role="tab" aria-selected="${tabDefault==='g-equipos'}" aria-controls="g-equipos" tabindex="${tabDefault==='g-equipos'?'0':'-1'}" data-tab="g-equipos" onclick="switchTab('garantia-tabs','g-equipos',this)">Equipos</button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-voc" tabindex="-1" data-tab="g-voc" onclick="switchTab('garantia-tabs','g-voc',this)">
-      Voc${(() => { const v = project.garantia?.validacionVoc; return v ? `<span class="tab-badge ${v.resultado==='seguro'?'tab-ok':v.resultado==='excede'?'tab-err':''}">${v.resultado==='seguro'?'✓':v.resultado==='excede'?'⚠':'~'}</span>` : ''; })()}
+      Voc${(() => {
+        // Peor caso entre todos los equipos: cualquier 'excede' domina; solo
+        // es 'ok' si TODOS los que tienen resultado son 'seguro'.
+        const equipos = (g.equipos||[]).filter(e=>e.tipo==='controladora'||e.tipo==='inversor');
+        const validaciones = g.arregloValidaciones || {};
+        const resultados = equipos.map(e => validaciones[e.id]?.resultado).filter(Boolean);
+        if (!resultados.length) return '';
+        const excede = resultados.includes('excede');
+        const todoSeguro = resultados.every(r => r === 'seguro');
+        return `<span class="tab-badge ${excede?'tab-err':todoSeguro?'tab-ok':''}">${excede?'⚠':todoSeguro?'✓':'~'}</span>`;
+      })()}
     </button>` : ''}
     <button class="tab-btn ${tabDefault==='g-estructura'?'tab-active':''}" role="tab" aria-selected="${tabDefault==='g-estructura'}" aria-controls="g-estructura" tabindex="${tabDefault==='g-estructura'?'0':'-1'}" data-tab="g-estructura" onclick="switchTab('garantia-tabs','g-estructura',this)">Estructura</button>
     <button class="tab-btn" role="tab" aria-selected="false" aria-controls="g-paneles"   tabindex="-1" data-tab="g-paneles"   onclick="switchTab('garantia-tabs','g-paneles',this)">Paneles</button>

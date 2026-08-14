@@ -391,30 +391,42 @@ window.exportarPDFTecnico = async function(projectId, btnEl) {
       }
     }
 
-    // Validación Voc
-    const vocData = project.garantia?.validacionVoc;
-    if (sec('sec-voc') && vocData?.resultado) {
-      if (y > 200) { doc.addPage(); addHeader(doc,'Validación Voc',project); y=44; }
-      else { y+=4; }
-      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...VERDE);
-      doc.text('Validación Voc de string', 14, y); y+=7;
-      const resLabel = vocData.resultado==='seguro' ? 'SEGURO ✓' : vocData.resultado==='limite' ? 'EN EL LÍMITE ⚠' : 'EXCEDE EL LÍMITE ✗';
-      const resColor = vocData.resultado==='seguro' ? [30,120,60] : vocData.resultado==='limite' ? [180,140,0] : [200,40,40];
-      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...resColor);
-      doc.text(resLabel, 14, y); y+=6;
-      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
-      y=campo(doc,'Voc del panel',`${vocData.vocPanel} V`,14,y);
-      y=campo(doc,'Paneles en serie',`${vocData.panelesSerie}`,110,y-12);
-      y=campo(doc,'Temp. mínima sitio',`${vocData.tMin}°C`,14,y);
-      y=campo(doc,'Coef. temp. Voc',`${vocData.coefVoc}%/°C`,110,y-12);
-      y=campo(doc,'Voc corregido por temp.',`${vocData.vocCorregido?.toFixed(2)} V`,14,y);
-      y=campo(doc,'Voc total del string',`${vocData.vocString?.toFixed(2)} V`,110,y-12);
-      y=campo(doc,`Voc máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`,`${vocData.vocMaxInversor} V`,14,y);
-      y=campo(doc,'Margen de seguridad',`${vocData.margen?.toFixed(1)}%`,110,y-12);
-      if (vocData.mensaje) {
-        const lineas = doc.splitTextToSize(vocData.mensaje, 170);
-        doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...resColor);
-        doc.text(lineas, 14, y); y += lineas.length*5+4;
+    // Validación de arreglo (Voc / corriente) — una por equipo (inversor/controladora)
+    const equiposLimitadoresVoc = (project.garantia?.equipos || []).filter(e => e.tipo === 'inversor' || e.tipo === 'controladora');
+    const validacionesVoc = project.garantia?.arregloValidaciones || {};
+    if (sec('sec-voc') && equiposLimitadoresVoc.length) {
+      for (const eqLim of equiposLimitadoresVoc) {
+        const vocData = validacionesVoc[eqLim.id];
+        if (!vocData?.resultado) continue;
+        if (y > 200) { doc.addPage(); addHeader(doc,'Validación de arreglo',project); y=44; }
+        else { y+=4; }
+        const tituloEq = `${eqLim.marca || ''} ${eqLim.modelo || ''}`.trim() || (eqLim.tipo === 'controladora' ? 'Controladora/MPPT' : 'Inversor');
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...VERDE);
+        doc.text(`Validación de arreglo — ${tituloEq}`, 14, y); y+=7;
+        const resLabel = vocData.resultado==='seguro' ? 'SEGURO ✓' : vocData.resultado==='limite' ? 'EN EL LÍMITE ⚠' : 'EXCEDE EL LÍMITE ✗';
+        const resColor = vocData.resultado==='seguro' ? [30,120,60] : vocData.resultado==='limite' ? [180,140,0] : [200,40,40];
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...resColor);
+        doc.text(resLabel, 14, y); y+=6;
+        doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+        y=campo(doc,'Voc del panel',`${vocData.vocPanel} V`,14,y);
+        y=campo(doc,'Paneles en serie',`${vocData.panelesSerie}`,110,y-12);
+        y=campo(doc,'Strings en paralelo',`${vocData.numStrings ?? '—'}`,14,y);
+        y=campo(doc,'Temp. mínima sitio',`${vocData.tMin}°C`,110,y-12);
+        y=campo(doc,'Coef. temp. Voc',`${vocData.coefVoc}%/°C`,14,y);
+        y=campo(doc,'Voc corregido por temp.',`${vocData.vocCorregido?.toFixed(2)} V`,110,y-12);
+        y=campo(doc,'Voc total del string',`${vocData.vocString?.toFixed(2)} V`,14,y);
+        y=campo(doc,`Voc máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`,`${vocData.vocMaxInversor} V`,110,y-12);
+        y=campo(doc,'Margen de seguridad (Voc)',`${vocData.margen?.toFixed(1)}%`,14,y);
+        if (vocData.iscArreglo != null) {
+          y=campo(doc,'Corriente del arreglo',`${vocData.iscArreglo.toFixed(2)} A`,110,y-12);
+          y=campo(doc,`Corriente máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`,`${vocData.imaxEquipo ?? '—'} A`,14,y);
+          y=campo(doc,'Margen de seguridad (corriente)',`${vocData.margenIsc?.toFixed(1)}%`,110,y-12);
+        }
+        if (vocData.mensaje) {
+          const lineas = doc.splitTextToSize(vocData.mensaje, 170);
+          doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...resColor);
+          doc.text(lineas, 14, y); y += lineas.length*5+4;
+        }
       }
     }
 

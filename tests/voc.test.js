@@ -37,6 +37,29 @@ function calcVocPuro({ vocPanel, panelesSerie, vocMaxInversor, tMin, coefVoc }) 
            vocCorregido, vocString, margen, resultado, mensaje };
 }
 
+// ── calcIscPuro — copia inline, espejo de calcVocPuro para corriente ───────
+function calcIscPuro({ iscPanel, numStrings, imaxEquipo }) {
+  if (!iscPanel || !numStrings || !imaxEquipo) return null;
+
+  const iscArreglo = iscPanel * numStrings;
+  const margenIsc  = ((imaxEquipo - iscArreglo) / imaxEquipo) * 100;
+  const maxStrings = Math.floor(imaxEquipo * 0.90 / iscPanel);
+
+  let resultadoIsc, mensajeIsc;
+  if (iscArreglo <= imaxEquipo * 0.90) {
+    resultadoIsc = 'seguro';
+    mensajeIsc   = `✅ Seguro. Margen: ${margenIsc.toFixed(1)}%. Máximo recomendado: ${maxStrings} strings en paralelo.`;
+  } else if (iscArreglo <= imaxEquipo) {
+    resultadoIsc = 'limite';
+    mensajeIsc   = `⚠️ En el límite (${margenIsc.toFixed(1)}% de margen). Considera reducir a ${maxStrings} strings en paralelo.`;
+  } else {
+    resultadoIsc = 'excede';
+    mensajeIsc   = `🚨 Excede el límite por ${(iscArreglo - imaxEquipo).toFixed(1)} A. Máximo seguro: ${maxStrings} strings en paralelo.`;
+  }
+
+  return { iscPanel, numStrings, imaxEquipo, iscArreglo, margenIsc, resultadoIsc, mensajeIsc };
+}
+
 // ── Runner mínimo sin dependencias ────────────────────────────────────────
 let passed = 0, failed = 0;
 
@@ -133,6 +156,49 @@ test('maxSerie calculado correctamente', () => {
   const esperado = Math.floor(600 * 0.90 / r.vocCorregido);
   assert(r.mensaje.includes(String(esperado)),
     `mensaje menciona maxSerie=${esperado}`);
+});
+
+// ── Tests de calcIscPuro ─────────────────────────────────────────────────
+test('calcIscPuro: inputs vacíos / inválidos retornan null', () => {
+  assert(calcIscPuro({}) === null,                                            'sin parámetros → null');
+  assert(calcIscPuro({ iscPanel:0, numStrings:2, imaxEquipo:45 }) === null,    'iscPanel=0 → null');
+  assert(calcIscPuro({ iscPanel:14, numStrings:0, imaxEquipo:45 }) === null,   'numStrings=0 → null');
+  assert(calcIscPuro({ iscPanel:14, numStrings:2, imaxEquipo:0 }) === null,    'imaxEquipo=0 → null');
+});
+
+test('calcIscPuro: resultado "seguro" — corriente bien dimensionada', () => {
+  // Panel 14A Isc, 2 strings en paralelo → 28A, controladora 45A máx
+  // 28 <= 45*0.90=40.5 → seguro
+  const r = calcIscPuro({ iscPanel:14, numStrings:2, imaxEquipo:45 });
+  assert(r !== null,                  'retorna objeto');
+  assert(r.resultado === undefined,   'no reusa el campo "resultado" de Voc (usa "resultadoIsc")');
+  assert(r.resultadoIsc === 'seguro', 'resultadoIsc = seguro');
+  assert(approx(r.iscArreglo, 28),    `iscArreglo = 28 (actual: ${r.iscArreglo})`);
+  assert(r.margenIsc > 10,            `margen positivo (${r.margenIsc.toFixed(1)}%)`);
+});
+
+test('calcIscPuro: resultado "excede" — demasiados strings en paralelo', () => {
+  // Panel 14A Isc, 4 strings → 56A > 45A máx → excede
+  const r = calcIscPuro({ iscPanel:14, numStrings:4, imaxEquipo:45 });
+  assert(r !== null,                  'retorna objeto');
+  assert(r.resultadoIsc === 'excede', 'resultadoIsc = excede');
+  assert(r.margenIsc < 0,             `margen negativo (${r.margenIsc.toFixed(1)}%)`);
+  assert(r.mensajeIsc.includes('Excede'), 'mensaje contiene "Excede"');
+});
+
+test('calcIscPuro: resultado "limite" — dentro del límite pero sin margen del 10%', () => {
+  // Panel 14A Isc, 3 strings → 42A — entre 40.5 (90%) y 45 → limite
+  const r = calcIscPuro({ iscPanel:14, numStrings:3, imaxEquipo:45 });
+  assert(r !== null,                  'retorna objeto');
+  assert(r.resultadoIsc === 'limite', `resultadoIsc = limite (iscArreglo=${r.iscArreglo}A)`);
+  assert(r.margenIsc >= 0 && r.margenIsc < 10, `margen entre 0-10% (${r.margenIsc.toFixed(1)}%)`);
+});
+
+test('calcIscPuro: maxStrings calculado correctamente', () => {
+  // maxStrings = floor(45*0.90 / 14) = floor(40.5/14) = floor(2.89) = 2
+  const r = calcIscPuro({ iscPanel:14, numStrings:2, imaxEquipo:45 });
+  const esperado = Math.floor(45 * 0.90 / 14);
+  assert(r.mensajeIsc.includes(String(esperado)), `mensaje menciona maxStrings=${esperado}`);
 });
 
 // ── Resultado final ────────────────────────────────────────────────────────

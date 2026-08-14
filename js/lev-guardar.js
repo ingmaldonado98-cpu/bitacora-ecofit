@@ -4,7 +4,7 @@
 import { projects, logChange } from './db.js';
 import { toast, isoNow, genDisplayId, capturePhoto, captureVideo, uuid, uploadProgressBar, confirmDialog } from './utils.js';
 import { getSession } from './auth.js';
-import { calcVocPuro } from './garantia.js';
+import { calcVocPuro, calcIscPuro } from './garantia.js';
 import { uploadPhotoQueued, uploadVideo, buildFotoPath } from './firebase.js';
 import { _sujecionPorTecho } from './lev-areas.js';
 import { getTotalPanels } from '../modules/calculadora/index.js';
@@ -218,42 +218,57 @@ window.guardarLevantamiento = async function(e, projectId) {
 };
 
 // ── Auto-carry Tmin → Voc ─────────────────────────────────────────────────────
-// Después de guardar el levantamiento, recalcula Voc silenciosamente si todos
-// los datos están disponibles Y el tMin realmente cambió respecto al último cálculo.
+// Después de guardar el levantamiento, recalcula Voc (y corriente, si hay
+// datos) silenciosamente para CADA equipo inversor/controladora que tenga
+// una validación previa cuyo tMin ya no coincide — antes solo tocaba el
+// primer inversor encontrado, ahora hay una validación por equipo.
 async function _autoRecalcVocSilent(projectId, newTMin, newTMinZona) {
   if (newTMin == null) return;
   try {
     const p       = await projects.getById(projectId);
     const g       = p?.garantia || {};
-    const vd      = g.validacionVoc || {};
+    const equipos = (g.equipos || []).filter(e => e.tipo === 'controladora' || e.tipo === 'inversor');
+    if (!equipos.length) return;
 
-    // Solo recalcular si el tMin cambió respecto al guardado anterior
-    if (vd.tMin != null && Math.abs(vd.tMin - newTMin) < 0.001 && vd.tMinZona === (newTMinZona || 'valle')) return;
+    const vocPanel = g.paneles?.voc || null;
+    const iscPanel = g.paneles?.isc || null;
+    if (!vocPanel) return;
 
-    // Ingredientes para el cálculo
-    const vocPanel     = g.paneles?.voc || null;
-    const inversor     = (g.equipos || []).find(e => e.tipo === 'inversor');
-    const vocMax       = inversor?.vocMax || null;
-    // "Paneles en serie" ya es un campo manual (ver gar-voc.js) — se preserva
-    // el último valor guardado en vez de re-derivarlo de strings.
-    const panelesSerie = vd.panelesSerie ?? getTotalPanels(p.projectConfig) ?? null;
+    const validaciones = g.arregloValidaciones || {};
+    let recalculado = false;
 
-    if (!vocPanel || !vocMax || !panelesSerie) return; // datos insuficientes — silencio
+    for (const eq of equipos) {
+      const vd = validaciones[eq.id] || {};
 
-    const result = calcVocPuro({ vocPanel, panelesSerie, vocMaxInversor: vocMax, tMin: newTMin });
-    if (!result) return;
+      // Solo recalcular si el tMin cambió respecto al guardado anterior de ESTE equipo
+      if (vd.tMin != null && Math.abs(vd.tMin - newTMin) < 0.001 && vd.tMinZona === (newTMinZona || 'valle')) continue;
 
-    await projects.setField(projectId, 'garantia.validacionVoc', {
-      ...result,
-      tMin:          newTMin,
-      tMinZona:      newTMinZona || 'valle',
-      vocPanel,
-      panelesSerie,
-      vocMaxInversor: vocMax,
-      savedAt:       isoNow(),
-      savedBy:       'auto-tmin',
-    });
-    toast(`🌡 Voc recalculado (T mín = ${newTMin}°C)`, 'info', 3000);
+      const vocMax = eq.vocMax || null;
+      // "Paneles en serie" ya es un campo manual (ver gar-voc.js) — se preserva
+      // el último valor guardado en vez de re-derivarlo de strings.
+      const panelesSerie = vd.panelesSerie ?? getTotalPanels(p.projectConfig) ?? null;
+      if (!vocMax || !panelesSerie) continue; // datos insuficientes para este equipo — silencio
+
+      const result = calcVocPuro({ vocPanel, panelesSerie, vocMaxInversor: vocMax, tMin: newTMin, coefVoc: vd.coefVoc });
+      if (!result) continue;
+
+      const numStrings = vd.numStrings ?? 1;
+      const iscResult = calcIscPuro({ iscPanel, numStrings, imaxEquipo: eq.imax || null });
+
+      await projects.setField(projectId, `garantia.arregloValidaciones.${eq.id}`, {
+        ...result,
+        tMinZona: newTMinZona || 'valle',
+        arreglo:  vd.arreglo || '',
+        numStrings,
+        limitadorTipo: eq.tipo,
+        ...(iscResult || {}),
+        savedAt: isoNow(),
+        savedBy: 'auto-tmin',
+      });
+      recalculado = true;
+    }
+
+    if (recalculado) toast(`🌡 Voc recalculado (T mín = ${newTMin}°C)`, 'info', 3000);
   } catch (_) {
     // Error silencioso — no interrumpir el flujo del usuario
   }

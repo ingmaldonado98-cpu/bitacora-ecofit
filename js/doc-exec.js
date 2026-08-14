@@ -315,9 +315,13 @@ export function renderExecPorBloque(project, bloque, allExecBlocks, edit, admin)
     const panelesSerie = str?.paneles?.length || null;
     const vocPanel = g.paneles?.voc || null;
     const lev = project.documentacion?.levantamiento || {};
+    // coefVoc ya no es un solo valor por proyecto — es por equipo. Toma el
+    // primero disponible solo como referencia para este hint de campo; si no
+    // hay ninguno, calcVocEsperadoString cae a su propio default interno.
+    const coefVocRef = Object.values(g.arregloValidaciones || {}).find(v => v?.coefVoc != null)?.coefVoc;
     const esperado = calcVocEsperadoString({
       vocPanel, panelesSerie,
-      tMin: lev.tMin, coefVoc: g.validacionVoc?.coefVoc,
+      tMin: lev.tMin, coefVoc: coefVocRef,
     });
     return esperado != null
       ? `<span class="input-hint">Esperado: ~${esperado.toFixed(1)} V (${panelesSerie} en serie)</span>`
