@@ -338,7 +338,7 @@ window.exportarWordTecnico = async function(projectId) {
     for (const eqLim of equiposLimitadoresVoc) {
       const vocData = validacionesVoc[eqLim.id];
       if (!vocData?.resultado) continue;
-      const tituloEq = `${eqLim.marca || ''} ${eqLim.modelo || ''}`.trim() || (eqLim.tipo === 'controladora' ? 'Controladora/MPPT' : 'Inversor');
+      const tituloEq = `${eqLim.marca || ''} ${eqLim.modelo || ''}`.trim() || (eqLim.tipo === 'controladora' ? 'Controladora/MPPT' : eqLim.tipo === 'vfd' ? 'Variador de Frecuencia' : 'Inversor');
       addSec(`Validación de arreglo — ${tituloEq}`);
       const resLabel = vocData.resultado === 'seguro' ? 'SEGURO ✓' : vocData.resultado === 'limite' ? 'EN EL LÍMITE ⚠' : 'EXCEDE EL LÍMITE ✗';
       const resColor = vocData.resultado === 'seguro' ? '1e7840' : vocData.resultado === 'limite' ? 'b48c00' : 'c82828';
@@ -350,11 +350,11 @@ window.exportarWordTecnico = async function(projectId) {
       addCampo('Coef. temp. Voc', `${vocData.coefVoc}%/°C`);
       addCampo('Voc corregido por temp.', `${vocData.vocCorregido?.toFixed(2)} V`);
       addCampo('Voc total del string', `${vocData.vocString?.toFixed(2)} V`);
-      addCampo(`Voc máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vocData.vocMaxInversor} V`);
+      addCampo(`Voc máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : vocData.limitadorTipo === 'vfd' ? 'variador de frecuencia' : 'inversor'}`, `${vocData.vocMaxInversor} V`);
       addCampo('Margen de seguridad (Voc)', `${vocData.margen?.toFixed(1)}%`);
       if (vocData.iscArreglo != null) {
         addCampo('Corriente del arreglo', `${vocData.iscArreglo.toFixed(2)} A`);
-        addCampo(`Corriente máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vocData.imaxEquipo ?? '—'} A`);
+        addCampo(`Corriente máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : vocData.limitadorTipo === 'vfd' ? 'variador de frecuencia' : 'inversor'}`, `${vocData.imaxEquipo ?? '—'} A`);
         addCampo('Margen de seguridad (corriente)', `${vocData.margenIsc?.toFixed(1)}%`);
       }
       if (vocData.mensaje) children.push(p(vocData.mensaje, { italic: true, color: resColor }));

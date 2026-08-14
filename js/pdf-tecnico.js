@@ -401,7 +401,7 @@ window.exportarPDFTecnico = async function(projectId, btnEl) {
         if (!vocData?.resultado) continue;
         if (y > 200) { doc.addPage(); addHeader(doc,'Validación de arreglo',project); y=44; }
         else { y+=4; }
-        const tituloEq = `${eqLim.marca || ''} ${eqLim.modelo || ''}`.trim() || (eqLim.tipo === 'controladora' ? 'Controladora/MPPT' : 'Inversor');
+        const tituloEq = `${eqLim.marca || ''} ${eqLim.modelo || ''}`.trim() || (eqLim.tipo === 'controladora' ? 'Controladora/MPPT' : eqLim.tipo === 'vfd' ? 'Variador de Frecuencia' : 'Inversor');
         doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...VERDE);
         doc.text(`Validación de arreglo — ${tituloEq}`, 14, y); y+=7;
         const resLabel = vocData.resultado==='seguro' ? 'SEGURO ✓' : vocData.resultado==='limite' ? 'EN EL LÍMITE ⚠' : 'EXCEDE EL LÍMITE ✗';
@@ -416,11 +416,11 @@ window.exportarPDFTecnico = async function(projectId, btnEl) {
         y=campo(doc,'Coef. temp. Voc',`${vocData.coefVoc}%/°C`,14,y);
         y=campo(doc,'Voc corregido por temp.',`${vocData.vocCorregido?.toFixed(2)} V`,110,y-12);
         y=campo(doc,'Voc total del string',`${vocData.vocString?.toFixed(2)} V`,14,y);
-        y=campo(doc,`Voc máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`,`${vocData.vocMaxInversor} V`,110,y-12);
+        y=campo(doc,`Voc máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : vocData.limitadorTipo === 'vfd' ? 'variador de frecuencia' : 'inversor'}`,`${vocData.vocMaxInversor} V`,110,y-12);
         y=campo(doc,'Margen de seguridad (Voc)',`${vocData.margen?.toFixed(1)}%`,14,y);
         if (vocData.iscArreglo != null) {
           y=campo(doc,'Corriente del arreglo',`${vocData.iscArreglo.toFixed(2)} A`,110,y-12);
-          y=campo(doc,`Corriente máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`,`${vocData.imaxEquipo ?? '—'} A`,14,y);
+          y=campo(doc,`Corriente máx. ${vocData.limitadorTipo === 'controladora' ? 'controlador/MPPT' : vocData.limitadorTipo === 'vfd' ? 'variador de frecuencia' : 'inversor'}`,`${vocData.imaxEquipo ?? '—'} A`,14,y);
           y=campo(doc,'Margen de seguridad (corriente)',`${vocData.margenIsc?.toFixed(1)}%`,110,y-12);
         }
         if (vocData.mensaje) {

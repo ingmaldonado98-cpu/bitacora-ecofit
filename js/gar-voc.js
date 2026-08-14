@@ -14,18 +14,28 @@ const VOC_T_MIN  = 3;    // °C — La Paz, BCS (valor por defecto)
 const VOC_COEF   = -0.29; // %/°C  coeficiente típico monocristalino
 
 // Equipos que reciben el arreglo eléctricamente y por tanto necesitan su
-// propia validación de Voc/corriente. Si hay controladora(s)/MPPT (sistemas
-// con batería), el arreglo entra AHÍ — el/los inversor(es) quedan aguas
-// abajo de la batería (batería → inversor → cargas CA) y nunca ven el
-// string de paneles, así que quedan excluidos. Solo se valida el inversor
-// cuando NO hay ninguna controladora (interconectado directo, el arreglo va
-// al inversor). En sistemas Victron-style puede haber MÁS DE UNA
-// controladora, cada una con su propio arreglo independiente — por eso esto
-// es un filtro (todas), no un .find() de la primera.
+// propia validación de Voc/corriente. Controladora/MPPT (sistemas con
+// batería) y variador de frecuencia (bombeo DC-acoplado directo, sin
+// inversor de red) son ambos equipos "de entrada CD" — el arreglo conecta
+// directo a ellos. Si hay al menos uno de estos, el/los inversor(es) quedan
+// excluidos: en sistemas con batería el inversor está aguas abajo de la
+// batería (batería → inversor → cargas CA) y nunca ve el string de paneles.
+// Solo se valida el inversor cuando NO hay ninguna controladora/VFD
+// (interconectado directo, el arreglo va al inversor). Puede haber MÁS DE UN
+// equipo de entrada CD (ej. varias controladoras Victron independientes),
+// por eso esto es un filtro (todos), no un .find() del primero.
 export function getLimitadorEquipos(g) {
   const equipos = g.equipos || [];
-  const controladoras = equipos.filter(e => e.tipo === 'controladora');
-  return controladoras.length ? controladoras : equipos.filter(e => e.tipo === 'inversor');
+  const entradaCD = equipos.filter(e => e.tipo === 'controladora' || e.tipo === 'vfd');
+  return entradaCD.length ? entradaCD : equipos.filter(e => e.tipo === 'inversor');
+}
+
+// Etiqueta legible del tipo de equipo limitante, reutilizada en la tarjeta,
+// el candado de guardado y las 3 exportaciones (PDF/Word).
+export function limitadorLabel(tipo) {
+  return tipo === 'controladora' ? 'controladora'
+       : tipo === 'vfd'          ? 'variador de frecuencia'
+       : 'inversor';
 }
 
 function _validacionDesactualizada(vd, equipo, g, lev) {
@@ -67,7 +77,7 @@ export function renderVocTab(project, projectId, edit) {
       <div class="card-title-row"><h3 class="card-title">Validación de arreglo (Voc / corriente)</h3></div>
       <div class="voc-no-inversor" role="status" aria-live="polite">
         ${icon('warning-circle', 16)}
-        <div>Registra un inversor o una controladora/MPPT en <em>Equipos</em> para poder validar el arreglo de paneles.</div>
+        <div>Registra un inversor, una controladora/MPPT o un variador de frecuencia en <em>Equipos</em> para poder validar el arreglo de paneles.</div>
       </div>
     </div>`;
   }
@@ -80,8 +90,11 @@ function _renderVocCard(project, projectId, edit, equipo) {
   const vd  = (g.arregloValidaciones || {})[equipo.id] || {};
   const lev = project.documentacion?.levantamiento || {};
   const eid = equipo.id;
-  const limitadorLabel = equipo.tipo === 'controladora' ? 'controladora' : 'inversor';
-  const tituloEquipo = [equipo.marca, equipo.modelo].filter(Boolean).join(' ') || (equipo.tipo === 'controladora' ? 'Controladora/MPPT' : 'Inversor');
+  const eqLabel = limitadorLabel(equipo.tipo);
+  const tituloEquipoDefault = equipo.tipo === 'controladora' ? 'Controladora/MPPT'
+                            : equipo.tipo === 'vfd'          ? 'Variador de frecuencia'
+                            : 'Inversor';
+  const tituloEquipo = [equipo.marca, equipo.modelo].filter(Boolean).join(' ') || tituloEquipoDefault;
 
   // T_min: primero del levantamiento, fallback constante La Paz
   const tMin        = (lev.tMin != null) ? lev.tMin : VOC_T_MIN;
@@ -132,7 +145,7 @@ function _renderVocCard(project, projectId, edit, equipo) {
   const alertas = [
     missingVoc   && `Voc del panel — registra el panel en la pestaña <em>Paneles</em>`,
     missingSerie && `Paneles en serie — captúralo abajo o guarda el BOM en la Calculadora`,
-    missingInv   && `Voc máx del ${limitadorLabel} — edita el equipo en <em>Equipos</em>`,
+    missingInv   && `Voc máx del ${eqLabel} — edita el equipo en <em>Equipos</em>`,
   ].filter(Boolean);
 
   // Isc/corriente es opcional y no bloqueante: si falta Isc del panel o la
@@ -156,7 +169,7 @@ function _renderVocCard(project, projectId, edit, equipo) {
   return `
   <div class="card">
     <div class="card-title-row">
-      <h3 class="card-title">${esc(tituloEquipo)} <span class="form-hint">(${limitadorLabel})</span></h3>
+      <h3 class="card-title">${esc(tituloEquipo)} <span class="form-hint">(${eqLabel})</span></h3>
       ${semaforo && !stale ? `<span class="voc-badge ${semaforo.cls}">${semaforo.ico} ${semaforo.txt}</span>` : ''}
       ${semaforoIsc && !stale ? `<span class="voc-badge ${semaforoIsc.cls}">${semaforoIsc.ico} ${semaforoIsc.txt}</span>` : ''}
       ${stale ? `<span class="voc-badge voc-warn">⚠️ Desactualizado</span>` : ''}
@@ -177,7 +190,7 @@ function _renderVocCard(project, projectId, edit, equipo) {
         <span class="vda-val ${vocPanel ? '' : 'vda-missing'}">${vocPanel ? vocPanel + ' V' : '—'}</span>
       </div>
       <div class="vda-item">
-        <span class="vda-lbl">${icon('cpu', 14)} Voc máx ${limitadorLabel}</span>
+        <span class="vda-lbl">${icon('cpu', 14)} Voc máx ${eqLabel}</span>
         <span class="vda-val ${vocMax ? '' : 'vda-missing'}">${vocMax ? vocMax + ' V' : '—'}</span>
       </div>
       <div class="vda-item">
@@ -185,7 +198,7 @@ function _renderVocCard(project, projectId, edit, equipo) {
         <span class="vda-val ${iscPanel ? '' : 'vda-missing'}">${iscPanel ? iscPanel + ' A' : '—'}</span>
       </div>
       <div class="vda-item">
-        <span class="vda-lbl">${icon('cpu', 14)} Corriente máx ${limitadorLabel}</span>
+        <span class="vda-lbl">${icon('cpu', 14)} Corriente máx ${eqLabel}</span>
         <span class="vda-val ${imaxEquipo ? '' : 'vda-missing'}">${imaxEquipo ? imaxEquipo + ' A' : '—'}</span>
       </div>
       <div class="vda-item">
@@ -534,7 +547,7 @@ window.guardarVoc = async function(projectId, eqId) {
   // ── Critical #3: Validar consistencia con el equipo registrado ─────────────
   const proj    = await projects.getById(projectId);
   const equipo  = (proj?.garantia?.equipos || []).find(e => e.id === eqId);
-  const limitadorLabel = equipo?.tipo === 'controladora' ? 'controladora' : 'inversor';
+  const eqLabel = limitadorLabel(equipo?.tipo);
   const savedVocMax = temp.vocMaxInversor;
   const session0 = await getSession();
 
@@ -543,11 +556,11 @@ window.guardarVoc = async function(projectId, eqId) {
   // que otros candados de la app (ej. bloque del checklist).
   if (temp.resultado === 'excede') {
     if (!isAdmin(session0)) {
-      toast(`🚨 El Voc excede el límite del ${limitadorLabel}. Solo un administrador puede autorizar guardar esta configuración.`, 'error', 7000);
+      toast(`🚨 El Voc excede el límite del ${eqLabel}. Solo un administrador puede autorizar guardar esta configuración.`, 'error', 7000);
       return;
     }
     const ok = await confirmDialog(
-      `🚨 El Voc del string (${temp.vocString.toFixed(1)} V) excede el límite del ${limitadorLabel} (${savedVocMax} V). ` +
+      `🚨 El Voc del string (${temp.vocString.toFixed(1)} V) excede el límite del ${eqLabel} (${savedVocMax} V). ` +
       'Esto es una excepción que quedará registrada en el historial. ¿Guardar de todas formas?'
     );
     if (!ok) return;
@@ -556,11 +569,11 @@ window.guardarVoc = async function(projectId, eqId) {
   // Mismo candado, espejo, para la corriente — solo aplica si se calculó Isc.
   if (temp.resultadoIsc === 'excede') {
     if (!isAdmin(session0)) {
-      toast(`🚨 La corriente del arreglo excede el límite del ${limitadorLabel}. Solo un administrador puede autorizar guardar esta configuración.`, 'error', 7000);
+      toast(`🚨 La corriente del arreglo excede el límite del ${eqLabel}. Solo un administrador puede autorizar guardar esta configuración.`, 'error', 7000);
       return;
     }
     const ok = await confirmDialog(
-      `🚨 La corriente del arreglo (${temp.iscArreglo.toFixed(1)} A) excede el límite del ${limitadorLabel} (${temp.imaxEquipo} A). ` +
+      `🚨 La corriente del arreglo (${temp.iscArreglo.toFixed(1)} A) excede el límite del ${eqLabel} (${temp.imaxEquipo} A). ` +
       'Esto es una excepción que quedará registrada en el historial. ¿Guardar de todas formas?'
     );
     if (!ok) return;
@@ -572,12 +585,12 @@ window.guardarVoc = async function(projectId, eqId) {
     if (!ok) return;
   } else if (!equipo.vocMax || equipo.vocMax === 0) {
     // Hay equipo pero sin vocMax — bloquear
-    toast(`El ${limitadorLabel} no tiene Voc máx registrado. Edítalo en la pestaña Equipos antes de guardar.`, 'warn', 6000);
+    toast(`El ${eqLabel} no tiene Voc máx registrado. Edítalo en la pestaña Equipos antes de guardar.`, 'warn', 6000);
     return;
   } else if (Math.abs(equipo.vocMax - savedVocMax) > 0.5) {
     // El valor ingresado difiere del registrado en el equipo
     const ok = await confirmDialog(
-      `⚠️ El ${limitadorLabel} registrado tiene Voc máx = ${equipo.vocMax} V, pero se calculó con ${savedVocMax} V. ¿Guardar con el valor ingresado manualmente?`
+      `⚠️ El ${eqLabel} registrado tiene Voc máx = ${equipo.vocMax} V, pero se calculó con ${savedVocMax} V. ¿Guardar con el valor ingresado manualmente?`
     );
     if (!ok) return;
   }
@@ -588,7 +601,7 @@ window.guardarVoc = async function(projectId, eqId) {
   const resMsg = data.resultado === 'seguro' ? 'configuración segura'
                : data.resultado === 'excede' ? '⚠️ excede el límite (excepción de admin)'
                : 'en el límite';
-  logChange(projectId, { modulo: 'Garantía', accion: 'Voc/corriente recalculado', detalle: `${limitadorLabel} ${equipo?.marca||''} ${equipo?.modelo||''}: ${resMsg}`, quien: session });
+  logChange(projectId, { modulo: 'Garantía', accion: 'Voc/corriente recalculado', detalle: `${eqLabel} ${equipo?.marca||''} ${equipo?.modelo||''}: ${resMsg}`, quien: session });
   toast(`✅ Guardado — ${resMsg}`);
   sessionStorage.setItem('garantia-tab-target', 'g-voc');
   navigate(`#proyecto/${projectId}/garantia`);

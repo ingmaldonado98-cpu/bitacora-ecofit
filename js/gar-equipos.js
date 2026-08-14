@@ -176,6 +176,13 @@ export function renderEquipos(equipos, projectId, edit, admin) {
   }).join('');
 }
 
+// Etiqueta para "Del datasheet del ___" en los campos de Voc/corriente máx entrada CD
+function _entradaCdLabel(tipo) {
+  return tipo === 'controladora' ? 'controlador/MPPT'
+       : tipo === 'vfd'          ? 'variador de frecuencia'
+       : 'inversor';
+}
+
 export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null) {
   const isEdit = editIdx >= 0 && eq;
   const modeloVal = isEdit ? esc(eq.modelo) : esc(kitPrefill?.nombre || '');
@@ -208,20 +215,20 @@ export function formEquipo(projectId, eq = null, editIdx = -1, kitPrefill = null
              oninput="toggleVocMaxField()" />
     </div>
     <!-- Voc máx / Imax entrada CD: inversor (grid-tie, el arreglo entra
-         directo) o controladora/MPPT (sistemas con batería — el arreglo
-         entra ahí, no al inversor, que solo ve el voltaje/corriente de la
-         batería). Potencia nominal CA es exclusiva del inversor. -->
-    <div class="form-row" id="eq-vocmax-wrap" style="${['inversor','controladora'].includes(isEdit ? eq.tipo : '') ? '' : 'display:none'}">
+         directo), controladora/MPPT o variador de frecuencia (bombeo
+         DC-acoplado directo) — todos reciben el arreglo eléctricamente.
+         Potencia nominal CA es exclusiva del inversor. -->
+    <div class="form-row" id="eq-vocmax-wrap" style="${['inversor','controladora','vfd'].includes(isEdit ? eq.tipo : '') ? '' : 'display:none'}">
       <div class="form-group">
         <label>Voc máx. entrada CD (V)
-          <span class="form-hint">Del datasheet del ${(isEdit ? eq.tipo : '') === 'controladora' ? 'controlador/MPPT' : 'inversor'}</span>
+          <span class="form-hint">Del datasheet del ${_entradaCdLabel(isEdit ? eq.tipo : '')}</span>
         </label>
         <input type="number" id="eq-vocmax" placeholder="Ej: 600" step="1" min="0"
                value="${isEdit ? esc(eq.vocMax || '') : ''}" />
       </div>
       <div class="form-group">
         <label>Corriente máx. entrada CD (A)
-          <span class="form-hint">Del datasheet del ${(isEdit ? eq.tipo : '') === 'controladora' ? 'controlador/MPPT' : 'inversor'}</span>
+          <span class="form-hint">Del datasheet del ${_entradaCdLabel(isEdit ? eq.tipo : '')}</span>
         </label>
         <input type="number" id="eq-imax" placeholder="Ej: 45" step="0.1" min="0"
                value="${isEdit ? esc(eq.imax || '') : ''}" />
@@ -300,7 +307,7 @@ window.capEqFoto = function(tipo, slotId) {
 window.toggleVocMaxField = function() {
   const tipo = document.getElementById('eq-tipo')?.value;
   const wrap = document.getElementById('eq-vocmax-wrap');
-  if (wrap) wrap.style.display = (tipo === 'inversor' || tipo === 'controladora') ? '' : 'none';
+  if (wrap) wrap.style.display = ['inversor','controladora','vfd'].includes(tipo) ? '' : 'none';
   const acWrap = document.getElementById('eq-potencia-ac-wrap');
   if (acWrap) acWrap.style.display = tipo === 'inversor' ? '' : 'none';
   const batWrap = document.getElementById('eq-bateria-wrap');
@@ -409,8 +416,8 @@ window.guardarEquipo = async function(projectId) {
   const equipo = {
     id:          isEdit ? (p.garantia.equipos[editIdx]?.id || uuid()) : uuid(),
     tipo, marca, modelo,
-    ...(['inversor','controladora'].includes(tipo) && vocMaxRaw ? { vocMax: parseFloat(vocMaxRaw) } : {}),
-    ...(['inversor','controladora'].includes(tipo) && imaxRaw   ? { imax: parseFloat(imaxRaw) } : {}),
+    ...(['inversor','controladora','vfd'].includes(tipo) && vocMaxRaw ? { vocMax: parseFloat(vocMaxRaw) } : {}),
+    ...(['inversor','controladora','vfd'].includes(tipo) && imaxRaw   ? { imax: parseFloat(imaxRaw) } : {}),
     ...(tipo === 'inversor' && potenciaAcRaw ? { potenciaNominalAC: parseFloat(potenciaAcRaw) } : {}),
     ...(tipo === 'bateria'  && bateriaKwhRaw ? { capacidadKwh: parseFloat(bateriaKwhRaw) } : {}),
     serial:      document.getElementById('eq-serial').value.trim(),

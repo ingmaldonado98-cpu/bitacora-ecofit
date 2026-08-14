@@ -11,7 +11,7 @@ import { newDoc, heading1, heading2, p, table, hr, imageBlock,
 const VERDE = '16a34a';
 
 const TIPOS_EQUIPO_LABEL = {
-  inversor: 'Inversor', microinversor: 'Microinversor', bateria: 'Batería',
+  inversor: 'Inversor', microinversor: 'Microinversor', vfd: 'Variador de Frecuencia (VFD)', bateria: 'Batería',
   controladora: 'Controladora / MPPT', cargador: 'Cargador',
   optimizador: 'Optimizador de potencia', monitor: 'Monitor / Gateway', otro: 'Otro',
 };
@@ -77,7 +77,7 @@ export async function exportarCertificadoGarantia(projectId) {
   } else {
     for (const eq of equiposLimitadores) {
       const vd = validaciones[eq.id];
-      const tituloEq = `${eq.marca || ''} ${eq.modelo || ''}`.trim() || (eq.tipo === 'controladora' ? 'Controladora/MPPT' : 'Inversor');
+      const tituloEq = `${eq.marca || ''} ${eq.modelo || ''}`.trim() || TIPOS_EQUIPO_LABEL[eq.tipo] || eq.tipo;
       children.push(p(tituloEq, { bold: true, size: 20, color: '111827' }));
       if (!vd?.resultado) {
         children.push(p('Validación de Voc no realizada todavía.', { size: 18, color: 'dc2626' }));
@@ -92,12 +92,12 @@ export async function exportarCertificadoGarantia(projectId) {
         ['Temperatura mínima histórica', `${vd.tMin ?? '—'} °C`],
         ['Coeficiente de temperatura', `${vd.coefVoc ?? '—'} %/°C`],
         ['Voc corregido por string', `${vd.vocString?.toFixed(2) ?? '—'} V`],
-        [`Voc máx. del ${vd.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vd.vocMaxInversor ?? '—'} V`],
+        [`Voc máx. del ${vd.limitadorTipo === 'controladora' ? 'controlador/MPPT' : vd.limitadorTipo === 'vfd' ? 'variador de frecuencia' : 'inversor'}`, `${vd.vocMaxInversor ?? '—'} V`],
       ];
       if (vd.iscArreglo != null) {
         rows.push(
           ['Corriente del arreglo (Isc)', `${vd.iscArreglo.toFixed(2)} A`],
-          [`Corriente máx. del ${vd.limitadorTipo === 'controladora' ? 'controlador/MPPT' : 'inversor'}`, `${vd.imaxEquipo ?? '—'} A`],
+          [`Corriente máx. del ${vd.limitadorTipo === 'controladora' ? 'controlador/MPPT' : vd.limitadorTipo === 'vfd' ? 'variador de frecuencia' : 'inversor'}`, `${vd.imaxEquipo ?? '—'} A`],
         );
       }
       children.push(table(['Medición', 'Valor'], rows, { headerShading: 'f3f4f6', headerColor: '111827' }));
