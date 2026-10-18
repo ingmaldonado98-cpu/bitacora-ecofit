@@ -1,13 +1,13 @@
 # HANDOFF.md — Estado de la Bitácora Ecofit V6
 
-> Corte: **2026-10-17**. Último commit de app: `5e44870` (2026-08-14). Actualiza este archivo en cada sesión que cambie el estado.
+> Corte: **2026-10-18**. Último deploy: commit `5e9be99`, publicado el 2026-10-18 en **los dos** hostings (Firebase Hosting y GitHub Pages), verificado con curl. Actualiza este archivo en cada sesión que cambie el estado.
 > Los datos salen del código, del `git log` y de las notas de sesiones anteriores. Lo que no se pudo verificar dice **⚠️ PENDIENTE DE CONFIRMAR**.
 > **Todos los proyectos que hay hoy en Firestore y en los celulares son de prueba y NO se conservan** (decisión del dueño, 2026-10-17). La operación real arranca desde cero, así que hoy se pueden borrar datos, cambiar de dominio o migrar el almacenamiento sin riesgo.
 
 ## 1. Versiones actuales
 | Qué | Valor | Dónde |
 |---|---|---|
-| Caché del service worker | `CACHE_NAME = 'ecofit-v6-v231'`, `SW_VERSION = '6.85.38'`, `BUILD_DATE = '2026-08-14'` | `sw.js` (lo sube `bump-sw.yml`) |
+| Caché del service worker | `CACHE_NAME = 'ecofit-v6-v233'`, `SW_VERSION = '6.85.40'`, `BUILD_DATE = '2026-10-18'` | `sw.js` (lo sube `bump-sw.yml`) |
 | Caché de fotos del SW | `ecofit-photos-v1`, máx. 300 entradas | `sw.js` |
 | `APP_VERSION` del reporte de errores | `'6.61.0'` — **desactualizado** respecto al SW | `js/app.js` |
 | `package.json` | `6.0.0` (nadie lo sube) | `package.json` |
@@ -27,11 +27,11 @@
 - Offline: caché local de proyectos, colas de escrituras y de fotos con reintentos, Background Sync, persistencia de Firestore (arreglada en `0448b15`, 2026-08-13: antes **no** persistía), sesión offline de 7 días y aviso de conflictos.
 
 ## 3. Bugs conocidos (de mayor a menor gravedad)
-1. ✅ **Arreglado en local (2026-10-17, sin commit ni deploy): el escáner web no funcionaba desde 2026-08-11.** `ecofit-scanner.html` carga `./js/vendor/zxing.min.js`, y ese archivo se había borrado en `20f2f77` por error. Se restauró desde git y se agregó a `APP_SHELL`; se comprobó que `window.ZXing` carga en localhost. Falta probar la cámara en un celular después del deploy.
-2. ✅ **Arreglado en local (sin commit ni deploy): ruta de fotos en Storage.** Desde `91cc2ac`, `buildFotoPath()` subía a `proyectos/…`, pero `storage.rules` solo permite `projects/{projectId}/…`. Ahora usa `projects/{id}/bitacora_{fecha}/…`. ⚠️ PENDIENTE DE CONFIRMAR que las reglas publicadas en Firebase Console coincidan con las del repo. Ojo: algunas fotos se suben con un projectId temporal (`equipo_temp`, `levantamiento_temp`, `temp_…`) y para un usuario **apoyo** `isAssignedToProject()` falla, porque ese proyecto no existe. Hay que probarlo con una cuenta apoyo.
+1. ✅ **Arreglado y publicado (2026-10-18): el escáner web no funcionaba desde 2026-08-11.** `ecofit-scanner.html` carga `./js/vendor/zxing.min.js`, y ese archivo se había borrado en `20f2f77` por error. Se restauró desde git y se agregó a `APP_SHELL`; se comprobó que `window.ZXing` carga en localhost. Falta probar la cámara en un celular después del deploy.
+2. ✅ **Arreglado y publicado (2026-10-18): ruta de fotos en Storage.** Desde `91cc2ac`, `buildFotoPath()` subía a `proyectos/…`, pero `storage.rules` solo permite `projects/{projectId}/…`. Ahora usa `projects/{id}/bitacora_{fecha}/…`. ⚠️ PENDIENTE DE CONFIRMAR que las reglas publicadas en Firebase Console coincidan con las del repo. Ojo: algunas fotos se suben con un projectId temporal (`equipo_temp`, `levantamiento_temp`, `temp_…`) y para un usuario **apoyo** `isAssignedToProject()` falla, porque ese proyecto no existe. Hay que probarlo con una cuenta apoyo.
 3. **Las reglas de Firestore de `9bea123` (2026-08-10) no estaban publicadas** al hacer el commit (corrigen permisos de kv para apoyo, auditoría, `usernameIndex` y `publicCards`). ⚠️ PENDIENTE DE CONFIRMAR si ya se publicaron. Sin ellas, la captura de inventario de un apoyo nunca llega al servidor. Se publican con `npx firebase-tools deploy --only firestore:rules --project ecofit-bitacora` desde `claude code/`.
-4. ✅ **Arreglado en local (sin commit): a `APP_SHELL` le faltaban** `ui-states.js`, `calc-tablero.js`, `pdf-avance.js`, `pdf-calculadora.js` y `pdf-garantia.js`. Ahora el check "Verify APP_SHELL completeness" del CI pasa en local.
-5. **Firebase Hosting no tiene CI**, así que puede quedarse atrás de GitHub Pages. ⚠️ PENDIENTE DE CONFIRMAR la fecha del último `firebase deploy` y qué versión sirve hoy `ecofit-bitacora.web.app` (se ve en Ajustes → versión del SW).
+4. ✅ **Arreglado y publicado (2026-10-18): a `APP_SHELL` le faltaban** `ui-states.js`, `calc-tablero.js`, `pdf-avance.js`, `pdf-calculadora.js` y `pdf-garantia.js`. Ahora el check "Verify APP_SHELL completeness" del CI pasa en local.
+5. **Firebase Hosting no tiene CI**, así que puede quedarse atrás de GitHub Pages. Después de cada push a `main` hay que esperar el bump del bot, hacer `git pull` y `firebase deploy` a mano (ver CLAUDE.md §10). El 2026-10-18 los dos sirven v233. **Gotcha arreglado ese día:** `firebase.json` publicaba `.git/` y `.github/` porque `**/.*` no excluye su contenido; ahora hay exclusiones explícitas. Si agregas carpetas ocultas, verifica con `curl` que den 404.
 6. **"Limpiar datos"** (`settings-backup.js` → `limpiarDatos`) borra la IndexedDB `ecofit-photo-queue`: las fotos que no se han subido **se pierden**. Hay doble confirmación, pero no avisa de esto.
 7. En nativo, si el plugin `BarcodeScanner` no existe, `_openNativeScannerOverlay` vuelve a llamar a `openScannerOverlay` y esta lo manda de nuevo a la ruta nativa: **recursión infinita** (`util-scanner.js`).
 8. La pantalla de exportar dice que el PDF Cliente incluye "QR del sistema", pero `pdf-cliente.js` no lo agrega.
@@ -65,7 +65,7 @@
 
 ## 6. Roadmap / pendientes
 1. Arreglar los bugs #1–#4 de arriba (escáner, ruta de Storage, publicar reglas, `APP_SHELL`).
-2. ✅ (en local, sin commit) `CLAUDE.md`, `HANDOFF.md`, las reglas, `tests/`, `scripts/` y `package.json` ya no se publican: se excluyen en `pages.yml` y en el `ignore` de `claude code/firebase.json`.
+2. ✅ (publicado 2026-10-18) `CLAUDE.md`, `HANDOFF.md`, las reglas, `tests/`, `scripts/` y `package.json` ya no se publican: se excluyen en `pages.yml` y en el `ignore` de `claude code/firebase.json`.
 3. Decidir un solo hosting y apagar GitHub Pages, o automatizar el deploy a Firebase desde Actions.
 4. Respaldo diferido en Google Drive (fotos/PDF): no existe en V6. ⚠️ PENDIENTE DE CONFIRMAR alcance y prioridad.
 5. "Integración con la app Inventario": hoy el inventario vive **dentro** de esta app y la calculadora descuenta stock. ⚠️ PENDIENTE DE CONFIRMAR si hay otra app Inventario que integrar (existe `bitacora-ecofit/inventario-almacen.html`, aparte).
