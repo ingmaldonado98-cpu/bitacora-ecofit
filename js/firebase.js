@@ -122,10 +122,13 @@ export async function uploadVideo(file, path) {
   return _withTimeout(getDownloadURL(sRef), UPLOAD_TIMEOUT_MS, 'Obtener URL de video');
 }
 
-// ── Ruta estándar de Storage: proyectos/{id}/bitacora_{fecha}/{archivo}.jpg ─
+// ── Ruta estándar de Storage: projects/{id}/bitacora_{fecha}/{archivo}.jpg ──
+// Debe empezar con "projects/" — es el único prefijo que storage.rules permite
+// (match /projects/{projectId}/{allPaths=**}). Con "proyectos/" las reglas
+// negaban la subida y las fotos se quedaban atascadas en la cola offline.
 export function buildFotoPath(projectId, filename) {
   const fecha = new Date().toISOString().slice(0, 10);
-  return `proyectos/${projectId}/bitacora_${fecha}/${filename}`;
+  return `projects/${projectId}/bitacora_${fecha}/${filename}`;
 }
 
 // ── Subir foto con cola offline ────────────────────────────────────────────

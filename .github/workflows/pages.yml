@@ -38,7 +38,8 @@ jobs:
         # upload-pages-artifact sube TODO lo que haya en path tal cual (no respeta
         # .gitignore) — se borra solo en esta copia efímera del runner, nunca en
         # el repo real. .git no debe servirse públicamente (historial completo).
-        run: rm -rf .git .github .claude
+        # CLAUDE.md/HANDOFF.md describen bugs y huecos de seguridad — solo internos.
+        run: rm -rf .git .github .claude CLAUDE.md HANDOFF.md firestore.rules storage.rules tests scripts package.json
 
       - name: Subir el sitio completo (sin build — es JS/CSS/HTML estático)
         uses: actions/upload-pages-artifact@v3
